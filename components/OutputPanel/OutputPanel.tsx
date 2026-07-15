@@ -3,7 +3,7 @@ import { forwardRef, useImperativeHandle, useState, useEffect, useRef, useCallba
 import { Snippet, GenerateResponse } from '@/types';
 import { toPng } from 'html-to-image';
 import CardPreview from '../card/CardPreview';
-import { CardTheme, themes } from '../card/themes'; // ✅ اصلاح شده
+import { CardTheme, themes } from '../card/themes';
 import LoadingState from './LoadingState';
 import EmptyState from './EmptyState';
 import OutputPanelHeader from './OutputPanelHeader';
@@ -249,8 +249,321 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
       }
     }, [showUsernameInput]);
 
+    // ===== توابع کپی و دانلود برای تب Analysis =====
+    const copyFullAnalysisNew = useCallback(() => {
+      if (!fullAnalysis || !isAdvanced) return;
+      let content = `📊 Code Analysis Report\n`;
+      content += `═══════════════════════════════════════\n\n`;
+      content += `📌 Title: ${safeString(fullAnalysis.title)}\n\n`;
+      if (fullAnalysis.highLevelSummary) {
+        content += `💡 High-Level Summary:\n${safeString(fullAnalysis.highLevelSummary)}\n\n`;
+      }
+      if (fullAnalysis.codeWalkthrough && fullAnalysis.codeWalkthrough.length > 0) {
+        content += `🧩 Code Walkthrough:\n`;
+        fullAnalysis.codeWalkthrough.forEach((item) => {
+          content += `  • ${safeString(item.section)}: ${safeString(item.explanation)}\n`;
+        });
+        content += `\n`;
+      }
+      if (fullAnalysis.whatWorksWell && fullAnalysis.whatWorksWell.length > 0) {
+        content += `✅ What Works Well:\n`;
+        fullAnalysis.whatWorksWell.forEach((item) => {
+          content += `  • ${safeString(item)}\n`;
+        });
+        content += `\n`;
+      }
+      if (fullAnalysis.bugsAndRiskyCases && fullAnalysis.bugsAndRiskyCases.length > 0) {
+        content += `🐛 Bugs and Risky Cases:\n`;
+        fullAnalysis.bugsAndRiskyCases.forEach((item) => {
+          content += `  • ${safeString(item.issue)}\n`;
+          content += `    Impact: ${safeString(item.impact)}\n`;
+          if (item.example) content += `    Example: ${safeString(item.example)}\n`;
+        });
+        content += `\n`;
+      }
+      if (fullAnalysis.edgeCases && fullAnalysis.edgeCases.length > 0) {
+        content += `🧪 Edge Cases:\n`;
+        fullAnalysis.edgeCases.forEach((item) => {
+          content += `  • ${safeString(item.case)}\n`;
+          content += `    Current: ${safeString(item.currentBehavior)}\n`;
+          content += `    Expected: ${safeString(item.expectedBehavior)}\n`;
+          content += `    Risk: ${safeString(item.risk)}\n`;
+        });
+        content += `\n`;
+      }
+      if (fullAnalysis.performanceAnalysis) {
+        content += `⚡ Performance Analysis:\n`;
+        if (fullAnalysis.performanceAnalysis.timeComplexity && fullAnalysis.performanceAnalysis.timeComplexity.length > 0) {
+          content += `  Time Complexity:\n`;
+          fullAnalysis.performanceAnalysis.timeComplexity.forEach((item) => {
+            content += `    • ${safeString(item.target)}: ${safeString(item.complexity)} (${safeString(item.explanation)})\n`;
+          });
+        }
+        if (fullAnalysis.performanceAnalysis.spaceComplexity && fullAnalysis.performanceAnalysis.spaceComplexity.length > 0) {
+          content += `  Space Complexity:\n`;
+          fullAnalysis.performanceAnalysis.spaceComplexity.forEach((item) => {
+            content += `    • ${safeString(item.target)}: ${safeString(item.complexity)} (${safeString(item.explanation)})\n`;
+          });
+        }
+        if (fullAnalysis.performanceAnalysis.scalabilityNotes && fullAnalysis.performanceAnalysis.scalabilityNotes.length > 0) {
+          content += `  Scalability Notes:\n`;
+          fullAnalysis.performanceAnalysis.scalabilityNotes.forEach((item) => {
+            content += `    • ${safeString(item)}\n`;
+          });
+        }
+        content += `\n`;
+      }
+      if (fullAnalysis.securityAnalysis) {
+        content += `🔒 Security Analysis:\n`;
+        content += `  Severity: ${safeString(fullAnalysis.securityAnalysis.severity)}\n`;
+        if (fullAnalysis.securityAnalysis.issues && fullAnalysis.securityAnalysis.issues.length > 0) {
+          content += `  Issues:\n`;
+          fullAnalysis.securityAnalysis.issues.forEach((issue) => {
+            content += `    • ${safeString(issue)}\n`;
+          });
+        }
+        if (fullAnalysis.securityAnalysis.recommendations && fullAnalysis.securityAnalysis.recommendations.length > 0) {
+          content += `  Recommendations:\n`;
+          fullAnalysis.securityAnalysis.recommendations.forEach((rec) => {
+            content += `    • ${safeString(rec)}\n`;
+          });
+        }
+        content += `\n`;
+      }
+      if (fullAnalysis.productionReadiness) {
+        content += `🛡️ Production Readiness:\n`;
+        content += `  Ready: ${fullAnalysis.productionReadiness.isProductionReady ? 'Yes' : 'No'}\n`;
+        if (fullAnalysis.productionReadiness.reasons && fullAnalysis.productionReadiness.reasons.length > 0) {
+          fullAnalysis.productionReadiness.reasons.forEach((reason) => {
+            content += `    • ${safeString(reason)}\n`;
+          });
+        }
+        if (fullAnalysis.productionReadiness.requiredChanges && fullAnalysis.productionReadiness.requiredChanges.length > 0) {
+          content += `  Required Changes:\n`;
+          fullAnalysis.productionReadiness.requiredChanges.forEach((change) => {
+            content += `    • ${safeString(change)}\n`;
+          });
+        }
+        content += `\n`;
+      }
+      if (fullAnalysis.recommendedImprovements && fullAnalysis.recommendedImprovements.length > 0) {
+        content += `🔧 Recommended Improvements:\n`;
+        fullAnalysis.recommendedImprovements.forEach((item) => {
+          content += `  [${safeString(item.priority)}] ${safeString(item.improvement)}\n`;
+          content += `    Reason: ${safeString(item.reason)}\n`;
+        });
+        content += `\n`;
+      }
+      if (fullAnalysis.improvedCode && fullAnalysis.improvedCode.available) {
+        content += `✨ Improved Code:\n`;
+        content += `Notes: ${safeString(fullAnalysis.improvedCode.notes)}\n`;
+        content += `${safeString(fullAnalysis.improvedCode.code)}\n\n`;
+      }
+      if (fullAnalysis.suggestedTests && fullAnalysis.suggestedTests.length > 0) {
+        content += `🧪 Suggested Tests:\n`;
+        fullAnalysis.suggestedTests.forEach((test) => {
+          content += `  • ${safeString(test.name)}\n`;
+          content += `    Input: ${safeString(test.input)}\n`;
+          content += `    Expected: ${safeString(test.expectedOutput)}\n`;
+          content += `    Type: ${safeString(test.type)}\n`;
+        });
+        content += `\n`;
+      }
+      if (fullAnalysis.scorecard) {
+        content += `📊 Scorecard:\n`;
+        const scores = fullAnalysis.scorecard;
+        content += `  Correctness: ${safeString(scores.correctness)}/10\n`;
+        content += `  Readability: ${safeString(scores.readability)}/10\n`;
+        content += `  Performance: ${safeString(scores.performance)}/10\n`;
+        content += `  Maintainability: ${safeString(scores.maintainability)}/10\n`;
+        content += `  Production Readiness: ${safeString(scores.productionReadiness)}/10\n`;
+        if (scores.security !== undefined) content += `  Security: ${safeString(scores.security)}/10\n`;
+        if (scores.overall) content += `  Overall: ${safeString(scores.overall)}/10\n`;
+        content += `\n`;
+      }
+      if (fullAnalysis.finalVerdict) {
+        content += `🏁 Final Verdict:\n`;
+        content += `  Summary: ${safeString(fullAnalysis.finalVerdict.summary)}\n`;
+        content += `  Approved: ${fullAnalysis.finalVerdict.approved ? '✅ Yes' : '❌ No'}\n`;
+        if (fullAnalysis.finalVerdict.nextSteps) {
+          content += `  Next Steps: ${safeString(fullAnalysis.finalVerdict.nextSteps)}\n`;
+        }
+      }
+      
+      navigator.clipboard.writeText(content).then(() => {
+        showToast('✅ Full analysis copied!');
+      }).catch(() => {
+        showToast('❌ Failed to copy');
+      });
+    }, [fullAnalysis, isAdvanced]);
+
+    const downloadAnalysisNew = useCallback(() => {
+      if (!fullAnalysis || !isAdvanced) return;
+      let content = `Zbloue - Code Analysis Report\n`;
+      content += `═══════════════════════════════════════\n\n`;
+      content += `📌 Title: ${safeString(fullAnalysis.title)}\n\n`;
+      if (fullAnalysis.highLevelSummary) {
+        content += `💡 High-Level Summary:\n${safeString(fullAnalysis.highLevelSummary)}\n\n`;
+      }
+      if (fullAnalysis.codeWalkthrough && fullAnalysis.codeWalkthrough.length > 0) {
+        content += `🧩 Code Walkthrough:\n`;
+        fullAnalysis.codeWalkthrough.forEach((item) => {
+          content += `  • ${safeString(item.section)}: ${safeString(item.explanation)}\n`;
+        });
+        content += `\n`;
+      }
+      if (fullAnalysis.whatWorksWell && fullAnalysis.whatWorksWell.length > 0) {
+        content += `✅ What Works Well:\n`;
+        fullAnalysis.whatWorksWell.forEach((item) => {
+          content += `  • ${safeString(item)}\n`;
+        });
+        content += `\n`;
+      }
+      if (fullAnalysis.bugsAndRiskyCases && fullAnalysis.bugsAndRiskyCases.length > 0) {
+        content += `🐛 Bugs and Risky Cases:\n`;
+        fullAnalysis.bugsAndRiskyCases.forEach((item) => {
+          content += `  • ${safeString(item.issue)}\n`;
+          content += `    Impact: ${safeString(item.impact)}\n`;
+          if (item.example) content += `    Example: ${safeString(item.example)}\n`;
+        });
+        content += `\n`;
+      }
+      if (fullAnalysis.edgeCases && fullAnalysis.edgeCases.length > 0) {
+        content += `🧪 Edge Cases:\n`;
+        fullAnalysis.edgeCases.forEach((item) => {
+          content += `  • ${safeString(item.case)}\n`;
+          content += `    Current: ${safeString(item.currentBehavior)}\n`;
+          content += `    Expected: ${safeString(item.expectedBehavior)}\n`;
+          content += `    Risk: ${safeString(item.risk)}\n`;
+        });
+        content += `\n`;
+      }
+      if (fullAnalysis.performanceAnalysis) {
+        content += `⚡ Performance Analysis:\n`;
+        if (fullAnalysis.performanceAnalysis.timeComplexity && fullAnalysis.performanceAnalysis.timeComplexity.length > 0) {
+          content += `  Time Complexity:\n`;
+          fullAnalysis.performanceAnalysis.timeComplexity.forEach((item) => {
+            content += `    • ${safeString(item.target)}: ${safeString(item.complexity)} (${safeString(item.explanation)})\n`;
+          });
+        }
+        if (fullAnalysis.performanceAnalysis.spaceComplexity && fullAnalysis.performanceAnalysis.spaceComplexity.length > 0) {
+          content += `  Space Complexity:\n`;
+          fullAnalysis.performanceAnalysis.spaceComplexity.forEach((item) => {
+            content += `    • ${safeString(item.target)}: ${safeString(item.complexity)} (${safeString(item.explanation)})\n`;
+          });
+        }
+        if (fullAnalysis.performanceAnalysis.scalabilityNotes && fullAnalysis.performanceAnalysis.scalabilityNotes.length > 0) {
+          content += `  Scalability Notes:\n`;
+          fullAnalysis.performanceAnalysis.scalabilityNotes.forEach((item) => {
+            content += `    • ${safeString(item)}\n`;
+          });
+        }
+        content += `\n`;
+      }
+      if (fullAnalysis.securityAnalysis) {
+        content += `🔒 Security Analysis:\n`;
+        content += `  Severity: ${safeString(fullAnalysis.securityAnalysis.severity)}\n`;
+        if (fullAnalysis.securityAnalysis.issues && fullAnalysis.securityAnalysis.issues.length > 0) {
+          content += `  Issues:\n`;
+          fullAnalysis.securityAnalysis.issues.forEach((issue) => {
+            content += `    • ${safeString(issue)}\n`;
+          });
+        }
+        if (fullAnalysis.securityAnalysis.recommendations && fullAnalysis.securityAnalysis.recommendations.length > 0) {
+          content += `  Recommendations:\n`;
+          fullAnalysis.securityAnalysis.recommendations.forEach((rec) => {
+            content += `    • ${safeString(rec)}\n`;
+          });
+        }
+        content += `\n`;
+      }
+      if (fullAnalysis.productionReadiness) {
+        content += `🛡️ Production Readiness:\n`;
+        content += `  Ready: ${fullAnalysis.productionReadiness.isProductionReady ? 'Yes' : 'No'}\n`;
+        if (fullAnalysis.productionReadiness.reasons && fullAnalysis.productionReadiness.reasons.length > 0) {
+          fullAnalysis.productionReadiness.reasons.forEach((reason) => {
+            content += `    • ${safeString(reason)}\n`;
+          });
+        }
+        if (fullAnalysis.productionReadiness.requiredChanges && fullAnalysis.productionReadiness.requiredChanges.length > 0) {
+          content += `  Required Changes:\n`;
+          fullAnalysis.productionReadiness.requiredChanges.forEach((change) => {
+            content += `    • ${safeString(change)}\n`;
+          });
+        }
+        content += `\n`;
+      }
+      if (fullAnalysis.recommendedImprovements && fullAnalysis.recommendedImprovements.length > 0) {
+        content += `🔧 Recommended Improvements:\n`;
+        fullAnalysis.recommendedImprovements.forEach((item) => {
+          content += `  [${safeString(item.priority)}] ${safeString(item.improvement)}\n`;
+          content += `    Reason: ${safeString(item.reason)}\n`;
+        });
+        content += `\n`;
+      }
+      if (fullAnalysis.improvedCode && fullAnalysis.improvedCode.available) {
+        content += `✨ Improved Code:\n`;
+        content += `Notes: ${safeString(fullAnalysis.improvedCode.notes)}\n`;
+        content += `${safeString(fullAnalysis.improvedCode.code)}\n\n`;
+      }
+      if (fullAnalysis.suggestedTests && fullAnalysis.suggestedTests.length > 0) {
+        content += `🧪 Suggested Tests:\n`;
+        fullAnalysis.suggestedTests.forEach((test) => {
+          content += `  • ${safeString(test.name)}\n`;
+          content += `    Input: ${safeString(test.input)}\n`;
+          content += `    Expected: ${safeString(test.expectedOutput)}\n`;
+          content += `    Type: ${safeString(test.type)}\n`;
+        });
+        content += `\n`;
+      }
+      if (fullAnalysis.scorecard) {
+        content += `📊 Scorecard:\n`;
+        const scores = fullAnalysis.scorecard;
+        content += `  Correctness: ${safeString(scores.correctness)}/10\n`;
+        content += `  Readability: ${safeString(scores.readability)}/10\n`;
+        content += `  Performance: ${safeString(scores.performance)}/10\n`;
+        content += `  Maintainability: ${safeString(scores.maintainability)}/10\n`;
+        content += `  Production Readiness: ${safeString(scores.productionReadiness)}/10\n`;
+        if (scores.security !== undefined) content += `  Security: ${safeString(scores.security)}/10\n`;
+        if (scores.overall) content += `  Overall: ${safeString(scores.overall)}/10\n`;
+        content += `\n`;
+      }
+      if (fullAnalysis.finalVerdict) {
+        content += `🏁 Final Verdict:\n`;
+        content += `  Summary: ${safeString(fullAnalysis.finalVerdict.summary)}\n`;
+        content += `  Approved: ${fullAnalysis.finalVerdict.approved ? '✅ Yes' : '❌ No'}\n`;
+        if (fullAnalysis.finalVerdict.nextSteps) {
+          content += `  Next Steps: ${safeString(fullAnalysis.finalVerdict.nextSteps)}\n`;
+        }
+      }
+      
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.download = `code-analysis-${snippet?.slug || Date.now()}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('✅ Analysis downloaded!');
+    }, [fullAnalysis, isAdvanced, snippet]);
+
     const publicUrl = `${appUrl}/snippet/${snippet?.slug || ''}`;
     const quickAnalysisText = !isAdvanced && fullAnalysis?.analysis ? fullAnalysis.analysis : null;
+
+    // ===== تابع safeString برای استفاده در توابع بالا =====
+    const safeString = (value: any): string => {
+      if (value === null || value === undefined) return '';
+      if (typeof value === 'string') return value;
+      if (typeof value === 'object') {
+        try {
+          return JSON.stringify(value, null, 2);
+        } catch {
+          return '[Object]';
+        }
+      }
+      return String(value);
+    };
 
     if (loading) {
       return <LoadingState />;
@@ -341,6 +654,8 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
               isAdvanced={isAdvanced}
               quickAnalysisText={quickAnalysisText}
               snippet={snippet}
+              onCopyFullAnalysis={copyFullAnalysisNew}
+              onDownloadFullAnalysis={downloadAnalysisNew}
             />
           )}
 
