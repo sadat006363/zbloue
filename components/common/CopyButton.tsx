@@ -3,7 +3,7 @@ import { useState } from 'react';
 import Tooltip from './Tooltip';
 
 interface CopyButtonProps {
-  text: string;
+  text?: string;
   label?: string;
   tooltip?: string;
   className?: string;
@@ -11,7 +11,7 @@ interface CopyButtonProps {
 }
 
 export default function CopyButton({ 
-  text, 
+  text = '', 
   label = '📋 Copy', 
   tooltip = 'Copy to clipboard',
   className = '',
@@ -21,9 +21,15 @@ export default function CopyButton({
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(text);
+      if (onCopy) {
+        onCopy();
+      } else if (text) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        console.warn('CopyButton: No text provided and no onCopy handler');
+        return;
+      }
       setCopied(true);
-      if (onCopy) onCopy();
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
       console.error('Copy failed:', error);

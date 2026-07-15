@@ -1,5 +1,5 @@
 'use client';
-import { CopyButton } from '@/components/common';
+import { CopyButton, DownloadButton, ShareButtons } from '@/components/common';
 import LineByLineExplanation from '../../LineByLineExplanation';
 
 interface LineByLineTabProps {
@@ -42,31 +42,60 @@ export default function LineByLineTab({
   }
 
   if (snippet && lineExplanations && lineExplanations.length > 0) {
+    const handleCopy = () => {
+      const content = lineExplanations.map((item: any) => 
+        `Line ${item.lineNumber}:\n${item.code}\nExplanation: ${item.explanation}\n---`
+      ).join('\n');
+      navigator.clipboard.writeText(content);
+      showToast('✅ Explanations copied!');
+    };
+
+    const handleDownload = () => {
+      let content = '# Line-by-Line Code Explanation\n\n';
+      content += `Generated: ${new Date().toLocaleString()}\n`;
+      content += `Language: ${snippet?.language || 'Unknown'}\n\n`;
+      content += '## Explanations\n\n';
+      
+      lineExplanations.forEach((item: any) => {
+        content += `### Line ${item.lineNumber}\n`;
+        content += `\`\`\`\n${item.code}\n\`\`\`\n`;
+        content += `**Explanation:** ${item.explanation}\n\n`;
+      });
+
+      const filename = `line-by-line-explanation-${Date.now()}`;
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${filename}.md`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('✅ File downloaded!');
+    };
+
+    const shareUrl = `${appUrl}/snippet/${snippet.slug}`;
+
     return (
       <>
-        <div className="flex justify-end items-center gap-2 flex-wrap">
+        <div className="flex justify-end items-center gap-2 flex-wrap mb-4">
           <CopyButton 
-            text={lineExplanations.map((item: any) => 
-              `Line ${item.lineNumber}:\n${item.code}\nExplanation: ${item.explanation}\n---`
-            ).join('\n')} 
             label="Copy All" 
-            tooltip="Copy all line explanations"
-            onCopy={() => showToast('✅ Explanations copied!')}
+            tooltip="Copy all explanations"
+            onCopy={handleCopy}
           />
-          <button
-            onClick={() => {
-              const url = `${appUrl}/snippet/${snippet?.slug}?tab=line-by-line`;
-              window.open(url, '_blank');
-              showToast('🔗 Opening line-by-line page...');
-            }}
-            className="bg-[#4a86f7] hover:bg-[#3b6fd4] text-white px-4 py-2 rounded-md text-sm font-medium transition flex items-center gap-2"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-            </svg>
-            <span>🔗 Open Explanation Page</span>
-          </button>
+          <DownloadButton 
+            label="Download .md" 
+            tooltip="Download as markdown file"
+            onDownload={handleDownload}
+          />
+          <ShareButtons 
+            url={shareUrl} 
+            title="Check out this code analysis on Zbloue!" 
+          />
         </div>
+
         <LineByLineExplanation
           code={snippet.raw_code || ''}
           language={snippet.language || ''}
