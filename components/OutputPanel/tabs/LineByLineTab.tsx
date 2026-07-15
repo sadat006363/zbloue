@@ -119,7 +119,7 @@ export default function LineByLineTab({
   if (snippet && lineExplanations && lineExplanations.length > 0) {
     return (
       <>
-        {/* ===== هدر با عنوان و دکمه‌ها در یک ردیف ===== */}
+        {/* ===== هدر با عنوان و دکمه‌های جدید (بدون دکمه‌های داخلی) ===== */}
         <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
           <h2 className="text-lg font-semibold text-[#1a1a2e] flex items-center gap-2">
             <span>📝</span> Line-by-Line Code Explanation
@@ -203,7 +203,7 @@ export default function LineByLineTab({
           </div>
         </div>
 
-        {/* ===== نمایش توضیحات خط به خط (بدون دکمه‌های داخلی) ===== */}
+        {/* ===== نمایش توضیحات خط به خط با هدر و دکمه‌های مخفی ===== */}
         <LineByLineExplanation
           code={snippet.raw_code || ''}
           language={snippet.language || ''}
@@ -211,7 +211,7 @@ export default function LineByLineTab({
           loading={false}
           hoveredLine={hoveredLine ?? null}
           onLineHover={onLineHover}
-          // ===== حذف پراپ‌های onCopy، onDownload، onShare =====
+          hideHeader={true} // ===== مخفی کردن هدر داخلی و دکمه‌ها =====
         />
       </>
     );
