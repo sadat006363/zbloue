@@ -271,6 +271,11 @@ export default function Home() {
       .filter(line => line.trim() !== '')
       .join('\n');
 
+    // ===== به‌روزرسانی ادیتور با کد پاک‌شده =====
+    if (cleanCode !== code) {
+      setCode(cleanCode);
+    }
+
     if (!cleanCode.trim()) {
       setErrorMessage('Please enter valid code.');
       return;
