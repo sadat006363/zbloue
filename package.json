@@ -1,0 +1,52 @@
+{
+  "name": "Zbloue",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@codemirror/lang-cpp": "^6.0.3",
+    "@codemirror/lang-css": "^6.3.1",
+    "@codemirror/lang-go": "^6.0.1",
+    "@codemirror/lang-html": "^6.4.9",
+    "@codemirror/lang-java": "^6.0.1",
+    "@codemirror/lang-javascript": "^6.2.2",
+    "@codemirror/lang-json": "^6.0.1",
+    "@codemirror/lang-php": "^6.0.2",
+    "@codemirror/lang-python": "^6.1.6",
+    "@codemirror/lang-rust": "^6.0.1",
+    "@codemirror/legacy-modes": "^6.5.3",
+    "@next/font": "^14.2.15",
+    "@resvg/resvg-wasm": "^2.6.2",
+    "@supabase/supabase-js": "^2.110.0",
+    "@uiw/react-codemirror": "^4.23.0",
+    "@vercel/og": "^0.11.1",
+    "dotenv": "^17.4.2",
+    "html-to-image": "^1.11.13",
+    "nanoid": "^5.1.16",
+    "next": "^16.2.9",
+    "openai": "^6.45.0",
+    "qrcode": "^1.5.4",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-dropzone": "^17.0.0",
+    "resvg": "^1.6.4",
+    "satori": "^0.26.0",
+    "shiki": "^4.3.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "^16.2.9",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}

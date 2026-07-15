@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f8f9fa;
+  --foreground: #1a1a2e;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* ===== انیمیشن‌های لودینگ ===== */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1.2s linear infinite;
+}
+
+.animation-delay-300 {
+  animation-delay: 0.3s;
+}
+
+.animation-delay-600 {
+  animation-delay: 0.6s;
+}
+
+.animate-pulse {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* ===== borderهای پررنگ‌تر ===== */
+.border-strong {
+  border-width: 2px !important;
+  border-color: #c0c0c8 !important;
+}
+
+.card-border {
+  border: 2px solid #d0d0d8;
+  border-radius: 0.75rem;
+}
+
+.editor-border {
+  border: 2px solid #d0d0d8;
+  border-radius: 0.75rem;
+}
+
+.tab-border {
+  border-bottom: 2px solid #d0d0d8;
+}
