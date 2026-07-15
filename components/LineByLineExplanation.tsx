@@ -1,6 +1,5 @@
 'use client';
 import { useState } from 'react';
-import { CopyButton, DownloadButton, ShareButtons } from '@/components/common';
 
 interface LineByLineExplanationProps {
   code: string;
@@ -46,7 +45,7 @@ export default function LineByLineExplanation({
 
   return (
     <div className="space-y-4">
-      {/* ===== هدر و دکمه‌ها (تنها در صورت وجود پراپ‌ها نمایش داده می‌شوند) ===== */}
+      {/* ===== هدر و دکمه‌ها (در صورت وجود پراپ‌ها) ===== */}
       {(onCopy || onDownload || onShare) && (
         <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
           <h3 className="text-sm font-semibold text-[#4a86f7]">
@@ -54,18 +53,26 @@ export default function LineByLineExplanation({
           </h3>
           <div className="flex items-center gap-2 flex-wrap">
             {onCopy && (
-              <CopyButton 
-                label="Copy All" 
-                tooltip="Copy all explanations"
-                onCopy={onCopy}
-              />
+              <button
+                onClick={onCopy}
+                className="flex items-center gap-1.5 text-sm px-2 py-1 rounded-md transition border border-[#d0d0d8] text-[#4a4a6a] hover:text-[#4a86f7] hover:bg-[#f1f3f5]"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                </svg>
+                <span>Copy All</span>
+              </button>
             )}
             {onDownload && (
-              <DownloadButton 
-                label="Download .md" 
-                tooltip="Download as markdown file"
-                onDownload={onDownload}
-              />
+              <button
+                onClick={onDownload}
+                className="flex items-center gap-1.5 text-sm px-2 py-1 rounded-md transition border border-[#d0d0d8] text-[#4a4a6a] hover:text-[#4a86f7] hover:bg-[#f1f3f5]"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                <span>Download .md</span>
+              </button>
             )}
             {onShare && (
               <button
@@ -82,30 +89,49 @@ export default function LineByLineExplanation({
         </div>
       )}
 
-      {/* ===== نمایش خطوط کد با توضیحات ===== */}
-      <div className="bg-[#11111b] rounded-lg border border-[#313244] overflow-hidden">
+      {/* ===== نمایش خطوط به صورت عمودی (کد بالا، توضیح پایین) ===== */}
+      <div className="space-y-3">
         {explanations.map((item, index) => {
           const isHovered = hoveredLine === item.lineNumber;
           return (
             <div
               key={index}
-              className={`flex border-b border-[#313244] last:border-b-0 transition-colors ${
-                isHovered ? 'bg-[#1e1e2e]' : ''
+              className={`rounded-lg border transition-all duration-200 ${
+                isHovered
+                  ? 'border-[#4a86f7] shadow-lg shadow-[#4a86f7]/10'
+                  : 'border-[#313244] hover:border-[#4a86f7]/50'
               }`}
               onMouseEnter={() => onLineHover?.(item.lineNumber)}
               onMouseLeave={() => onLineHover?.(null)}
             >
-              {/* ===== شماره خط ===== */}
-              <div className="w-12 py-2 px-3 text-right text-[#6c7086] text-xs select-none border-r border-[#313244]">
-                {item.lineNumber}
+              {/* ===== شماره خط و کد ===== */}
+              <div
+                className={`flex items-start gap-3 px-4 py-3 rounded-t-lg ${
+                  isHovered ? 'bg-[#1e1e2e]' : 'bg-[#11111b]'
+                }`}
+              >
+                <span className="text-xs text-[#6c7086] select-none font-mono min-w-[30px]">
+                  {item.lineNumber}
+                </span>
+                <pre className="flex-1 font-mono text-sm text-[#cdd6f4] whitespace-pre-wrap break-all leading-relaxed">
+                  {item.code}
+                </pre>
               </div>
-              {/* ===== کد ===== */}
-              <div className="flex-1 py-2 px-3 font-mono text-sm text-[#cdd6f4] whitespace-pre-wrap break-all">
-                {item.code}
-              </div>
+
               {/* ===== توضیح ===== */}
-              <div className="flex-1 py-2 px-3 text-sm text-[#a6adc8] border-l border-[#313244] whitespace-pre-wrap">
-                {item.explanation}
+              <div
+                className={`px-4 py-3 rounded-b-lg border-t ${
+                  isHovered
+                    ? 'bg-[#1a1a2e] border-[#4a86f7]/30'
+                    : 'bg-[#0f0f14] border-[#313244]'
+                }`}
+              >
+                <div className="flex items-start gap-2">
+                  <span className="text-[#4a86f7] text-sm">💡</span>
+                  <p className="text-sm text-[#a6adc8] leading-relaxed">
+                    {item.explanation}
+                  </p>
+                </div>
               </div>
             </div>
           );
