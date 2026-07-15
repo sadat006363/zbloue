@@ -11,7 +11,7 @@ interface AnalysisTabProps {
   onDownloadFullAnalysis?: () => void;
 }
 
-// ===== تابع پاکسازی متن از علامت‌های ### و فرمت‌دهی =====
+// ===== تابع پاکسازی متن از علامت‌های ### =====
 const cleanMarkdown = (text: string) => {
   if (!text) return '';
   
@@ -26,6 +26,25 @@ const cleanMarkdown = (text: string) => {
   
   // تبدیل ** به <strong>
   cleaned = cleaned.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  
+  return cleaned;
+};
+
+// ===== تابع پاکسازی متن برای کپی و دانلود (بدون HTML) =====
+const cleanTextForCopy = (text: string) => {
+  if (!text) return '';
+  
+  // حذف ### از ابتدای خطوط
+  let cleaned = text.replace(/^###\s*/gm, '');
+  
+  // حذف ### که با خط جدید جدا شده‌اند
+  cleaned = cleaned.replace(/\n###\s*/g, '\n');
+  
+  // تبدیل - به •
+  cleaned = cleaned.replace(/^-\s*/gm, '• ');
+  
+  // حذف ** برای متن ساده
+  cleaned = cleaned.replace(/\*\*/g, '');
   
   return cleaned;
 };
@@ -47,7 +66,8 @@ export default function AnalysisTab({
         <div className="flex justify-end items-center gap-3 pb-2 border-b-2 border-[#e8e8f0]">
           <button
             onClick={onCopyFullAnalysis}
-            className="flex items-center gap-1.5 text-sm text-[#4a4a6a] hover:text-[#4a86f7] transition px-2 py-1 rounded-md hover:bg-[#f1f3f5] border border-[#d0d0d8]"
+            className="flex items-center gap-1.5 text-sm text-[#4a4a6a] hover:text-[#4a86f7] transition px-2 py-1 rounded-md hover:bg-[#f1f3f5] border border-[#d0d0d8] group relative"
+            title="Copy full analysis to clipboard"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
@@ -56,7 +76,8 @@ export default function AnalysisTab({
           </button>
           <button
             onClick={onDownloadFullAnalysis}
-            className="flex items-center gap-1.5 text-sm text-[#4a4a6a] hover:text-[#4a86f7] transition px-2 py-1 rounded-md hover:bg-[#f1f3f5] border border-[#d0d0d8]"
+            className="flex items-center gap-1.5 text-sm text-[#4a4a6a] hover:text-[#4a86f7] transition px-2 py-1 rounded-md hover:bg-[#f1f3f5] border border-[#d0d0d8] group relative"
+            title="Download analysis as text file"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -113,15 +134,33 @@ export default function AnalysisTab({
   }
 
   const cleanedText = cleanMarkdown(quickAnalysisText);
+  const cleanedTextForCopy = cleanTextForCopy(quickAnalysisText);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(cleanedTextForCopy);
+    } catch (error) {
+      console.error('Copy failed:', error);
+    }
+  };
+
+  const handleDownload = () => {
+    const blob = new Blob([cleanedTextForCopy], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `analysis-${snippet?.slug || Date.now()}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="space-y-4">
       <div className="flex justify-end items-center gap-3 pb-2 border-b-2 border-[#e8e8f0]">
         <button
-          onClick={() => {
-            navigator.clipboard.writeText(quickAnalysisText);
-          }}
-          className="flex items-center gap-1.5 text-sm text-[#4a4a6a] hover:text-[#4a86f7] transition px-2 py-1 rounded-md hover:bg-[#f1f3f5] border border-[#d0d0d8]"
+          onClick={handleCopy}
+          className="flex items-center gap-1.5 text-sm text-[#4a4a6a] hover:text-[#4a86f7] transition px-2 py-1 rounded-md hover:bg-[#f1f3f5] border border-[#d0d0d8] group relative"
+          title="Copy analysis to clipboard"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
@@ -129,16 +168,9 @@ export default function AnalysisTab({
           <span className="hidden sm:inline">Copy</span>
         </button>
         <button
-          onClick={() => {
-            const blob = new Blob([quickAnalysisText], { type: 'text/plain;charset=utf-8' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `analysis-${snippet?.slug || Date.now()}.txt`;
-            a.click();
-            URL.revokeObjectURL(url);
-          }}
-          className="flex items-center gap-1.5 text-sm text-[#4a4a6a] hover:text-[#4a86f7] transition px-2 py-1 rounded-md hover:bg-[#f1f3f5] border border-[#d0d0d8]"
+          onClick={handleDownload}
+          className="flex items-center gap-1.5 text-sm text-[#4a4a6a] hover:text-[#4a86f7] transition px-2 py-1 rounded-md hover:bg-[#f1f3f5] border border-[#d0d0d8] group relative"
+          title="Download analysis as text file"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
