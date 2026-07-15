@@ -142,7 +142,13 @@ export default function Home() {
       return;
     }
 
-    const lines = code.split('\n').filter((line: string) => line.trim().length > 0);
+    // حذف خطوط خالی برای توضیحات
+    const cleanCode = code
+      .split('\n')
+      .filter((line: string) => line.trim() !== '')
+      .join('\n');
+
+    const lines = cleanCode.split('\n').filter((line: string) => line.trim().length > 0);
     if (lines.length > MAX_LINES_EXPLAIN) {
       setExplainError(`Code exceeds ${MAX_LINES_EXPLAIN} lines. Please shorten your code for line-by-line explanation.`);
       showToast(`❌ Code exceeds ${MAX_LINES_EXPLAIN} lines. Please shorten your code.`);
@@ -156,7 +162,7 @@ export default function Home() {
       const res = await fetch('/api/explain-line-by-line', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, language }),
+        body: JSON.stringify({ code: cleanCode, language }),
       });
 
       const data = await res.json();
@@ -189,7 +195,13 @@ export default function Home() {
       return;
     }
 
-    const lines = code.split('\n').filter((line: string) => line.trim().length > 0);
+    // حذف خطوط خالی برای پرامپت
+    const cleanCode = code
+      .split('\n')
+      .filter((line: string) => line.trim() !== '')
+      .join('\n');
+
+    const lines = cleanCode.split('\n').filter((line: string) => line.trim().length > 0);
     if (lines.length > MAX_LINES_PROMPT) {
       setPromptError(`Code exceeds ${MAX_LINES_PROMPT} lines. Please shorten your code for prompt generation.`);
       showToast(`❌ Code exceeds ${MAX_LINES_PROMPT} lines. Please shorten your code.`);
@@ -203,7 +215,7 @@ export default function Home() {
       const res = await fetch('/api/generate-prompt', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, language }),
+        body: JSON.stringify({ code: cleanCode, language }),
       });
 
       const data = await res.json();
@@ -253,7 +265,18 @@ export default function Home() {
       return;
     }
 
-    const isCode = isCodeLike(code);
+    // ===== حذف خطوط خالی از کد =====
+    const cleanCode = code
+      .split('\n')
+      .filter(line => line.trim() !== '')
+      .join('\n');
+
+    if (!cleanCode.trim()) {
+      setErrorMessage('Please enter valid code.');
+      return;
+    }
+
+    const isCode = isCodeLike(cleanCode);
     console.log('isCodeLike result:', isCode);
 
     if (!isCode) {
@@ -261,14 +284,14 @@ export default function Home() {
       return;
     }
 
-    const lines = code.split('\n').length;
+    const lines = cleanCode.split('\n').length;
     if (lines > MAX_LINES_GENERATE) {
       setErrorMessage(`Code exceeds ${MAX_LINES_GENERATE} lines (${lines} lines). Please shorten your code.`);
       return;
     }
 
-    if (code.length > MAX_CODE_LENGTH) {
-      setErrorMessage(`Code is too long (${code.length} characters). Maximum is ${MAX_CODE_LENGTH} characters.`);
+    if (cleanCode.length > MAX_CODE_LENGTH) {
+      setErrorMessage(`Code is too long (${cleanCode.length} characters). Maximum is ${MAX_CODE_LENGTH} characters.`);
       return;
     }
 
@@ -285,7 +308,7 @@ export default function Home() {
       const genRes = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, language, mode }),
+        body: JSON.stringify({ code: cleanCode, language, mode }),
       });
 
       const genData: GenerateResponse = await genRes.json();
@@ -310,7 +333,7 @@ export default function Home() {
           : 'No improvements suggested.';
 
         saveData = await saveSnippet({
-          code,
+          code: cleanCode,
           language,
           card_title,
           key_concept,
@@ -328,7 +351,7 @@ export default function Home() {
         const card_title = mode === 'simple' ? 'Quick Analysis' : 'Standard Analysis';
 
         saveData = await saveSnippet({
-          code,
+          code: cleanCode,
           language,
           card_title,
           key_concept: summaryLines,
@@ -345,7 +368,7 @@ export default function Home() {
       setSnippet({
         id: saveData.id,
         slug: saveData.slug,
-        raw_code: code,
+        raw_code: cleanCode,
         language,
         card_title: saveData.card_title || 'Code Analysis',
         key_concept: saveData.key_concept || '',
