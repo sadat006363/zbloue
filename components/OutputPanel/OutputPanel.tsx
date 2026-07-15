@@ -95,16 +95,6 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
       return String(value);
     };
 
-    // ===== تابع پاکسازی متن برای کپی و دانلود (Simple/Medium) =====
-    const cleanTextForCopy = (text: string) => {
-      if (!text) return '';
-      let cleaned = text.replace(/^###\s*/gm, '');
-      cleaned = cleaned.replace(/\n###\s*/g, '\n');
-      cleaned = cleaned.replace(/^-\s*/gm, '• ');
-      cleaned = cleaned.replace(/\*\*/g, '');
-      return cleaned;
-    };
-
     const updateSnippetInDatabase = useCallback(async (username: string, githubUsername: string) => {
       if (!snippet || !snippet.slug) return;
 
@@ -629,7 +619,7 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
 
         <OutputPanelHeader activeTab={activeTab} setActiveTab={setActiveTab} />
 
-        <div className="flex-1 p-4 md:p-6 overflow-y-auto text-[#1a1a2e]">
+        <div className="flex-1 p-4 md:p-6 overflow-y-auto max-h-[calc(100vh-200px)] text-[#1a1a2e]">
           {/* Explanation Tab */}
           {activeTab === 'explanation' && (
             <ExplanationTab 

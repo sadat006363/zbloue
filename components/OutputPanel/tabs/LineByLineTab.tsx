@@ -1,5 +1,5 @@
 'use client';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { CopyButton, DownloadButton } from '@/components/common';
 import LineByLineExplanation from '../../LineByLineExplanation';
 
@@ -39,6 +39,71 @@ export default function LineByLineTab({
     };
   }, []);
 
+  // ===== اصلاح شماره خطوط برای تطابق با کد اصلی =====
+  const correctedExplanations = useMemo(() => {
+    if (!snippet?.raw_code || !lineExplanations || lineExplanations.length === 0) {
+      return lineExplanations;
+    }
+
+    const codeLines = snippet.raw_code.split('\n');
+    const explanationMap = new Map<number, any>();
+
+    let explanationIndex = 0;
+    for (let i = 0; i < codeLines.length; i++) {
+      const line = codeLines[i];
+      const lineNumber = i + 1;
+
+      // اگر توضیحی برای این خط وجود دارد
+      if (explanationIndex < lineExplanations.length) {
+        const exp = lineExplanations[explanationIndex];
+        // اگر خط خالی نباشد یا توضیح داشته باشد
+        if (line.trim() !== '' && exp && exp.code) {
+          // اگر کد خط با کد توضیح مطابقت داشته باشد، از توضیح استفاده کن
+          if (line.includes(exp.code.trim())) {
+            explanationMap.set(lineNumber, { ...exp, lineNumber });
+            explanationIndex++;
+          } else {
+            // اگر مطابقت نداشت، توضیح را به این خط نسبت بده
+            explanationMap.set(lineNumber, { ...exp, lineNumber });
+            explanationIndex++;
+          }
+        } else if (line.trim() === '' && exp && exp.code === '') {
+          // خط خالی با توضیح خالی
+          explanationMap.set(lineNumber, { ...exp, lineNumber });
+          explanationIndex++;
+        } else if (line.trim() === '') {
+          // خط خالی بدون توضیح
+          explanationMap.set(lineNumber, {
+            lineNumber,
+            code: '',
+            explanation: '',
+          });
+        } else {
+          // اگر توضیحی برای خط وجود ندارد
+          explanationMap.set(lineNumber, {
+            lineNumber,
+            code: line || ' ',
+            explanation: 'No explanation provided.',
+          });
+        }
+      } else {
+        // توضیحی باقی نمانده است
+        explanationMap.set(lineNumber, {
+          lineNumber,
+          code: line || ' ',
+          explanation: '',
+        });
+      }
+    }
+
+    // مرتب‌سازی بر اساس شماره خط
+    const sorted = Array.from(explanationMap.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([_, exp]) => exp);
+
+    return sorted;
+  }, [snippet?.raw_code, lineExplanations]);
+
   // ===== تابع اشتراک‌گذاری =====
   const handleShare = (platform: string) => {
     setShowShareDropdown(false);
@@ -64,9 +129,11 @@ export default function LineByLineTab({
 
   // ===== توابع کپی و دانلود =====
   const handleCopy = () => {
-    const content = lineExplanations.map((item: any) => 
-      `Line ${item.lineNumber}:\n${item.code}\nExplanation: ${item.explanation}\n---`
-    ).join('\n');
+    const content = correctedExplanations
+      .filter((item: any) => item.explanation)
+      .map((item: any) => 
+        `Line ${item.lineNumber}:\n${item.code}\nExplanation: ${item.explanation}\n---`
+      ).join('\n');
     navigator.clipboard.writeText(content);
     showToast('✅ Explanations copied!');
   };
@@ -77,10 +144,12 @@ export default function LineByLineTab({
     content += `Language: ${snippet?.language || 'Unknown'}\n\n`;
     content += '## Explanations\n\n';
     
-    lineExplanations.forEach((item: any) => {
-      content += `### Line ${item.lineNumber}\n`;
-      content += `\`\`\`\n${item.code}\n\`\`\`\n`;
-      content += `**Explanation:** ${item.explanation}\n\n`;
+    correctedExplanations.forEach((item: any) => {
+      if (item.code !== undefined || item.explanation) {
+        content += `### Line ${item.lineNumber}\n`;
+        content += `\`\`\`\n${item.code || ' '}\n\`\`\`\n`;
+        content += `**Explanation:** ${item.explanation || 'No explanation provided.'}\n\n`;
+      }
     });
 
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
@@ -119,7 +188,7 @@ export default function LineByLineTab({
   if (snippet && lineExplanations && lineExplanations.length > 0) {
     return (
       <>
-        {/* ===== هدر با عنوان و دکمه‌های جدید ===== */}
+        {/* ===== هدر با عنوان و دکمه‌ها ===== */}
         <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
           <h2 className="text-lg font-semibold text-[#1a1a2e] flex items-center gap-2">
             <span>📝</span> Line-by-Line Code Explanation
@@ -203,16 +272,14 @@ export default function LineByLineTab({
           </div>
         </div>
 
-        {/* ===== نمایش توضیحات خط به خط با هدر داخلی (حذف hideHeader) ===== */}
+        {/* ===== نمایش توضیحات خط به خط با شماره‌های اصلاح‌شده ===== */}
         <LineByLineExplanation
           code={snippet.raw_code || ''}
           language={snippet.language || ''}
-          explanations={lineExplanations}
+          explanations={correctedExplanations}
           loading={false}
           hoveredLine={hoveredLine ?? null}
           onLineHover={onLineHover}
-          // ===== عدم ارسال onCopy، onDownload و onShare =====
-          // ===== تا دکمه‌های داخلی نمایش داده نشوند =====
         />
       </>
     );
