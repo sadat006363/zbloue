@@ -12,7 +12,6 @@ interface LineByLineExplanationProps {
   onCopy?: () => void;
   onDownload?: () => void;
   onShare?: () => void;
-  hideHeader?: boolean; // ===== جدید: مخفی کردن هدر و دکمه‌ها =====
 }
 
 export default function LineByLineExplanation({
@@ -25,7 +24,6 @@ export default function LineByLineExplanation({
   onCopy,
   onDownload,
   onShare,
-  hideHeader = false, // ===== پیش‌فرض false برای حفظ سازگاری =====
 }: LineByLineExplanationProps) {
   // ===== حالت لودینگ =====
   if (loading) {
@@ -48,8 +46,8 @@ export default function LineByLineExplanation({
 
   return (
     <div className="space-y-4">
-      {/* ===== هدر و دکمه‌ها (در صورت عدم مخفی‌سازی) ===== */}
-      {!hideHeader && (
+      {/* ===== هدر و دکمه‌ها (تنها در صورت وجود پراپ‌ها نمایش داده می‌شوند) ===== */}
+      {(onCopy || onDownload || onShare) && (
         <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
           <h3 className="text-sm font-semibold text-[#4a86f7]">
             📝 Line-by-Line Code Explanation
