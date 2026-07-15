@@ -89,47 +89,50 @@ export default function LineByLineExplanation({
         </div>
       )}
 
-      {/* ===== نمایش خطوط به صورت عمودی (کد بالا، توضیح پایین) ===== */}
+      {/* ===== نمایش خطوط به صورت عمودی با شماره‌های دقیق ===== */}
       <div className="space-y-3">
         {explanations.map((item, index) => {
           const isHovered = hoveredLine === item.lineNumber;
+          const lineNumber = item.lineNumber || index + 1;
+
           return (
             <div
               key={index}
-              className={`rounded-lg border transition-all duration-200 ${
+              className={`rounded-xl border transition-all duration-300 ${
                 isHovered
-                  ? 'border-[#4a86f7] shadow-lg shadow-[#4a86f7]/10'
-                  : 'border-[#313244] hover:border-[#4a86f7]/50'
-              }`}
-              onMouseEnter={() => onLineHover?.(item.lineNumber)}
+                  ? 'border-[#4a86f7] shadow-lg shadow-[#4a86f7]/20'
+                  : 'border-[#313244] hover:border-[#4a86f7]/40'
+              } overflow-hidden`}
+              onMouseEnter={() => onLineHover?.(lineNumber)}
               onMouseLeave={() => onLineHover?.(null)}
             >
-              {/* ===== شماره خط و کد ===== */}
+              {/* ===== بخش کد (شماره خط + خود کد) ===== */}
               <div
-                className={`flex items-start gap-3 px-4 py-3 rounded-t-lg ${
-                  isHovered ? 'bg-[#1e1e2e]' : 'bg-[#11111b]'
+                className={`flex items-start gap-3 px-4 py-3 ${
+                  isHovered ? 'bg-[#0d0d1a]' : 'bg-[#11111b]'
                 }`}
               >
-                <span className="text-xs text-[#6c7086] select-none font-mono min-w-[30px]">
-                  {item.lineNumber}
+                <span className="text-xs text-[#6c7086] select-none font-mono min-w-[32px] text-right">
+                  {lineNumber}
                 </span>
                 <pre className="flex-1 font-mono text-sm text-[#cdd6f4] whitespace-pre-wrap break-all leading-relaxed">
-                  {item.code}
+                  {item.code || ' '}
                 </pre>
               </div>
 
-              {/* ===== توضیح ===== */}
+              {/* ===== خط جداکننده با گرادیان ===== */}
+              <div className={`h-[2px] ${isHovered ? 'bg-gradient-to-r from-[#4a86f7] to-[#a855f7]' : 'bg-[#313244]'}`} />
+
+              {/* ===== بخش توضیحات ===== */}
               <div
-                className={`px-4 py-3 rounded-b-lg border-t ${
-                  isHovered
-                    ? 'bg-[#1a1a2e] border-[#4a86f7]/30'
-                    : 'bg-[#0f0f14] border-[#313244]'
+                className={`px-4 py-3 ${
+                  isHovered ? 'bg-[#1a1a2e]' : 'bg-[#0f0f14]'
                 }`}
               >
                 <div className="flex items-start gap-2">
-                  <span className="text-[#4a86f7] text-sm">💡</span>
+                  <span className="text-[#4a86f7] text-sm mt-0.5">💡</span>
                   <p className="text-sm text-[#a6adc8] leading-relaxed">
-                    {item.explanation}
+                    {item.explanation || 'No explanation provided.'}
                   </p>
                 </div>
               </div>
