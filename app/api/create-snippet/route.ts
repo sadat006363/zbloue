@@ -6,11 +6,9 @@ import {
   MAX_CODE_LENGTH,
   MAX_PAYLOAD_SIZE,
   SUPPORTED_LANGUAGES,
-  MAX_REQUESTS_PER_IP,
-  TIME_WINDOW,
 } from '@/lib/constants';
 
-// ===== Rate Limiting =====
+// ===== Rate Limiting (In-Memory) =====
 const requestLog = new Map<string, { count: number; firstRequest: number }>();
 
 function getClientIP(req: NextRequest): string {
@@ -25,19 +23,13 @@ function getClientIP(req: NextRequest): string {
   return '127.0.0.1';
 }
 
-// ===== استفاده از placeholder در زمان build =====
+// ===== Supabase Admin Client (با fallback برای build) =====
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder-url.supabase.co';
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-key';
 
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-// ===== فقط در محیط production واقعی اخطار بده =====
-if (typeof window === 'undefined' && process.env.NODE_ENV === 'production') {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    console.error('⚠️ Missing Supabase environment variables in production');
-  }
-}
-
+// ===== Type Guard برای زبان‌ها =====
 function isSupportedLanguage(lang: string): lang is typeof SUPPORTED_LANGUAGES[number] {
   return SUPPORTED_LANGUAGES.includes(lang as any);
 }
@@ -50,13 +42,11 @@ export async function POST(req: NextRequest) {
     const log = requestLog.get(ip);
 
     if (log) {
-      if (now - log.firstRequest > TIME_WINDOW) {
+      if (now - log.firstRequest > 24 * 60 * 60 * 1000) {
         requestLog.set(ip, { count: 1, firstRequest: now });
-      } else if (log.count >= MAX_REQUESTS_PER_IP) {
+      } else if (log.count >= 20) {
         return NextResponse.json(
-          {
-            error: `Too many requests. Maximum ${MAX_REQUESTS_PER_IP} requests per 24 hours.`,
-          },
+          { error: 'Too many requests. Maximum 20 requests per 24 hours.' },
           { status: 429 }
         );
       } else {
@@ -108,17 +98,11 @@ export async function POST(req: NextRequest) {
 
     // ===== 3. Validate required fields =====
     if (!code || !code.trim()) {
-      return NextResponse.json(
-        { error: 'Code is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Code is required' }, { status: 400 });
     }
 
     if (!language) {
-      return NextResponse.json(
-        { error: 'Language is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Language is required' }, { status: 400 });
     }
 
     if (
@@ -155,12 +139,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ===== 6. Sanitize username only (NOT code) =====
+    // ===== 6. Generate slug and sanitize username =====
     const slug = nanoid(10);
     const sanitizedUsername = username ? username.trim().slice(0, 50) : null;
     const sanitizedGithubUsername = github_username ? github_username.trim().slice(0, 50) : null;
 
-    // ===== 7. Build payload (code is stored RAW, no sanitization) =====
+    // ===== 7. Build payload (code stored RAW) =====
     const payload = {
       slug,
       raw_code: code,

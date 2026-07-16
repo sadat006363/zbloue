@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// ============================================================
+// 🔥 OpenAI Client با fallback (برای build بدون خطا)
+// ============================================================
+const openaiApiKey = process.env.OPENAI_API_KEY || 'placeholder-key';
+const openai = new OpenAI({ apiKey: openaiApiKey });
 
 // ===== Supported languages for conversion =====
 const SUPPORTED_LANGUAGES = [
-  'javascript', 'typescript', 'python', 'java', 
+  'javascript', 'typescript', 'python', 'java',
   'rust', 'go', 'cpp', 'php'
 ];
 
@@ -24,11 +28,50 @@ const CONVERSION_MAP: Record<string, string[]> = {
   'php': ['javascript', 'python', 'java', 'go'],
 };
 
+// ============================================================
+// 🔥 Rate Limiting (اختیاری ولی پیشنهاد میشه)
+// ============================================================
+const requestLog = new Map<string, { count: number; firstRequest: number }>();
+
+function getClientIP(req: NextRequest): string {
+  const forwarded = req.headers.get('x-forwarded-for');
+  if (forwarded) {
+    return forwarded.split(',')[0].trim();
+  }
+  const realIp = req.headers.get('x-real-ip');
+  if (realIp) {
+    return realIp;
+  }
+  return '127.0.0.1';
+}
+
 export async function POST(req: NextRequest) {
   try {
+    // ===== 1. Rate Limiting (اختیاری) =====
+    const ip = getClientIP(req);
+    const now = Date.now();
+    const log = requestLog.get(ip);
+
+    if (log) {
+      if (now - log.firstRequest > 24 * 60 * 60 * 1000) {
+        requestLog.set(ip, { count: 1, firstRequest: now });
+      } else if (log.count >= 10) { // محدودیت ۱۰ درخواست در روز برای تبدیل
+        return NextResponse.json(
+          { error: 'Too many conversion requests. Maximum 10 per day.' },
+          { status: 429 }
+        );
+      } else {
+        log.count += 1;
+        requestLog.set(ip, log);
+      }
+    } else {
+      requestLog.set(ip, { count: 1, firstRequest: now });
+    }
+
+    // ===== 2. دریافت داده =====
     const { code, sourceLanguage, targetLanguage } = await req.json();
 
-    // ===== 1. Validation =====
+    // ===== 3. Validation =====
     if (!code || !sourceLanguage || !targetLanguage) {
       return NextResponse.json(
         { error: 'Code, source language, and target language are required' },
@@ -36,10 +79,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ===== 2. Check if source language is convertible =====
+    // ===== 4. Check if source language is convertible =====
     if (NON_CONVERTIBLE.includes(sourceLanguage)) {
       return NextResponse.json(
-        { 
+        {
           error: `${sourceLanguage.toUpperCase()} is a markup/data language and cannot be converted to other languages.`,
           availableTargets: [],
         },
@@ -47,7 +90,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ===== 3. Check if source language is supported =====
+    // ===== 5. Check if source language is supported =====
     if (!SUPPORTED_LANGUAGES.includes(sourceLanguage)) {
       return NextResponse.json(
         { error: `Source language "${sourceLanguage}" is not supported for conversion` },
@@ -55,7 +98,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ===== 4. Check if target language is supported =====
+    // ===== 6. Check if target language is supported =====
     if (!SUPPORTED_LANGUAGES.includes(targetLanguage)) {
       return NextResponse.json(
         { error: `Target language "${targetLanguage}" is not supported for conversion` },
@@ -63,11 +106,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ===== 5. Check if conversion is possible =====
+    // ===== 7. Check if conversion is possible =====
     const availableTargets = CONVERSION_MAP[sourceLanguage] || [];
     if (!availableTargets.includes(targetLanguage)) {
       return NextResponse.json(
-        { 
+        {
           error: `Conversion from ${sourceLanguage} to ${targetLanguage} is not supported.`,
           availableTargets,
         },
@@ -75,7 +118,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ===== 6. Code length limit for conversion =====
+    // ===== 8. Code length limit for conversion =====
     if (code.length > 30000) {
       return NextResponse.json(
         { error: 'Code is too long for conversion. Maximum 30,000 characters.' },
@@ -83,7 +126,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ===== 7. Prepare prompt for AI =====
+    // ===== 9. Prepare prompt for AI =====
     const prompt = `
 You are an expert software engineer. Convert the following code from ${sourceLanguage} to ${targetLanguage}.
 
@@ -102,23 +145,31 @@ ${code}
 Converted code (${targetLanguage}):
 `;
 
-    // ===== 8. Call OpenAI API =====
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { 
-          role: 'system', 
-          content: 'You are a code conversion expert. Return only the converted code. Do not add any explanations or markdown formatting.' 
-        },
-        { role: 'user', content: prompt }
-      ],
-      temperature: 0.3,
-      max_tokens: 4000,
-    });
+    // ===== 10. Call OpenAI API با timeout =====
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    const response = await openai.chat.completions.create(
+      {
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a code conversion expert. Return only the converted code. Do not add any explanations or markdown formatting.'
+          },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.3,
+        max_tokens: 4000,
+      },
+      { signal: controller.signal }
+    );
+
+    clearTimeout(timeoutId);
 
     const convertedCode = response.choices[0].message.content || '';
 
-    // ===== 9. Clean up response (remove markdown if present) =====
+    // ===== 11. Clean up response (remove markdown if present) =====
     const cleanCode = convertedCode
       .replace(/^```[a-zA-Z]*\s*/, '') // Remove opening ```lang
       .replace(/\s*```$/, '') // Remove closing ```
@@ -132,7 +183,18 @@ Converted code (${targetLanguage}):
     });
 
   } catch (error: any) {
-    console.error('Code conversion error:', error);
+    // ===== 12. مدیریت خطا با شرط development =====
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Code conversion error:', error);
+    }
+
+    if (error.name === 'AbortError') {
+      return NextResponse.json(
+        { error: 'Conversion request timed out after 30 seconds' },
+        { status: 504 }
+      );
+    }
+
     return NextResponse.json(
       { error: 'Failed to convert code', details: error.message },
       { status: 500 }

@@ -14,6 +14,9 @@ export async function GET(req: NextRequest) {
       return new Response('Missing slug parameter', { status: 400 });
     }
 
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://Zbloue.vercel.app';
+    const fullUrl = `${appUrl}/snippet/${slug}`;
+
     // ===== ساخت تصویر با استفاده از @vercel/og =====
     return new ImageResponse(
       (
@@ -158,7 +161,7 @@ export async function GET(req: NextRequest) {
             }}
           >
             <span style={{ color: '#6c7086', fontSize: 14 }}>
-              🔗 {`${process.env.NEXT_PUBLIC_APP_URL || 'https://Zbloue.vercel.app'}/snippet/${slug}`}
+              🔗 {fullUrl}
             </span>
           </div>
 
@@ -186,7 +189,9 @@ export async function GET(req: NextRequest) {
       }
     );
   } catch (error: any) {
-    console.error('OG Image generation error:', error);
+    if (process.env.NODE_ENV === 'development') {
+      console.error('OG Image generation error:', error);
+    }
     return new Response(
       JSON.stringify({ 
         error: 'Failed to generate image', 

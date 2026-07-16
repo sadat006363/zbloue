@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { MAX_LINES_EXPLAIN, MAX_CODE_LENGTH } from '@/lib/constants';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// ============================================================
+// 🔥 OpenAI Client با fallback (برای build بدون خطا)
+// ============================================================
+const openaiApiKey = process.env.OPENAI_API_KEY || 'placeholder-key';
+const openai = new OpenAI({ apiKey: openaiApiKey });
 
 export async function POST(req: NextRequest) {
   try {
@@ -67,15 +69,26 @@ ${code}
 Provide a clear explanation for each line of code.
 `;
 
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-      temperature: 0.3,
-      response_format: { type: 'json_object' },
-    });
+    // ============================================================
+    // 🔥 AbortController با timeout
+    // ============================================================
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    const response = await openai.chat.completions.create(
+      {
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0.3,
+        response_format: { type: 'json_object' },
+      },
+      { signal: controller.signal }
+    );
+
+    clearTimeout(timeoutId);
 
     const content = response.choices[0].message.content || '{}';
     const data = JSON.parse(content);
@@ -83,9 +96,21 @@ Provide a clear explanation for each line of code.
     return NextResponse.json({
       explanations: data.explanations || [],
     });
-
   } catch (error: any) {
-    console.error('Explanation error:', error);
+    // ============================================================
+    // 🔥 مدیریت خطا با شرط development
+    // ============================================================
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Explanation error:', error);
+    }
+
+    if (error.name === 'AbortError') {
+      return NextResponse.json(
+        { error: 'Explanation request timed out after 30 seconds' },
+        { status: 504 }
+      );
+    }
+
     return NextResponse.json(
       { error: error.message || 'Failed to generate explanations' },
       { status: 500 }

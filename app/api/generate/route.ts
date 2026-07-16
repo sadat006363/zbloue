@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateEducationalContent } from '@/lib/ai';
 import { GenerateRequest } from '@/types';
-import { 
-  MAX_LINES_GENERATE, 
-  MAX_CODE_LENGTH, 
+import {
+  MAX_LINES_GENERATE,
+  MAX_CODE_LENGTH,
   MAX_REQUESTS_PER_IP,
   TIME_WINDOW,
-  SUPPORTED_LANGUAGES 
+  SUPPORTED_LANGUAGES,
 } from '@/lib/constants';
 
-// ===== Rate Limiting =====
+// ============================================================
+// 🔥 Rate Limiting (In-Memory)
+// ============================================================
 const requestLog = new Map<string, { count: number; firstRequest: number }>();
 
 function getClientIP(req: NextRequest): string {
@@ -24,6 +26,13 @@ function getClientIP(req: NextRequest): string {
   return '127.0.0.1';
 }
 
+// ============================================================
+// 🔥 Type Guard برای زبان‌ها
+// ============================================================
+function isSupportedLanguage(lang: string): lang is typeof SUPPORTED_LANGUAGES[number] {
+  return SUPPORTED_LANGUAGES.includes(lang as any);
+}
+
 export async function POST(req: NextRequest) {
   try {
     // ===== 1. Rate Limiting =====
@@ -36,8 +45,8 @@ export async function POST(req: NextRequest) {
         requestLog.set(ip, { count: 1, firstRequest: now });
       } else if (log.count >= MAX_REQUESTS_PER_IP) {
         return NextResponse.json(
-          { 
-            error: `Too many requests. Maximum ${MAX_REQUESTS_PER_IP} requests per 24 hours.` 
+          {
+            error: `Too many requests. Maximum ${MAX_REQUESTS_PER_IP} requests per 24 hours.`,
           },
           { status: 429 }
         );
@@ -67,10 +76,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ===== 3. Validate language =====
-    if (!SUPPORTED_LANGUAGES.includes(language as any)) {
+    // ===== 3. Validate language (با type guard) =====
+    if (!isSupportedLanguage(language)) {
       return NextResponse.json(
-        { error: `Unsupported language: ${language}. Supported: ${SUPPORTED_LANGUAGES.join(', ')}` },
+        {
+          error: `Unsupported language: ${language}. Supported: ${SUPPORTED_LANGUAGES.join(', ')}`,
+        },
         { status: 400 }
       );
     }
@@ -79,14 +90,18 @@ export async function POST(req: NextRequest) {
     const lines = code.split('\n').length;
     if (lines > MAX_LINES_GENERATE) {
       return NextResponse.json(
-        { error: `Code exceeds ${MAX_LINES_GENERATE} lines (${lines} lines). Please shorten your code.` },
+        {
+          error: `Code exceeds ${MAX_LINES_GENERATE} lines (${lines} lines). Please shorten your code.`,
+        },
         { status: 400 }
       );
     }
 
     if (code.length > MAX_CODE_LENGTH) {
       return NextResponse.json(
-        { error: `Code is too long (${code.length} characters). Maximum is ${MAX_CODE_LENGTH} characters.` },
+        {
+          error: `Code is too long (${code.length} characters). Maximum is ${MAX_CODE_LENGTH} characters.`,
+        },
         { status: 400 }
       );
     }
@@ -103,9 +118,13 @@ export async function POST(req: NextRequest) {
     // ===== 6. Execute AI =====
     const result = await generateEducationalContent(code, language, mode);
     return NextResponse.json(result);
-
   } catch (error: any) {
-    console.error('AI Generation error:', error);
+    // ============================================================
+    // 🔥 مدیریت خطا با شرط development
+    // ============================================================
+    if (process.env.NODE_ENV === 'development') {
+      console.error('AI Generation error:', error);
+    }
     return NextResponse.json(
       { error: error.message || 'AI processing failed. Please try again.' },
       { status: 500 }
