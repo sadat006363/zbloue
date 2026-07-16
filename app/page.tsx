@@ -16,7 +16,6 @@ import { HomeHeader, ErrorDisplay, HomeFooter } from '@/components/home';
 
 const GITHUB_URL = process.env.NEXT_PUBLIC_GITHUB_URL || 'https://github.com/sadat006363/Zbloue';
 
-// ===== توضیحات کامل برای هر حالت =====
 const modeDescriptions = {
   simple: '⚡ Quick analysis for basic code review — fast and concise. Identifies obvious syntax errors and logic flaws.',
   medium: '📊 Balanced analysis with more details. Identifies functional bugs, edge cases (null, undefined, empty inputs), and provides actionable suggestions.',
@@ -55,6 +54,24 @@ export default function Home() {
     setToastMessage(message);
     setTimeout(() => setToastMessage(null), 3000);
   };
+
+  // ===== تابع تغییر حالت با پاک کردن خروجی‌ها =====
+  const handleModeChange = useCallback((newMode: 'simple' | 'medium' | 'advanced') => {
+    // تغییر حالت
+    setMode(newMode);
+    
+    // پاک کردن تمام خروجی‌های قبلی
+    setSnippet(null);
+    setFullAnalysis(null);
+    setLineExplanations([]);
+    setGeneratedPrompt('');
+    setErrorMessage(null);
+    
+    // اگر تب باز است، به تب Explanation برگردان (اختیاری)
+    if (outputPanelRef.current) {
+      outputPanelRef.current.setActiveTab('explanation');
+    }
+  }, []);
 
   useEffect(() => {
     if (code.trim().length > 0) {
@@ -420,7 +437,7 @@ export default function Home() {
             {['simple', 'medium', 'advanced'].map((m) => (
               <button
                 key={m}
-                onClick={() => setMode(m as typeof mode)}
+                onClick={() => handleModeChange(m as typeof mode)}
                 className={`px-4 py-1.5 text-sm rounded-full border-2 transition ${
                   mode === m
                     ? 'bg-[#4a86f7] text-white border-[#4a86f7]'
