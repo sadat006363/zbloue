@@ -12,46 +12,18 @@ export default function AllOutputsTab({
   showToast,
   appUrl,
 }: AllOutputsTabProps) {
-  const shareUrl = `${appUrl}/snippet/${snippet?.slug}`;
+  // ===== ساخت لینک صفحه اسنیپت =====
+  const shareUrl = `${appUrl}/snippet/${snippet?.slug || ''}`;
 
-  // ===== بخش‌های موجود در صفحه اسنیپت =====
-  const sections = [
-    {
-      icon: '💻',
-      title: 'Source Code',
-      description: 'The original code with syntax highlighting, ready to copy or download.',
-    },
-    {
-      icon: '📖',
-      title: 'Explanation',
-      description: 'A clear summary of what the code does, including key concepts, debug analysis, and optimization suggestions.',
-    },
-    {
-      icon: '💼',
-      title: 'LinkedIn Post',
-      description: 'A ready-to-share LinkedIn post with relevant hashtags to promote your code analysis.',
-    },
-    {
-      icon: '🖼️',
-      title: 'Code Card',
-      description: 'A beautiful, shareable card with your code, theme options, QR code, and user info.',
-    },
-    {
-      icon: '📊',
-      title: 'Advanced Analysis',
-      description: 'In-depth review including code walkthrough, performance analysis, security review, scorecard, and improved code suggestions.',
-    },
-    {
-      icon: '📝',
-      title: 'Line-by-Line Explanations',
-      description: 'Each line of code is explained in detail, making it easy to understand the logic and flow.',
-    },
-    {
-      icon: '📝',
-      title: 'Generated Prompt',
-      description: 'A professional prompt generated from your code, useful for documentation or team collaboration.',
-    },
-  ];
+  // ===== تابع کپی برای اطمینان =====
+  const handleCopyLink = () => {
+    if (shareUrl) {
+      navigator.clipboard.writeText(shareUrl);
+      showToast('✅ Link copied!');
+    } else {
+      showToast('❌ No link available');
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -73,13 +45,16 @@ export default function AllOutputsTab({
               </span>
             </p>
             <div className="flex flex-wrap items-center gap-3 mt-4">
-              {/* ===== دکمه کپی لینک ===== */}
-              <CopyButton
-                text={shareUrl}
-                label="🔗 Copy Link"
-                tooltip="Copy snippet page link"
-                onCopy={() => showToast('✅ Link copied!')}
-              />
+              {/* ===== دکمه کپی لینک (اصلاح‌شده) ===== */}
+              <button
+                onClick={handleCopyLink}
+                className="flex items-center gap-2 text-sm px-4 py-1.5 rounded-md transition border border-[#d0d0d8] text-[#4a4a6a] hover:text-[#4a86f7] hover:bg-[#f1f3f5]"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                </svg>
+                🔗 Copy Link
+              </button>
               {/* ===== دکمه باز کردن صفحه اسنیپت ===== */}
               <a
                 href={shareUrl}
@@ -137,7 +112,15 @@ export default function AllOutputsTab({
           📋 What's Inside the Snippet Page?
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {sections.map((section) => (
+          {[
+            { icon: '💻', title: 'Source Code', description: 'The original code with syntax highlighting, ready to copy or download.' },
+            { icon: '📖', title: 'Explanation', description: 'A clear summary of what the code does, including key concepts, debug analysis, and optimization suggestions.' },
+            { icon: '💼', title: 'LinkedIn Post', description: 'A ready-to-share LinkedIn post with relevant hashtags to promote your code analysis.' },
+            { icon: '🖼️', title: 'Code Card', description: 'A beautiful, shareable card with your code, theme options, QR code, and user info.' },
+            { icon: '📊', title: 'Advanced Analysis', description: 'In-depth review including code walkthrough, performance analysis, security review, scorecard, and improved code suggestions.' },
+            { icon: '📝', title: 'Line-by-Line Explanations', description: 'Each line of code is explained in detail, making it easy to understand the logic and flow.' },
+            { icon: '📝', title: 'Generated Prompt', description: 'A professional prompt generated from your code, useful for documentation or team collaboration.' },
+          ].map((section) => (
             <div
               key={section.title}
               className="bg-white rounded-lg border border-[#e8e8f0] p-3 hover:border-[#4a86f7] transition-colors"
