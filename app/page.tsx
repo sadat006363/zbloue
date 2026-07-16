@@ -116,6 +116,7 @@ export default function Home() {
     return result;
   }, []);
 
+  // ===== اصلاح مسیر updateSnippet =====
   const updateSnippet = useCallback(async (slug: string, data: any) => {
     const res = await fetch(`/api/update-snippet/${slug}`, {
       method: 'PATCH',
@@ -247,7 +248,6 @@ export default function Home() {
         [mode]: { ...prev[mode], lineExplanations: explanations }
       }));
 
-      // ===== ذخیره در دیتابیس =====
       if (displaySnippet?.slug) {
         await updateSnippet(displaySnippet.slug, {
           line_explanations: explanations,
@@ -312,7 +312,6 @@ export default function Home() {
         [mode]: { ...prev[mode], generatedPrompt: prompt }
       }));
 
-      // ===== ذخیره در دیتابیس =====
       if (displaySnippet?.slug) {
         await updateSnippet(displaySnippet.slug, {
           generated_prompt: prompt,
@@ -443,7 +442,6 @@ export default function Home() {
           linkedin_post,
           username: username || 'Developer',
           github_username: githubUsername || null,
-          // ===== فیلدهای جدید برای Advanced =====
           code_walkthrough: genData.codeWalkthrough || null,
           what_works_well: genData.whatWorksWell || null,
           bugs_and_risky_cases: genData.bugsAndRiskyCases || null,
@@ -476,7 +474,6 @@ export default function Home() {
           linkedin_post,
           username: username || 'Developer',
           github_username: githubUsername || null,
-          // ===== فیلدهای جدید (برای Simple/Medium null) =====
           code_walkthrough: null,
           what_works_well: null,
           bugs_and_risky_cases: null,
@@ -510,7 +507,6 @@ export default function Home() {
         created_at: new Date().toISOString(),
         username: username || 'Developer',
         github_username: githubUsername || null,
-        // ===== فیلدهای جدید از saveData =====
         code_walkthrough: saveData.code_walkthrough || null,
         what_works_well: saveData.what_works_well || null,
         bugs_and_risky_cases: saveData.bugs_and_risky_cases || null,

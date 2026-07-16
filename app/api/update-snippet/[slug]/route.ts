@@ -28,7 +28,6 @@ export async function PATCH(
     if (line_explanations !== undefined) updateData.line_explanations = line_explanations;
     if (generated_prompt !== undefined) updateData.generated_prompt = generated_prompt;
 
-    // اگر هیچ فیلدی برای به‌روزرسانی وجود نداشته باشد
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json(
         { error: 'No fields to update' },
