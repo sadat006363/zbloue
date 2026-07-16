@@ -373,7 +373,6 @@ export default function Editor({
             {loading ? 'Generating...' : '✨ Generate'}
           </button>
 
-          {/* ===== دکمه Explain (بدون آیکون چراغ) ===== */}
           {onExplain && (
             <button
               onClick={handleExplainClick}
@@ -389,7 +388,6 @@ export default function Editor({
             </button>
           )}
 
-          {/* ===== دکمه Generate Prompt (بدون آیکون چراغ) ===== */}
           {onGeneratePrompt && (
             <button
               onClick={handleGeneratePromptClick}
@@ -473,7 +471,7 @@ export default function Editor({
             autocompletion: true,
             tabSize: 2,
           }}
-          placeholder="// Paste your code here... or drag & drop a file"
+          placeholder="" // ===== placeholder خالی (حذف شد) =====
         />
         
         {!code.trim() && !isDragging && !uploadProgress && (
