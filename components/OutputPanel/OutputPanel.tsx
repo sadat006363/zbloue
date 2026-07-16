@@ -622,11 +622,6 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
         <OutputPanelHeader 
           activeTab={activeTab} 
           setActiveTab={setActiveTab}
-          shareUrl={publicUrl}
-          onCopyLink={() => {
-            navigator.clipboard.writeText(publicUrl);
-            showToast('✅ Link copied!');
-          }}
         />
 
         <div className="flex-1 p-4 md:p-6 overflow-y-auto max-h-[calc(100vh-200px)] text-[#1a1a2e]">
