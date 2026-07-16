@@ -36,7 +36,6 @@ interface EditorProps {
   onGeneratePrompt?: () => void;
   isGeneratingPrompt?: boolean;
   onStop?: () => void;
-  isStopping?: boolean;
 }
 
 const SUPPORTED_LANGUAGES = [
@@ -142,7 +141,6 @@ export default function Editor({
   onGeneratePrompt,
   isGeneratingPrompt,
   onStop,
-  isStopping,
 }: EditorProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
@@ -433,17 +431,14 @@ export default function Editor({
             </button>
           )}
 
-          {/* ===== دکمه Stop (در حین بارگذاری) ===== */}
+          {/* ===== دکمه Stop (بدون آیکون) ===== */}
           {loading && onStop && (
             <button
               onClick={onStop}
-              className="flex items-center gap-1 text-orange-500 hover:text-orange-700 transition-colors hover:bg-orange-50 px-2 py-1 rounded-md border border-orange-200 hover:border-orange-300 text-sm"
+              className="flex items-center text-orange-500 hover:text-orange-700 transition-colors hover:bg-orange-50 px-2 py-1 rounded-md border border-orange-200 hover:border-orange-300 text-sm"
               title="Stop generation process"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <rect x="6" y="6" width="12" height="12" rx="1" strokeWidth="2" />
-              </svg>
-              <span className="hidden sm:inline">Stop</span>
+              <span>Stop</span>
             </button>
           )}
 

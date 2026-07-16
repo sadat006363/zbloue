@@ -28,7 +28,6 @@ export default function Home() {
   const [mode, setMode] = useState<'simple' | 'medium' | 'advanced'>('simple');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isStopping, setIsStopping] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const [displaySnippet, setDisplaySnippet] = useState<Snippet | null>(null);
@@ -321,22 +320,18 @@ export default function Home() {
       abortControllerRef.current = null;
     }
     setLoading(false);
-    setIsStopping(false);
     showToast('🧹 All content cleared!');
   }, [clearAllOutputs]);
 
-  // ===== تابع Stop =====
   const handleStop = useCallback(() => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
-      setIsStopping(false);
       setLoading(false);
       showToast('⏹️ Generation stopped by user');
     }
   }, []);
 
-  // ===== تابع Generate با AbortController =====
   const handleGenerate = useCallback(async () => {
     if (!code.trim()) {
       setErrorMessage('Please enter your code.');
@@ -376,9 +371,7 @@ export default function Home() {
       return;
     }
 
-    // ===== آماده‌سازی AbortController =====
     abortControllerRef.current = new AbortController();
-    setIsStopping(false);
     setLoading(true);
     setErrorMessage(null);
 
@@ -483,6 +476,8 @@ export default function Home() {
       if (error.name === 'AbortError') {
         console.log('Fetch aborted by user');
         setErrorMessage(null);
+        setDisplaySnippet(null);       // ✅ پاک کردن نتایج
+        setDisplayFullAnalysis(null);  // ✅ پاک کردن تحلیل
         return;
       }
       console.error('Error:', error);
@@ -490,7 +485,6 @@ export default function Home() {
     } finally {
       setLoading(false);
       abortControllerRef.current = null;
-      setIsStopping(false);
     }
   }, [code, language, mode, saveSnippet, username, githubUsername]);
 
@@ -550,7 +544,6 @@ export default function Home() {
             onGeneratePrompt={handleGeneratePrompt}
             isGeneratingPrompt={isGeneratingPrompt}
             onStop={handleStop}
-            isStopping={isStopping}
           />
           <OutputPanel
             ref={outputPanelRef}
