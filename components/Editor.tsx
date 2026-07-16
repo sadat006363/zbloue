@@ -471,7 +471,7 @@ export default function Editor({
             autocompletion: true,
             tabSize: 2,
           }}
-          placeholder="" // ===== placeholder خالی (حذف شد) =====
+          placeholder=""
         />
         
         {!code.trim() && !isDragging && !uploadProgress && (
@@ -500,11 +500,7 @@ export default function Editor({
           </div>
         )}
         
-        {!isDragging && !uploadProgress && code.trim() && (
-          <div className="absolute bottom-2 right-3 text-xs text-[#a0a0b0] pointer-events-none">
-            <span>📂 Drag & drop to replace</span>
-          </div>
-        )}
+        {/* ===== بخش حذف‌شده: hint پایین ادیتور ===== */}
       </div>
     </div>
   );
