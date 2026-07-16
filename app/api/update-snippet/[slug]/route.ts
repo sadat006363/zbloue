@@ -21,18 +21,24 @@ function getClientIP(req: NextRequest): string {
   return '127.0.0.1';
 }
 
-// ===== Check environment variables =====
-if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-  throw new Error('Missing Supabase environment variables');
-}
+// ===== Check environment variables (runtime only) =====
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const apiSecretKey = process.env.API_SECRET_KEY;
 
-if (!process.env.API_SECRET_KEY) {
-  throw new Error('Missing API_SECRET_KEY environment variable');
+// ===== در زمان build خطا نمیده، فقط لاگ می‌ده =====
+if (typeof window === 'undefined' && process.env.NODE_ENV === 'production') {
+  if (!supabaseUrl || !supabaseServiceKey) {
+    console.error('⚠️ Missing Supabase environment variables');
+  }
+  if (!apiSecretKey) {
+    console.error('⚠️ Missing API_SECRET_KEY environment variable');
+  }
 }
 
 const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
+  supabaseUrl || 'https://placeholder-url.supabase.co',
+  supabaseServiceKey || 'placeholder-key'
 );
 
 type UpdateSnippetData = Partial<Pick<
@@ -70,7 +76,16 @@ export async function PATCH(
 
     // ===== 2. Authentication =====
     const apiKey = req.headers.get('x-api-key');
-    if (apiKey !== process.env.API_SECRET_KEY) {
+    
+    // ===== اگر کلید در محیط تعریف نشده باشه، درخواست رد میشه =====
+    if (!apiSecretKey) {
+      return NextResponse.json(
+        { error: 'Server configuration error: API key not set' },
+        { status: 500 }
+      );
+    }
+    
+    if (apiKey !== apiSecretKey) {
       return NextResponse.json(
         { error: 'Unauthorized: Invalid API key' },
         { status: 401 }
