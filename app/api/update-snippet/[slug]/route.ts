@@ -21,25 +21,22 @@ function getClientIP(req: NextRequest): string {
   return '127.0.0.1';
 }
 
-// ===== Check environment variables (runtime only) =====
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// ===== استفاده از placeholder در زمان build =====
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder-url.supabase.co';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-key';
 const apiSecretKey = process.env.API_SECRET_KEY;
 
-// ===== در زمان build خطا نمیده، فقط لاگ می‌ده =====
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
+// ===== فقط در محیط production واقعی اخطار بده =====
 if (typeof window === 'undefined' && process.env.NODE_ENV === 'production') {
-  if (!supabaseUrl || !supabaseServiceKey) {
-    console.error('⚠️ Missing Supabase environment variables');
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error('⚠️ Missing Supabase environment variables in production');
   }
-  if (!apiSecretKey) {
-    console.error('⚠️ Missing API_SECRET_KEY environment variable');
+  if (!process.env.API_SECRET_KEY) {
+    console.error('⚠️ Missing API_SECRET_KEY environment variable in production');
   }
 }
-
-const supabaseAdmin = createClient(
-  supabaseUrl || 'https://placeholder-url.supabase.co',
-  supabaseServiceKey || 'placeholder-key'
-);
 
 type UpdateSnippetData = Partial<Pick<
   Snippet,
@@ -77,7 +74,6 @@ export async function PATCH(
     // ===== 2. Authentication =====
     const apiKey = req.headers.get('x-api-key');
     
-    // ===== اگر کلید در محیط تعریف نشده باشه، درخواست رد میشه =====
     if (!apiSecretKey) {
       return NextResponse.json(
         { error: 'Server configuration error: API key not set' },

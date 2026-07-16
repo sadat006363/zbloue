@@ -25,15 +25,18 @@ function getClientIP(req: NextRequest): string {
   return '127.0.0.1';
 }
 
-// ===== Check environment variables =====
-if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-  throw new Error('Missing Supabase environment variables');
-}
+// ===== استفاده از placeholder در زمان build =====
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder-url.supabase.co';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-key';
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
+// ===== فقط در محیط production واقعی اخطار بده =====
+if (typeof window === 'undefined' && process.env.NODE_ENV === 'production') {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error('⚠️ Missing Supabase environment variables in production');
+  }
+}
 
 function isSupportedLanguage(lang: string): lang is typeof SUPPORTED_LANGUAGES[number] {
   return SUPPORTED_LANGUAGES.includes(lang as any);
@@ -160,7 +163,7 @@ export async function POST(req: NextRequest) {
     // ===== 7. Build payload (code is stored RAW, no sanitization) =====
     const payload = {
       slug,
-      raw_code: code, // ← ذخیره کد خام (بدون تغییر)
+      raw_code: code,
       language,
       card_title: card_title.slice(0, 500),
       key_concept: key_concept.slice(0, 2000),
