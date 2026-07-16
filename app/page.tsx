@@ -28,14 +28,14 @@ export default function Home() {
   const [mode, setMode] = useState<'simple' | 'medium' | 'advanced'>('simple');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isStopping, setIsStopping] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  // ===== State‌های نمایشی (که در OutputPanel نشان داده می‌شوند) =====
   const [displaySnippet, setDisplaySnippet] = useState<Snippet | null>(null);
   const [displayFullAnalysis, setDisplayFullAnalysis] = useState<GenerateResponse | null>(null);
   const [displayLineExplanations, setDisplayLineExplanations] = useState<any[]>([]);
   const [displayGeneratedPrompt, setDisplayGeneratedPrompt] = useState<string>('');
 
-  // ===== ذخیره خروجی‌های هر حالت به‌صورت جداگانه =====
   const [modeOutputs, setModeOutputs] = useState<{
     simple: { snippet: Snippet | null; fullAnalysis: GenerateResponse | null; lineExplanations: any[]; generatedPrompt: string; }
     medium: { snippet: Snippet | null; fullAnalysis: GenerateResponse | null; lineExplanations: any[]; generatedPrompt: string; }
@@ -68,22 +68,16 @@ export default function Home() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // ===== تابع تغییر حالت با نمایش خروجی ذخیره‌شده (در صورت وجود) =====
   const handleModeChange = useCallback((newMode: 'simple' | 'medium' | 'advanced') => {
     setMode(newMode);
-    
-    // خروجی‌های ذخیره‌شده برای حالت جدید را نمایش بده
     const output = modeOutputs[newMode];
     setDisplaySnippet(output.snippet);
     setDisplayFullAnalysis(output.fullAnalysis);
     setDisplayLineExplanations(output.lineExplanations);
     setDisplayGeneratedPrompt(output.generatedPrompt);
     setErrorMessage(null);
-
-    // ===== تب فعلی را تغییر نده =====
   }, [modeOutputs]);
 
-  // ===== تابع پاک کردن همه خروجی‌ها (وقتی سورس کد عوض می‌شود) =====
   const clearAllOutputs = useCallback(() => {
     setModeOutputs({
       simple: { snippet: null, fullAnalysis: null, lineExplanations: [], generatedPrompt: '' },
@@ -97,12 +91,10 @@ export default function Home() {
     setErrorMessage(null);
   }, []);
 
-  // ===== تشخیص تغییر سورس کد برای پاک کردن خروجی‌ها =====
   useEffect(() => {
     clearAllOutputs();
   }, [code, language]);
 
-  // ===== تشخیص زبان =====
   useEffect(() => {
     if (code.trim().length > 0) {
       const detected = detectLanguage(code);
@@ -134,7 +126,6 @@ export default function Home() {
         github_username: data.github_username,
       };
     });
-    // همچنین خروجی ذخیره‌شده در حالت فعلی را به‌روز کن
     setModeOutputs((prev) => ({
       ...prev,
       [mode]: {
@@ -239,7 +230,6 @@ export default function Home() {
       const explanations = data.explanations || [];
       setDisplayLineExplanations(explanations);
       
-      // ذخیره در حالت فعلی
       setModeOutputs((prev) => ({
         ...prev,
         [mode]: { ...prev[mode], lineExplanations: explanations }
@@ -326,9 +316,27 @@ export default function Home() {
     setIsExplaining(false);
     setExplainError(null);
     setPromptError(null);
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setLoading(false);
+    setIsStopping(false);
     showToast('🧹 All content cleared!');
   }, [clearAllOutputs]);
 
+  // ===== تابع Stop =====
+  const handleStop = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+      setIsStopping(false);
+      setLoading(false);
+      showToast('⏹️ Generation stopped by user');
+    }
+  }, []);
+
+  // ===== تابع Generate با AbortController =====
   const handleGenerate = useCallback(async () => {
     if (!code.trim()) {
       setErrorMessage('Please enter your code.');
@@ -368,6 +376,9 @@ export default function Home() {
       return;
     }
 
+    // ===== آماده‌سازی AbortController =====
+    abortControllerRef.current = new AbortController();
+    setIsStopping(false);
     setLoading(true);
     setErrorMessage(null);
 
@@ -376,6 +387,7 @@ export default function Home() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: cleanCode, language, mode }),
+        signal: abortControllerRef.current.signal,
       });
 
       const genData: GenerateResponse = await genRes.json();
@@ -450,7 +462,6 @@ export default function Home() {
         github_username: githubUsername || null,
       };
 
-      // ذخیره خروجی برای حالت فعلی
       setModeOutputs((prev) => ({
         ...prev,
         [mode]: {
@@ -461,20 +472,25 @@ export default function Home() {
         }
       }));
 
-      // نمایش خروجی فعلی
       setDisplaySnippet(newSnippet);
       setDisplayFullAnalysis(fullAnalysisData);
 
-      // ===== فقط در اینجا تب به explanation تغییر می‌کند =====
       if (outputPanelRef.current) {
         outputPanelRef.current.setActiveTab('explanation');
       }
 
     } catch (error: any) {
+      if (error.name === 'AbortError') {
+        console.log('Fetch aborted by user');
+        setErrorMessage(null);
+        return;
+      }
       console.error('Error:', error);
       setErrorMessage(error.message || 'Unknown error occurred.');
     } finally {
       setLoading(false);
+      abortControllerRef.current = null;
+      setIsStopping(false);
     }
   }, [code, language, mode, saveSnippet, username, githubUsername]);
 
@@ -489,7 +505,6 @@ export default function Home() {
 
         <HomeHeader githubUrl={GITHUB_URL} />
         
-        {/* ===== Analysis Mode با توضیحات کامل در سمت راست ===== */}
         <div className="mb-4 flex flex-wrap items-center gap-2 bg-white p-3 rounded-xl border-2 border-[#d0d0d8] shadow-sm">
           <span className="text-sm font-medium text-[#1a1a2e] whitespace-nowrap">Analysis Mode:</span>
           <div className="flex gap-2">
@@ -534,6 +549,8 @@ export default function Home() {
             onClear={handleClearAll}
             onGeneratePrompt={handleGeneratePrompt}
             isGeneratingPrompt={isGeneratingPrompt}
+            onStop={handleStop}
+            isStopping={isStopping}
           />
           <OutputPanel
             ref={outputPanelRef}

@@ -35,6 +35,8 @@ interface EditorProps {
   onClear?: () => void;
   onGeneratePrompt?: () => void;
   isGeneratingPrompt?: boolean;
+  onStop?: () => void;
+  isStopping?: boolean;
 }
 
 const SUPPORTED_LANGUAGES = [
@@ -139,6 +141,8 @@ export default function Editor({
   onClear,
   onGeneratePrompt,
   isGeneratingPrompt,
+  onStop,
+  isStopping,
 }: EditorProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
@@ -275,7 +279,6 @@ export default function Editor({
     }
   }, [onGeneratePrompt]);
 
-  // ===== تابع تبدیل با دکمه =====
   const handleConvertClick = useCallback(() => {
     if (convertLanguage && onConvert && canConvert) {
       onConvert(convertLanguage);
@@ -311,9 +314,7 @@ export default function Editor({
         </div>
       )}
 
-      {/* ===== Toolbar ===== */}
       <div className="flex flex-col gap-2 p-3 bg-[#f1f3f5] border-b border-[#d0d0d8]">
-        {/* ===== ردیف اول: Source Language ===== */}
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-medium text-[#4a4a6a] whitespace-nowrap">📝 Source Language:</span>
           <select
@@ -329,7 +330,6 @@ export default function Editor({
           </select>
         </div>
 
-        {/* ===== ردیف دوم: Target Language + Convert Button ===== */}
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-medium text-[#4a4a6a] whitespace-nowrap">🎯 Target Language:</span>
           <select
@@ -351,7 +351,6 @@ export default function Editor({
               ))}
           </select>
 
-          {/* ===== دکمه Convert ===== */}
           <button
             onClick={handleConvertClick}
             disabled={!convertLanguage || !canConvert || isConverting}
@@ -368,7 +367,6 @@ export default function Editor({
             <span>{isConverting ? 'Converting...' : 'Convert'}</span>
           </button>
 
-          {/* ===== پیام‌های وضعیت ===== */}
           {isConverting && (
             <span className="text-sm text-[#4a86f7] animate-pulse">⏳ Converting...</span>
           )}
@@ -392,7 +390,6 @@ export default function Editor({
         </div>
       </div>
 
-      {/* ===== Action Buttons Row ===== */}
       <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2 bg-[#f8f9fa] border-b border-[#d0d0d8]">
         <div className="flex items-center gap-2 flex-wrap">
           <button
@@ -436,6 +433,20 @@ export default function Editor({
             </button>
           )}
 
+          {/* ===== دکمه Stop (در حین بارگذاری) ===== */}
+          {loading && onStop && (
+            <button
+              onClick={onStop}
+              className="flex items-center gap-1 text-orange-500 hover:text-orange-700 transition-colors hover:bg-orange-50 px-2 py-1 rounded-md border border-orange-200 hover:border-orange-300 text-sm"
+              title="Stop generation process"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <rect x="6" y="6" width="12" height="12" rx="1" strokeWidth="2" />
+              </svg>
+              <span className="hidden sm:inline">Stop</span>
+            </button>
+          )}
+
           {code.trim() && (
             <button
               onClick={handleClearCode}
@@ -456,7 +467,6 @@ export default function Editor({
         </div>
       </div>
 
-      {/* ===== Drag & Drop Overlay ===== */}
       {isDragging && (
         <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#4a86f7]/5 backdrop-blur-sm">
           <div className="w-64 h-64 rounded-2xl border-4 border-dashed border-[#4a86f7] bg-white/80 flex flex-col items-center justify-center gap-4 shadow-2xl transition-all duration-300">
@@ -487,7 +497,6 @@ export default function Editor({
         </div>
       )}
 
-      {/* ===== CodeMirror Editor ===== */}
       <div className="flex-1 overflow-hidden bg-[#fafbfc] relative">
         <CodeMirror
           value={code}
