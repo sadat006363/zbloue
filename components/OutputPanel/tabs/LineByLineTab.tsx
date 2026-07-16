@@ -42,66 +42,64 @@ export default function LineByLineTab({
   // ===== اصلاح شماره خطوط برای تطابق با کد اصلی =====
   const correctedExplanations = useMemo(() => {
     if (!snippet?.raw_code || !lineExplanations || lineExplanations.length === 0) {
-      return lineExplanations;
+      return lineExplanations || [];
     }
 
     const codeLines = snippet.raw_code.split('\n');
-    const explanationMap = new Map<number, any>();
+    const result: any[] = [];
 
-    let explanationIndex = 0;
+    // ایجاد یک کپی از توضیحات برای پیمایش
+    let expIndex = 0;
+    const explanationsCopy = [...lineExplanations];
+
     for (let i = 0; i < codeLines.length; i++) {
-      const line = codeLines[i];
       const lineNumber = i + 1;
+      const lineContent = codeLines[i];
+      const trimmedLine = lineContent.trim();
+
+      // اگر خط خالی است، توضیح خالی بده
+      if (trimmedLine === '') {
+        result.push({
+          lineNumber,
+          code: '',
+          explanation: '',
+        });
+        continue;
+      }
 
       // اگر توضیحی برای این خط وجود دارد
-      if (explanationIndex < lineExplanations.length) {
-        const exp = lineExplanations[explanationIndex];
-        // اگر خط خالی نباشد یا توضیح داشته باشد
-        if (line.trim() !== '' && exp && exp.code) {
-          // اگر کد خط با کد توضیح مطابقت داشته باشد، از توضیح استفاده کن
-          if (line.includes(exp.code.trim())) {
-            explanationMap.set(lineNumber, { ...exp, lineNumber });
-            explanationIndex++;
-          } else {
-            // اگر مطابقت نداشت، توضیح را به این خط نسبت بده
-            explanationMap.set(lineNumber, { ...exp, lineNumber });
-            explanationIndex++;
-          }
-        } else if (line.trim() === '' && exp && exp.code === '') {
-          // خط خالی با توضیح خالی
-          explanationMap.set(lineNumber, { ...exp, lineNumber });
-          explanationIndex++;
-        } else if (line.trim() === '') {
-          // خط خالی بدون توضیح
-          explanationMap.set(lineNumber, {
+      if (expIndex < explanationsCopy.length) {
+        const exp = explanationsCopy[expIndex];
+        
+        // بررسی اینکه آیا توضیح مربوط به این خط است یا خیر
+        // (با تطابق محتوای کد)
+        if (exp && exp.code && trimmedLine.includes(exp.code.trim())) {
+          result.push({
+            ...exp,
             lineNumber,
-            code: '',
-            explanation: '',
           });
+          expIndex++;
         } else {
-          // اگر توضیحی برای خط وجود ندارد
-          explanationMap.set(lineNumber, {
+          // اگر مطابقت نداشت، ممکن است توضیح برای خط بعدی باشد
+          // پس این خط را با توضیح خالی ذخیره می‌کنیم و توضیح را برای خط بعدی نگه می‌داریم
+          result.push({
             lineNumber,
-            code: line || ' ',
+            code: lineContent,
             explanation: 'No explanation provided.',
           });
+          // توضیح را برای خط بعدی نگه می‌داریم (expIndex را افزایش نمی‌دهیم)
         }
       } else {
-        // توضیحی باقی نمانده است
-        explanationMap.set(lineNumber, {
+        // دیگر توضیحی وجود ندارد
+        result.push({
           lineNumber,
-          code: line || ' ',
+          code: lineContent,
           explanation: '',
         });
       }
     }
 
-    // مرتب‌سازی بر اساس شماره خط
-    const sorted = Array.from(explanationMap.entries())
-      .sort((a, b) => a[0] - b[0])
-      .map(([_, exp]) => exp);
-
-    return sorted;
+    return result;
   }, [snippet?.raw_code, lineExplanations]);
 
   // ===== تابع اشتراک‌گذاری =====
