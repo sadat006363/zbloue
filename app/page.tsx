@@ -135,7 +135,6 @@ export default function Home() {
     }
   }, [code, language]);
 
-  // ===== تابع Explain با باز شدن خودکار تب =====
   const handleGenerateExplanation = useCallback(async () => {
     if (!code.trim()) {
       setExplainError('Please enter some code first.');
@@ -143,7 +142,6 @@ export default function Home() {
       return;
     }
 
-    // ===== باز کردن تب Line-by-Line بلافاصله =====
     if (outputPanelRef.current) {
       outputPanelRef.current.setActiveTab('line-by-line');
     }
@@ -189,7 +187,6 @@ export default function Home() {
     }
   }, [code, language]);
 
-  // ===== تابع Prompt با باز شدن خودکار تب =====
   const handleGeneratePrompt = useCallback(async () => {
     if (!code.trim()) {
       setPromptError('Please enter some code first.');
@@ -197,7 +194,6 @@ export default function Home() {
       return;
     }
 
-    // ===== باز کردن تب Prompt بلافاصله =====
     if (outputPanelRef.current) {
       outputPanelRef.current.setActiveTab('prompt');
     }
@@ -386,6 +382,11 @@ export default function Home() {
         username: username || 'Developer',
         github_username: githubUsername || null,
       });
+
+      // ===== باز کردن تب Explanation پس از Generate =====
+      if (outputPanelRef.current) {
+        outputPanelRef.current.setActiveTab('explanation');
+      }
 
     } catch (error: any) {
       console.error('Error:', error);
