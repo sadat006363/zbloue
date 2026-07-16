@@ -80,9 +80,7 @@ export default function Home() {
     setDisplayGeneratedPrompt(output.generatedPrompt);
     setErrorMessage(null);
 
-    if (outputPanelRef.current) {
-      outputPanelRef.current.setActiveTab('explanation');
-    }
+    // ===== تب فعلی را تغییر نده =====
   }, [modeOutputs]);
 
   // ===== تابع پاک کردن همه خروجی‌ها (وقتی سورس کد عوض می‌شود) =====
@@ -102,11 +100,7 @@ export default function Home() {
   // ===== تشخیص تغییر سورس کد برای پاک کردن خروجی‌ها =====
   useEffect(() => {
     clearAllOutputs();
-    // بعد از پاک کردن، تب را به state اولیه برگردان
-    if (outputPanelRef.current) {
-      outputPanelRef.current.setActiveTab('explanation');
-    }
-  }, [code, language]); // با تغییر کد یا زبان، خروجی‌ها پاک می‌شوند
+  }, [code, language]);
 
   // ===== تشخیص زبان =====
   useEffect(() => {
@@ -471,6 +465,7 @@ export default function Home() {
       setDisplaySnippet(newSnippet);
       setDisplayFullAnalysis(fullAnalysisData);
 
+      // ===== فقط در اینجا تب به explanation تغییر می‌کند =====
       if (outputPanelRef.current) {
         outputPanelRef.current.setActiveTab('explanation');
       }
@@ -494,7 +489,7 @@ export default function Home() {
 
         <HomeHeader githubUrl={GITHUB_URL} />
         
-        {/* ===== Analysis Mode ===== */}
+        {/* ===== Analysis Mode با توضیحات کامل در سمت راست ===== */}
         <div className="mb-4 flex flex-wrap items-center gap-2 bg-white p-3 rounded-xl border-2 border-[#d0d0d8] shadow-sm">
           <span className="text-sm font-medium text-[#1a1a2e] whitespace-nowrap">Analysis Mode:</span>
           <div className="flex gap-2">
