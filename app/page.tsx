@@ -376,10 +376,16 @@ export default function Home() {
       return;
     }
 
+    // ===== حذف خطوط خالی =====
     const cleanCode = code
       .split('\n')
       .filter(line => line.trim() !== '')
       .join('\n');
+
+    // ===== به‌روزرسانی ادیتور با کد فشرده =====
+    if (cleanCode !== code) {
+      setCode(cleanCode);
+    }
 
     if (!cleanCode.trim()) {
       setErrorMessage('Please enter valid code.');
@@ -407,6 +413,7 @@ export default function Home() {
       return;
     }
 
+    // === لغو درخواست قبلی اگر وجود داره ===
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
