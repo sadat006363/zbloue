@@ -15,6 +15,7 @@ const supabaseAdmin = createClient(
 
 interface PageProps {
   params: Promise<{ slug: string }>;
+  searchParams?: Promise<{ tab?: string }>;
 }
 
 // ===== Generate metadata with OG image =====
@@ -73,8 +74,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 }
 
-export default async function SnippetPage({ params }: PageProps) {
+export default async function SnippetPage({ params, searchParams }: PageProps) {
   const { slug } = await params;
+  const resolvedSearchParams = await searchParams;
+  const tab = resolvedSearchParams?.tab || 'explanation';
 
   try {
     const { data: snippet, error } = await supabaseAdmin
@@ -146,6 +149,10 @@ export default async function SnippetPage({ params }: PageProps) {
 
     const hasLineExplanations = snippet.line_explanations && snippet.line_explanations.length > 0;
     const hasGeneratedPrompt = snippet.generated_prompt;
+
+    // ===== تب‌های قابل پشتیبانی (با اضافه شدن all-outputs) =====
+    const validTabs = ['explanation', 'linkedin', 'preview', 'analysis', 'line-by-line', 'prompt', 'all-outputs'];
+    const initialTab = validTabs.includes(tab) ? tab : 'explanation';
 
     return (
       <main className="min-h-screen bg-[#0f0f14] text-[#cdd6f4] p-4 md:p-8 flex flex-col items-center">

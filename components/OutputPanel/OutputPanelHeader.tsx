@@ -4,8 +4,8 @@ import { TabType } from './OutputPanel';
 interface OutputPanelHeaderProps {
   activeTab: TabType;
   setActiveTab: (tab: TabType) => void;
-  shareUrl?: string; // ✅ اضافه شد
-  onCopyLink?: () => void; // ✅ اضافه شد
+  shareUrl?: string;
+  onCopyLink?: () => void;
 }
 
 const tabs: { id: TabType; label: string; icon: string }[] = [
@@ -15,6 +15,7 @@ const tabs: { id: TabType; label: string; icon: string }[] = [
   { id: 'analysis', label: 'Analysis', icon: '📊' },
   { id: 'line-by-line', label: 'Line by Line', icon: '📝' },
   { id: 'prompt', label: 'Prompt', icon: '📝' },
+  { id: 'all-outputs', label: 'All Outputs', icon: '📊' }, // ===== تب جدید =====
 ];
 
 export default function OutputPanelHeader({ 
@@ -41,7 +42,6 @@ export default function OutputPanelHeader({
         ))}
       </div>
 
-      {/* ===== دکمه کپی لینک ===== */}
       {shareUrl && onCopyLink && (
         <button
           onClick={onCopyLink}

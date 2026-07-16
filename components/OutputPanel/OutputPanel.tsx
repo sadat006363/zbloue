@@ -13,6 +13,7 @@ import PreviewTab from './tabs/PreviewTab';
 import AnalysisTab from './tabs/AnalysisTab';
 import LineByLineTab from './tabs/LineByLineTab';
 import PromptTab from './tabs/PromptTab';
+import AllOutputsTab from './tabs/AllOutputsTab';
 
 export interface OutputPanelProps {
   snippet: Snippet | null;
@@ -29,10 +30,10 @@ export interface OutputPanelProps {
   onLineHover?: (lineNumber: number | null) => void;
   generatedPrompt?: string;
   isGeneratingPrompt?: boolean;
-  initialTab?: 'explanation' | 'linkedin' | 'preview' | 'analysis' | 'line-by-line' | 'prompt';
+  initialTab?: 'explanation' | 'linkedin' | 'preview' | 'analysis' | 'line-by-line' | 'prompt' | 'all-outputs';
 }
 
-export type TabType = 'explanation' | 'linkedin' | 'preview' | 'analysis' | 'line-by-line' | 'prompt';
+export type TabType = 'explanation' | 'linkedin' | 'preview' | 'analysis' | 'line-by-line' | 'prompt' | 'all-outputs';
 
 const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputPanelProps>(
   function OutputPanel({ 
@@ -706,6 +707,19 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
               snippet={snippet}
               generatedPrompt={generatedPrompt}
               isGeneratingPrompt={isGeneratingPrompt}
+              showToast={showToast}
+              appUrl={appUrl}
+            />
+          )}
+
+          {/* All Outputs Tab */}
+          {activeTab === 'all-outputs' && (
+            <AllOutputsTab
+              snippet={snippet}
+              fullAnalysis={fullAnalysis}
+              lineExplanations={lineExplanations}
+              generatedPrompt={generatedPrompt}
+              isAdvanced={isAdvanced}
               showToast={showToast}
               appUrl={appUrl}
             />
