@@ -7,7 +7,7 @@ interface AllOutputsTabProps {
   snippet: any;
   fullAnalysis: any;
   lineExplanations: any[];
-  generatedPrompt: string;
+  generatedPrompt?: string; // ===== تغییر: اضافه کردن ? برای optional =====
   isAdvanced: boolean;
   showToast: (message: string) => void;
   appUrl: string;
@@ -17,7 +17,7 @@ export default function AllOutputsTab({
   snippet,
   fullAnalysis,
   lineExplanations,
-  generatedPrompt,
+  generatedPrompt = '', // ===== تغییر: مقدار پیش‌فرض =====
   isAdvanced,
   showToast,
   appUrl,
