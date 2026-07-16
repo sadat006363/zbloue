@@ -711,10 +711,6 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
           {activeTab === 'all-outputs' && (
             <AllOutputsTab
               snippet={snippet}
-              fullAnalysis={fullAnalysis}
-              lineExplanations={lineExplanations}
-              generatedPrompt={generatedPrompt}
-              isAdvanced={isAdvanced}
               showToast={showToast}
               appUrl={appUrl}
             />
