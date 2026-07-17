@@ -1,4 +1,3 @@
-// components/OutputPanel/tabs/PreviewTab.tsx
 'use client';
 import { useState, useEffect } from 'react';
 import { CardTheme } from '@/components/card/themes';
@@ -22,10 +21,10 @@ interface PreviewTabProps {
   publicUrl: string;
   appUrl: string;
   downloadCard: () => void;
-  savedImageUrl?: string | null; // ← اضافه شد
-  isUploading?: boolean; // ← اضافه شد
-  hasUploaded?: boolean; // ← اضافه شد
-  onUploadImage?: () => Promise<void>; // ← اضافه شد
+  savedImageUrl?: string | null;
+  isUploading?: boolean;
+  hasUploaded?: boolean;
+  onUploadImage?: () => Promise<void>;
 }
 
 const themes: CardTheme[] = [
@@ -104,15 +103,20 @@ export default function PreviewTab({
   }, [cardImageDataUrl, isGeneratingCard]);
 
   // ============================================================
-  // 🔥 لینک کارت (صفحه HTML)
+  // 🔥 لینک‌ها
   // ============================================================
+  // ===== لینک صفحه کارت (برای کپی در صورت عدم وجود تصویر) =====
   const cardPageUrl = `${appUrl}/snippet/${snippet?.slug}/card?theme=${selectedTheme}`;
+  
+  // ===== لینک صفحه اسنیپت (برای اشتراک‌گذاری در شبکه‌های اجتماعی) =====
+  const snippetPageUrl = `${appUrl}/snippet/${snippet?.slug}`;
 
   // ============================================================
-  // 🔥 دکمه کپی اختصاصی (لینک تصویر ذخیره‌شده یا لینک صفحه کارت)
+  // 🔥 دکمه کپی اختصاصی
   // ============================================================
   const handleCopyLink = async () => {
-    // اگر تصویر قبلاً آپلود شده، لینک آن را کپی کن
+    // اگر تصویر قبلاً آپلود شده، لینک تصویر را کپی کن
+    // در غیر این صورت لینک صفحه کارت را کپی کن
     const linkToCopy = localSavedImageUrl || cardPageUrl;
     try {
       await navigator.clipboard.writeText(linkToCopy);
@@ -131,7 +135,6 @@ export default function PreviewTab({
   const handleUploadImage = async () => {
     if (onUploadImage) {
       await onUploadImage();
-      // وضعیت‌ها از طریق props به‌روز می‌شوند
     } else {
       showToast('❌ Upload function not available');
     }
@@ -162,7 +165,9 @@ export default function PreviewTab({
 
   const handleShare = (platform: string) => {
     setShowShareDropdown(false);
-    const shareUrl = localSavedImageUrl || cardPageUrl;
+    // برای اشتراک‌گذاری، اگر تصویر آپلود شده باشد از لینک تصویر استفاده کن
+    // در غیر این صورت از لینک صفحه اسنیپت استفاده کن
+    const shareUrl = localSavedImageUrl || snippetPageUrl;
     const title = snippet?.card_title || 'Check out this code analysis on Zbloue!';
     const fullText = `${title} - Analyze your code with AI and share it with the world! #Zbloue #CodeReview #AI #Developer`;
 

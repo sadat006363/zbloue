@@ -105,11 +105,16 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
     }));
 
     // ============================================================
-    // 🔥 تابع آپلود تصویر کارت
+    // 🔥 تابع آپلود تصویر کارت (با استفاده از imageDataUrl موجود)
     // ============================================================
     const handleUploadImage = useCallback(async () => {
       if (!snippet?.slug) {
         showToast('❌ No snippet available');
+        return;
+      }
+
+      if (!cardImageDataUrl) {
+        showToast('❌ No card image to upload. Please generate card first.');
         return;
       }
 
@@ -120,9 +125,7 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             slug: snippet.slug,
-            title: snippet.card_title || 'Code Analysis',
-            username: displayUsername || 'Developer',
-            theme: selectedTheme,
+            imageDataUrl: cardImageDataUrl,
           }),
         });
 
@@ -131,18 +134,18 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
           setSavedImageUrl(data.imageUrl);
           setHasUploaded(true);
           showToast('✅ Card image uploaded successfully!');
-          return data.imageUrl;
         } else {
           throw new Error(data.error || 'Upload failed');
         }
       } catch (error: any) {
-        console.error('Upload error:', error);
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Upload error:', error);
+        }
         showToast(`❌ ${error.message || 'Failed to upload'}`);
-        return null;
       } finally {
         setIsUploading(false);
       }
-    }, [snippet, displayUsername, selectedTheme]);
+    }, [snippet, cardImageDataUrl]);
 
     const updateSnippetInDatabase = useCallback(async (username: string, githubUsername: string) => {
       if (!snippet || !snippet.slug) return;
