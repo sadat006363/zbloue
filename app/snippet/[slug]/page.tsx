@@ -1,4 +1,3 @@
-// app/snippet/[slug]/page.tsx
 import { createClient } from '@supabase/supabase-js';
 import { notFound } from 'next/navigation';
 import { highlightCode } from '@/lib/shiki';
@@ -19,11 +18,9 @@ import {
   LineExplanation,
 } from '@/types';
 
-// ============================================================
-// 🔥 تغییر به ISR (Incremental Static Regeneration)
-// ============================================================
+// ===== ISR (Incremental Static Regeneration) =====
 export const dynamic = 'auto';
-export const revalidate = 3600; // هر ۱ ساعت یکبار بازتولید می‌شود
+export const revalidate = 3600;
 
 // ===== Supabase Client با fallback =====
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder-url.supabase.co';
@@ -55,10 +52,6 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       : 'View this code snippet and its analysis.';
     const username = snippet.username || 'Developer';
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://Zbloue.vercel.app';
-    
-    // ============================================================
-    // 🔥 اگر تصویر در Blob ذخیره شده باشد، از آن استفاده کن
-    // ============================================================
     const imageUrl = snippet.card_image_url || `${appUrl}/api/og-image?slug=${slug}&title=${encodeURIComponent(title)}&username=${encodeURIComponent(username)}`;
 
     return {
@@ -69,14 +62,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
         description: description,
         type: 'article',
         url: `${appUrl}/snippet/${slug}`,
-        images: [
-          {
-            url: imageUrl,
-            width: 1200,
-            height: 630,
-            alt: title,
-          },
-        ],
+        images: [{ url: imageUrl, width: 1200, height: 630, alt: title }],
       },
       twitter: {
         card: 'summary_large_image',
@@ -109,6 +95,38 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
       notFound();
     }
 
+    // ============================================================
+    // 🔥 تشخیص حالت تحلیل
+    // ============================================================
+    const isAdvanced = snippet.code_walkthrough && snippet.code_walkthrough.length > 0;
+    const isMedium = snippet.debug_analysis && snippet.debug_analysis !== '-';
+    const isSimple = !isAdvanced && !isMedium;
+
+    // ============================================================
+    // 🔥 استخراج Debug و Optimization از analysis برای حالت Medium
+    // ============================================================
+    const extractDebugAndOptimization = (text: string) => {
+      if (!text) return { debug: null, optimization: null };
+      const debugMatch = text.match(/### 🐛 Critical Issues\n([\s\S]*?)(?=\n###|$)/);
+      const optimizationMatch = text.match(/### ⚡ Quick Fix\n([\s\S]*?)(?=\n###|$)/);
+      return {
+        debug: debugMatch ? debugMatch[1].trim() : null,
+        optimization: optimizationMatch ? optimizationMatch[1].trim() : null,
+      };
+    };
+
+    const extracted = isMedium ? extractDebugAndOptimization(snippet.what_this_code_does) : {};
+
+    // ============================================================
+    // 🔥 نشانگر حالت تحلیل (Mode Badge)
+    // ============================================================
+    const modeBadge = {
+      simple: { label: '⚡ Simple Analysis', color: 'bg-blue-500/20 text-blue-300 border-blue-500/30' },
+      medium: { label: '📊 Medium Analysis', color: 'bg-purple-500/20 text-purple-300 border-purple-500/30' },
+      advanced: { label: '🔬 Advanced Analysis', color: 'bg-green-500/20 text-green-300 border-green-500/30' },
+    }[isAdvanced ? 'advanced' : isMedium ? 'medium' : 'simple'];
+
+    // ===== هایلایت کد =====
     let highlightedHtml = '';
     try {
       highlightedHtml = await highlightCode(snippet.raw_code, snippet.language);
@@ -160,6 +178,8 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
     return (
       <main className="min-h-screen bg-[#0f0f14] text-[#cdd6f4] p-4 md:p-8 flex flex-col items-center">
         <div className="max-w-4xl w-full">
+
+          {/* ===== HEADER ===== */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
             <Link href="/" className="text-[#89b4fa] hover:text-[#b4befe] transition-colors inline-flex items-center gap-2 text-sm font-medium">
               ← Back to Home
@@ -170,19 +190,29 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
             </div>
           </div>
 
+          {/* ===== MAIN CARD ===== */}
           <div className="bg-[#1e1e2e] rounded-xl p-6 md:p-8 shadow-2xl border border-[#313244] space-y-6">
+
+            {/* ===== TITLE & MODE BADGE ===== */}
             <div>
               <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
-                <div>
-                  <h1 className="text-2xl md:text-3xl font-bold text-white mb-2 tracking-tight">
-                    {safeString(snippet.card_title || 'Code Analysis')}
-                  </h1>
+                <div className="flex-1">
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                    <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">
+                      {safeString(snippet.card_title || 'Code Analysis')}
+                    </h1>
+                    <span className={`text-xs px-2.5 py-0.5 rounded-full border font-medium ${modeBadge.color}`}>
+                      {modeBadge.label}
+                    </span>
+                  </div>
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[#a6adc8] text-xs md:text-sm">
                     <span className="bg-[#313244] px-2.5 py-0.5 rounded-full text-[#cba6f7] font-semibold">
                       {safeString(snippet.language).toUpperCase()}
                     </span>
                     <span>•</span>
                     <span>Published: {formattedDate}</span>
+                    <span>•</span>
+                    <span>Lines: {snippet.raw_code.split('\n').length}</span>
                   </div>
                 </div>
 
@@ -214,6 +244,7 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
               </div>
             </div>
 
+            {/* ===== SOURCE CODE ===== */}
             <div className="space-y-2">
               <div className="flex justify-between items-center">
                 <span className="text-sm font-semibold text-[#89b4fa]">💻 Source Code</span>
@@ -224,47 +255,63 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
               </div>
             </div>
 
+            {/* ===== BASIC ANALYSIS ===== */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-[#313244]">
               <div className="space-y-2">
-                <h3 className="text-lg font-semibold text-[#89b4fa] flex items-center gap-2">💡 Key Concept</h3>
+                <h3 className="text-lg font-semibold text-[#89b4fa] flex items-center gap-2">
+                  💡 Key Concept
+                </h3>
                 <p className="text-[#a6adc8] text-sm leading-relaxed whitespace-pre-wrap">
                   {safeString(snippet.key_concept || 'No key concept provided.')}
                 </p>
               </div>
+
               <div className="space-y-2">
-                <h3 className="text-lg font-semibold text-[#89b4fa] flex items-center gap-2">🔍 What This Code Does</h3>
+                <h3 className="text-lg font-semibold text-[#89b4fa] flex items-center gap-2">
+                  🔍 What This Code Does
+                </h3>
                 <p className="text-[#a6adc8] text-sm leading-relaxed whitespace-pre-wrap">
                   {safeString(snippet.what_this_code_does || 'No description available.')}
                 </p>
               </div>
             </div>
 
-            {(snippet.debug_analysis && snippet.debug_analysis !== '-') ||
-              (snippet.optimization && snippet.optimization !== '-') ? (
+            {/* ============================================================
+                🔥 DEBUG & OPTIMIZATION (فقط برای حالت Medium و Advanced)
+                ============================================================ */}
+            {(isMedium || isAdvanced) && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-[#313244]">
-                {snippet.debug_analysis && snippet.debug_analysis !== '-' && (
-                  <div className="space-y-2">
-                    <h3 className="text-lg font-semibold text-[#f38ba8]">🐛 Debug Analysis</h3>
-                    <p className="text-[#a6adc8] text-sm leading-relaxed whitespace-pre-wrap">
-                      {safeString(snippet.debug_analysis)}
-                    </p>
-                  </div>
-                )}
-                {snippet.optimization && snippet.optimization !== '-' && (
-                  <div className="space-y-2">
-                    <h3 className="text-lg font-semibold text-[#a6e3a1]">⚡ Optimization</h3>
-                    <p className="text-[#a6adc8] text-sm leading-relaxed whitespace-pre-wrap">
-                      {safeString(snippet.optimization)}
-                    </p>
-                  </div>
-                )}
-              </div>
-            ) : null}
+                {/* Debug Analysis */}
+                <div className="space-y-2">
+                  <h3 className="text-lg font-semibold text-[#f38ba8]">🐛 Debug Analysis</h3>
+                  <p className="text-[#a6adc8] text-sm leading-relaxed whitespace-pre-wrap">
+                    {isAdvanced
+                      ? safeString(snippet.debug_analysis || 'No bugs identified.')
+                      : safeString(extracted.debug || 'No debug information available.')}
+                  </p>
+                </div>
 
-            {hasAdvancedAnalysis && (
+                {/* Optimization */}
+                <div className="space-y-2">
+                  <h3 className="text-lg font-semibold text-[#a6e3a1]">⚡ Optimization</h3>
+                  <p className="text-[#a6adc8] text-sm leading-relaxed whitespace-pre-wrap">
+                    {isAdvanced
+                      ? safeString(snippet.optimization || 'No improvements suggested.')
+                      : safeString(extracted.optimization || 'No optimization suggestions available.')}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* ============================================================
+                🔥 ADVANCED ANALYSIS (فقط برای حالت Advanced)
+                ============================================================ */}
+            {isAdvanced && hasAdvancedAnalysis && (
               <div className="pt-6 border-t border-[#313244]">
                 <h2 className="text-2xl font-bold text-white mb-4">📊 Advanced Analysis</h2>
+
                 <div className="space-y-4 text-[#cdd6f4]">
+                  {/* Code Walkthrough */}
                   {snippet.code_walkthrough && snippet.code_walkthrough.length > 0 && (
                     <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
                       <h3 className="text-lg font-semibold text-[#89b4fa]">🧩 Code Walkthrough</h3>
@@ -278,6 +325,8 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
                       </div>
                     </div>
                   )}
+
+                  {/* What Works Well */}
                   {snippet.what_works_well && snippet.what_works_well.length > 0 && (
                     <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
                       <h3 className="text-lg font-semibold text-[#a6e3a1]">✅ What Works Well</h3>
@@ -288,6 +337,8 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
                       </ul>
                     </div>
                   )}
+
+                  {/* Bugs and Risky Cases */}
                   {snippet.bugs_and_risky_cases && snippet.bugs_and_risky_cases.length > 0 && (
                     <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
                       <h3 className="text-lg font-semibold text-[#f38ba8]">🐛 Bugs and Risky Cases</h3>
@@ -302,6 +353,8 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
                       </div>
                     </div>
                   )}
+
+                  {/* Edge Cases */}
                   {snippet.edge_cases && snippet.edge_cases.length > 0 && (
                     <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
                       <h3 className="text-lg font-semibold text-[#89b4fa]">🧪 Edge Cases</h3>
@@ -317,6 +370,8 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
                       </div>
                     </div>
                   )}
+
+                  {/* Performance Analysis */}
                   {snippet.performance_analysis && (
                     <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
                       <h3 className="text-lg font-semibold text-[#89b4fa]">⚡ Performance Analysis</h3>
@@ -347,6 +402,8 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
                       </div>
                     </div>
                   )}
+
+                  {/* Security Analysis */}
                   {snippet.security_analysis && (
                     <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
                       <h3 className="text-lg font-semibold text-[#f38ba8]">🔒 Security Analysis</h3>
@@ -375,6 +432,8 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
                       </div>
                     </div>
                   )}
+
+                  {/* Production Readiness */}
                   {snippet.production_readiness && (
                     <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
                       <h3 className="text-lg font-semibold text-[#89b4fa]">🛡️ Production Readiness</h3>
@@ -403,6 +462,8 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
                       </div>
                     </div>
                   )}
+
+                  {/* Recommended Improvements */}
                   {snippet.recommended_improvements && snippet.recommended_improvements.length > 0 && (
                     <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
                       <h3 className="text-lg font-semibold text-[#a6e3a1]">🔧 Recommended Improvements</h3>
@@ -416,6 +477,8 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
                       </div>
                     </div>
                   )}
+
+                  {/* Scorecard */}
                   {snippet.scorecard && (
                     <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
                       <h3 className="text-lg font-semibold text-[#89b4fa]">📊 Scorecard</h3>
@@ -431,6 +494,8 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
                       </div>
                     </div>
                   )}
+
+                  {/* Final Verdict */}
                   {snippet.final_verdict_summary && (
                     <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
                       <h3 className="text-lg font-semibold text-[#89b4fa]">🏁 Final Verdict</h3>
@@ -443,6 +508,8 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
                       )}
                     </div>
                   )}
+
+                  {/* Improved Code */}
                   {snippet.improved_code && (
                     <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
                       <h3 className="text-lg font-semibold text-[#89b4fa]">✨ Improved Code</h3>
@@ -451,6 +518,8 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
                       </pre>
                     </div>
                   )}
+
+                  {/* Suggested Tests */}
                   {snippet.suggested_tests && snippet.suggested_tests.length > 0 && (
                     <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
                       <h3 className="text-lg font-semibold text-[#89b4fa]">🧪 Suggested Tests</h3>
@@ -470,33 +539,43 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
               </div>
             )}
 
-            {hasLineExplanations && (
-              <div className="pt-6 border-t border-[#313244]">
-                <h2 className="text-2xl font-bold text-white mb-4">📝 Line-by-Line Explanations</h2>
-                <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
-                  <div className="space-y-2 max-h-[500px] overflow-y-auto">
-                    {snippet.line_explanations.map((item: LineExplanation, idx: number) => (
-                      <div key={idx} className="border-b border-[#313244] pb-2 last:border-0">
-                        <p className="font-mono text-sm text-[#cdd6f4]">Line {item.lineNumber}: {item.code}</p>
-                        <p className="text-[#a6adc8] text-sm">💡 {item.explanation}</p>
+            {/* ============================================================
+                🔥 LINE-BY-LINE و PROMPT (فقط در حالت Advanced)
+                ============================================================ */}
+            {isAdvanced && (
+              <>
+                {hasLineExplanations && (
+                  <div className="pt-6 border-t border-[#313244]">
+                    <h2 className="text-2xl font-bold text-white mb-4">📝 Line-by-Line Explanations</h2>
+                    <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
+                      <div className="space-y-2 max-h-[500px] overflow-y-auto">
+                        {snippet.line_explanations.map((item: LineExplanation, idx: number) => (
+                          <div key={idx} className="border-b border-[#313244] pb-2 last:border-0">
+                            <p className="font-mono text-sm text-[#cdd6f4]">Line {item.lineNumber}: {item.code}</p>
+                            <p className="text-[#a6adc8] text-sm">💡 {item.explanation}</p>
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    </div>
                   </div>
-                </div>
-              </div>
+                )}
+
+                {hasGeneratedPrompt && (
+                  <div className="pt-6 border-t border-[#313244]">
+                    <h2 className="text-2xl font-bold text-white mb-4">📝 Generated Prompt</h2>
+                    <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
+                      <div className="bg-[#0a0a0a] p-3 rounded text-[#cdd6f4] text-sm whitespace-pre-wrap max-h-[400px] overflow-y-auto">
+                        {snippet.generated_prompt}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
-            {hasGeneratedPrompt && (
-              <div className="pt-6 border-t border-[#313244]">
-                <h2 className="text-2xl font-bold text-white mb-4">📝 Generated Prompt</h2>
-                <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
-                  <div className="bg-[#0a0a0a] p-3 rounded text-[#cdd6f4] text-sm whitespace-pre-wrap max-h-[400px] overflow-y-auto">
-                    {snippet.generated_prompt}
-                  </div>
-                </div>
-              </div>
-            )}
-
+            {/* ============================================================
+                🔥 LINKEDIN POST (برای همه حالت‌ها)
+                ============================================================ */}
             <div className="pt-6 border-t border-[#313244] space-y-3">
               <div className="flex justify-between items-center">
                 <h3 className="text-lg font-semibold text-[#fab387] flex items-center gap-2">💼 LinkedIn Post</h3>
@@ -507,6 +586,9 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
               </div>
             </div>
 
+            {/* ============================================================
+                🔥 SHARE BUTTONS
+                ============================================================ */}
             <div className="pt-6 border-t border-[#313244] space-y-3">
               <h3 className="text-lg font-semibold text-[#89b4fa] flex items-center gap-2">🌐 Share This Analysis</h3>
               <div className="flex flex-wrap gap-2">
@@ -525,6 +607,7 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
               </div>
             </div>
 
+            {/* ===== FOOTER ===== */}
             <div className="mt-8 pt-6 border-t border-[#313244]">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-[#a6adc8]">
                 <div className="flex flex-col sm:flex-row items-center gap-2 text-center sm:text-left">
@@ -540,6 +623,7 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
                 <div className="text-xs text-[#6c7086]">✨ Share your code. Get insights. Grow your network.</div>
               </div>
             </div>
+
           </div>
         </div>
       </main>
