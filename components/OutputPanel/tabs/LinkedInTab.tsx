@@ -1,7 +1,6 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
 import { safeString } from '@/lib/utils';
-import { CopyButton } from '@/components/common';
 
 interface LinkedInTabProps {
   linkedinPost: string;
@@ -54,6 +53,19 @@ export default function LinkedInTab({ linkedinPost, shareUrl, showToast }: Linke
     }
   };
 
+  // ============================================================
+  // 🔥 دکمه کپی اختصاصی (مستقل از CopyButton)
+  // ============================================================
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(linkedinPost);
+      showToast('✅ LinkedIn post copied!');
+    } catch (error) {
+      console.error('Copy failed:', error);
+      showToast('❌ Failed to copy');
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* ===== Header with Title and Copy Button ===== */}
@@ -66,13 +78,19 @@ export default function LinkedInTab({ linkedinPost, shareUrl, showToast }: Linke
         </div>
         
         <div className="flex items-center gap-2">
-          {/* ===== Copy Button ===== */}
-          <CopyButton 
-            text={linkedinPost} 
-            label="Copy" 
-            tooltip="Copy LinkedIn post text"
-            onCopy={() => showToast('✅ LinkedIn post copied!')}
-          />
+          {/* ============================================================
+              🔥 دکمه کپی اختصاصی که محتوای پست لینکدین را کپی می‌کند
+              ============================================================ */}
+          <button
+            onClick={handleCopy}
+            className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md transition border border-[#d0d0d8] text-[#4a4a6a] hover:text-[#4a86f7] hover:bg-[#f1f3f5]"
+            title="Copy LinkedIn post to clipboard"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+            </svg>
+            <span>Copy</span>
+          </button>
           
           {/* ===== Share Dropdown Button ===== */}
           <div className="relative" ref={dropdownRef}>

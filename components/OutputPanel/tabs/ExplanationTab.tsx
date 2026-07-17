@@ -35,10 +35,15 @@ export default function ExplanationTab({
       content += `🐛 Debug Analysis:\n${safeString(debugAnalysis)}\n\n`;
       content += `⚡ Optimization:\n${safeString(optimization)}\n\n`;
     } else {
-      content += `📌 ${safeString(cardTitle)}\n\n`;
-      content += `📝 Summary:\n${safeString(keyConcept)}\n\n`;
-      if (debugAnalysis && debugAnalysis !== '-') {
-        content += `🐛 Debug Analysis:\n${safeString(debugAnalysis)}\n\n`;
+      // ===== حالت Simple/Medium: از quickAnalysisText استفاده کن =====
+      if (quickAnalysisText) {
+        content = quickAnalysisText;
+      } else {
+        content += `📌 ${safeString(cardTitle)}\n\n`;
+        content += `📝 Summary:\n${safeString(keyConcept)}\n\n`;
+        if (debugAnalysis && debugAnalysis !== '-') {
+          content += `🐛 Debug Analysis:\n${safeString(debugAnalysis)}\n\n`;
+        }
       }
     }
     
@@ -219,6 +224,21 @@ export default function ExplanationTab({
           </h2>
           
           {(() => {
+            // ===== اگر quickAnalysisText وجود دارد، از آن استفاده کن =====
+            if (quickAnalysisText) {
+              const sections = parseQuickAnalysis(quickAnalysisText);
+              if (sections && sections.length > 0) {
+                return sections.map((section, idx) => (
+                  <div key={idx}>
+                    {renderSection(section.title, section.content)}
+                  </div>
+                ));
+              }
+              // اگر parse نشد، کل متن را نمایش بده
+              return renderSection('📝 Analysis', quickAnalysisText);
+            }
+            
+            // ===== fallback: از keyConcept استفاده کن =====
             const sections = parseQuickAnalysis(keyConcept);
             if (sections && sections.length > 0) {
               return sections.map((section, idx) => (
