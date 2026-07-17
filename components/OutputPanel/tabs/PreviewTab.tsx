@@ -99,9 +99,14 @@ export default function PreviewTab({
   }, [cardImageDataUrl, isGeneratingCard]);
 
   // ============================================================
+  // 🔥 استخراج slug از snippet یا publicUrl (به عنوان fallback)
+  // ============================================================
+  const slug = snippet?.slug || publicUrl.split('/').pop() || 'unknown';
+
+  // ============================================================
   // 🔥 لینک صفحه کارت (HTML) – برای کپی قبل از آپلود
   // ============================================================
-  const cardPageUrl = `${appUrl}/snippet/${snippet?.slug}/card?theme=${selectedTheme}`;
+  const cardPageUrl = `${appUrl}/snippet/${slug}/card?theme=${selectedTheme}`;
 
   // ============================================================
   // 🔥 دکمه کپی – اگر تصویر آپلود شده، لینک تصویر را کپی کن،
