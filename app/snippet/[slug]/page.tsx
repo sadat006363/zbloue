@@ -32,6 +32,22 @@ interface PageProps {
   searchParams?: Promise<{ tab?: string }>;
 }
 
+// ===== تابع استخراج Debug و Optimization از متن analysis =====
+type ExtractedDebug = {
+  debug: string | null;
+  optimization: string | null;
+};
+
+const extractDebugAndOptimization = (text: string): ExtractedDebug => {
+  if (!text) return { debug: null, optimization: null };
+  const debugMatch = text.match(/### 🐛 Critical Issues\n([\s\S]*?)(?=\n###|$)/);
+  const optimizationMatch = text.match(/### ⚡ Quick Fix\n([\s\S]*?)(?=\n###|$)/);
+  return {
+    debug: debugMatch ? debugMatch[1].trim() : null,
+    optimization: optimizationMatch ? optimizationMatch[1].trim() : null,
+  };
+};
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
 
@@ -103,19 +119,11 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
     const isSimple = !isAdvanced && !isMedium;
 
     // ============================================================
-    // 🔥 استخراج Debug و Optimization از analysis برای حالت Medium
+    // 🔥 استخراج Debug و Optimization (با نوع صریح)
     // ============================================================
-    const extractDebugAndOptimization = (text: string) => {
-      if (!text) return { debug: null, optimization: null };
-      const debugMatch = text.match(/### 🐛 Critical Issues\n([\s\S]*?)(?=\n###|$)/);
-      const optimizationMatch = text.match(/### ⚡ Quick Fix\n([\s\S]*?)(?=\n###|$)/);
-      return {
-        debug: debugMatch ? debugMatch[1].trim() : null,
-        optimization: optimizationMatch ? optimizationMatch[1].trim() : null,
-      };
-    };
-
-    const extracted = isMedium ? extractDebugAndOptimization(snippet.what_this_code_does) : {};
+    const extracted: ExtractedDebug = isMedium
+      ? extractDebugAndOptimization(snippet.what_this_code_does)
+      : { debug: null, optimization: null };
 
     // ============================================================
     // 🔥 نشانگر حالت تحلیل (Mode Badge)
