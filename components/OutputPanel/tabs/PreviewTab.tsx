@@ -74,7 +74,7 @@ export default function PreviewTab({
   const [copySuccess, setCopySuccess] = useState(false);
 
   // ============================================================
-  // 🔥 لینک صحیح برای صفحه کارت (نه صفحه اسنیپت)
+  // 🔥 لینک کارت (card page) با تم انتخاب‌شده
   // ============================================================
   const cardPageUrl = `${appUrl}/snippet/${snippet?.slug}/card?theme=${selectedTheme}`;
 
