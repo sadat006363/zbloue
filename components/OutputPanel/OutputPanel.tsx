@@ -332,6 +332,7 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
           setDisplayGithubUsername(snippet.github_username);
           setTempGithubUsername(snippet.github_username);
         }
+        // Load avatar from snippet
         if (snippet.avatar_url) {
           setAvatarUrl(snippet.avatar_url);
         }
@@ -725,6 +726,7 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
             codeSnippet={snippet?.raw_code || ''}
             createdAt={snippet?.created_at}
             githubUsername={displayGithubUsername || undefined}
+            avatarUrl={avatarUrl} // Pass avatar URL to CardPreview
           />
         </div>
 

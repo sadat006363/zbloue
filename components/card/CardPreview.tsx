@@ -21,6 +21,7 @@ interface CardPreviewProps {
   githubUsername?: string;
   views?: number;
   interactive?: boolean;
+  avatarUrl?: string | null; // NEW: avatar URL from upload
 }
 
 const CardPreview = forwardRef<HTMLDivElement, CardPreviewProps>(
@@ -38,6 +39,7 @@ const CardPreview = forwardRef<HTMLDivElement, CardPreviewProps>(
     githubUsername,
     views = 0,
     interactive = false,
+    avatarUrl = null, // NEW
   }, ref) => {
     const colors = themes[theme] || themes.blue;
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://Zbloue.vercel.app';
@@ -60,6 +62,7 @@ const CardPreview = forwardRef<HTMLDivElement, CardPreviewProps>(
           userAvatar={userAvatar}
           interactive={interactive}
           appUrl={appUrl}
+          avatarUrl={avatarUrl} // NEW
         />
 
         <CardContent
