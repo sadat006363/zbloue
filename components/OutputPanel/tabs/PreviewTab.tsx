@@ -26,7 +26,6 @@ interface PreviewTabProps {
   hasUploaded?: boolean;
   onUploadImage?: () => Promise<void>;
   cardPageUrl: string;
-  // ===== NEW: Avatar props =====
   avatarUrl?: string | null;
   isUploadingAvatar?: boolean;
   onUploadAvatar?: (file: File) => Promise<void>;
@@ -210,7 +209,9 @@ export default function PreviewTab({
 
   return (
     <div className="flex flex-col items-center gap-4">
-      {/* ===== HEADER ===== */}
+      {/* ============================================================
+          🔥 HEADER
+          ============================================================ */}
       <div className="flex flex-wrap items-center justify-between w-full max-w-[600px]">
         <h2 className="text-lg font-semibold text-[#1a1a2e] flex items-center gap-2">
           <span>🖼️</span> Card Preview
@@ -317,68 +318,133 @@ export default function PreviewTab({
       </div>
 
       {/* ============================================================
-          🔥 NEW: Avatar Upload Section
+          🔥 Avatar + Change Name - SIDE BY SIDE
           ============================================================ */}
-      <div className="w-full max-w-[600px]">
-        <div className="flex items-center gap-4 p-3 bg-gray-50 rounded-xl border border-gray-200">
-          {/* Avatar preview */}
-          <div className="relative flex-shrink-0">
-            {avatarUrl ? (
-              <img
-                src={avatarUrl}
-                alt="Avatar"
-                className="w-14 h-14 rounded-full object-cover border-2 border-blue-400"
-              />
-            ) : (
-              <div className="w-14 h-14 rounded-full bg-gray-200 flex items-center justify-center text-gray-400 border-2 border-gray-300">
-                <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                </svg>
-              </div>
-            )}
-            {isUploadingAvatar && (
-              <div className="absolute inset-0 bg-black/30 rounded-full flex items-center justify-center">
-                <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              </div>
-            )}
-          </div>
-
-          {/* Upload controls */}
-          <div className="flex-1">
-            <p className="text-sm font-medium text-gray-700">Profile Picture</p>
-            <p className="text-xs text-gray-500">Upload a photo to personalize your card</p>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleFileSelect}
-              className="hidden"
-            />
-            <div className="flex items-center gap-3 mt-1">
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploadingAvatar}
-                className="text-xs text-blue-600 hover:text-blue-800 hover:underline transition disabled:opacity-50"
-              >
-                {avatarUrl ? 'Change Photo' : 'Upload Photo'}
-              </button>
-              {avatarUrl && (
-                <button
-                  onClick={() => {
-                    // Optionally remove avatar - you can implement this if needed
-                    showToast('ℹ️ Remove avatar feature coming soon');
-                  }}
-                  className="text-xs text-red-500 hover:text-red-700 hover:underline transition"
-                >
-                  Remove
-                </button>
+      <div className="w-full max-w-[600px] flex flex-col md:flex-row gap-4">
+        {/* Left: Avatar Upload */}
+        <div className="flex-1">
+          <div className="flex items-center gap-4 p-3 bg-gray-50 rounded-xl border border-gray-200 h-full">
+            {/* Avatar preview */}
+            <div className="relative flex-shrink-0">
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt="Avatar"
+                  className="w-14 h-14 rounded-full object-cover border-2 border-blue-400"
+                />
+              ) : (
+                <div className="w-14 h-14 rounded-full bg-gray-200 flex items-center justify-center text-gray-400 border-2 border-gray-300">
+                  <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                  </svg>
+                </div>
+              )}
+              {isUploadingAvatar && (
+                <div className="absolute inset-0 bg-black/30 rounded-full flex items-center justify-center">
+                  <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                </div>
               )}
             </div>
+
+            {/* Upload controls */}
+            <div className="flex-1">
+              <p className="text-sm font-medium text-gray-700">Profile Picture</p>
+              <p className="text-xs text-gray-500">Upload a photo</p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+              <div className="flex items-center gap-3 mt-1">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploadingAvatar}
+                  className="text-xs text-blue-600 hover:text-blue-800 hover:underline transition disabled:opacity-50"
+                >
+                  {avatarUrl ? 'Change Photo' : 'Upload Photo'}
+                </button>
+                {avatarUrl && (
+                  <button
+                    onClick={() => {
+                      showToast('ℹ️ Remove avatar feature coming soon');
+                    }}
+                    className="text-xs text-red-500 hover:text-red-700 hover:underline transition"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right: Change Name */}
+        <div className="flex-1">
+          <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 h-full flex flex-col justify-center">
+            <button
+              onClick={() => setShowUsernameInput(!showUsernameInput)}
+              className="text-sm text-blue-600 hover:text-blue-800 hover:underline transition text-left flex items-center gap-2"
+            >
+              <span>👤</span>
+              {showUsernameInput ? 'Hide Name & GitHub' : 'Change Name & GitHub'}
+            </button>
+
+            {showUsernameInput && (
+              <div className="mt-3 space-y-2">
+                <div className="relative">
+                  <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[#6c7086] pointer-events-none">
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                    </svg>
+                  </div>
+                  <input
+                    type="text"
+                    value={tempUsername}
+                    onChange={(e) => setTempUsername(e.target.value)}
+                    placeholder="Your name"
+                    className="w-full px-3 py-1.5 pl-9 rounded-md border-2 border-[#d0d0d8] text-sm focus:outline-none focus:border-[#4a86f7] transition bg-white"
+                  />
+                </div>
+                <div className="relative">
+                  <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[#6c7086] pointer-events-none">
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.15 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.62.24 2.85.12 3.15.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
+                    </svg>
+                  </div>
+                  <input
+                    type="text"
+                    value={tempGithubUsername}
+                    onChange={(e) => setTempGithubUsername(e.target.value.trim())}
+                    placeholder="GitHub username (e.g., sadat006363)"
+                    className="w-full px-3 py-1.5 pl-9 rounded-md border-2 border-[#d0d0d8] text-sm focus:outline-none focus:border-[#4a86f7] transition bg-white"
+                  />
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <button
+                    onClick={updateCardImage}
+                    disabled={isUpdating}
+                    className="flex-1 bg-[#4a86f7] hover:bg-[#3b6fd4] text-white px-3 py-1.5 rounded-md text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isUpdating ? 'Updating...' : 'Update'}
+                  </button>
+                  <button
+                    onClick={() => setShowUsernameInput(false)}
+                    className="px-3 py-1.5 rounded-md text-sm border-2 border-[#d0d0d8] hover:bg-gray-100 transition"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* ===== Theme Selector ===== */}
+      {/* ============================================================
+          🔥 Theme Selector
+          ============================================================ */}
       <div className="w-full max-w-[600px]">
         <ThemeSelector
           themes={themes}
@@ -389,77 +455,9 @@ export default function PreviewTab({
         />
       </div>
 
-      {/* ===== Username Input ===== */}
-      <div className="w-full max-w-[600px]">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowUsernameInput(!showUsernameInput)}
-            className="text-sm text-[#4a4a6a] hover:text-[#4a86f7] transition px-3 py-1 rounded-md border border-[#d0d0d8] hover:border-[#4a86f7]"
-          >
-            👤 {showUsernameInput ? 'Hide' : 'Change Name'}
-          </button>
-        </div>
-      </div>
-
-      {showUsernameInput && (
-        <div className="w-full max-w-[600px] space-y-3 bg-[#f1f3f5] p-4 rounded-lg border-2 border-[#d0d0d8]">
-          <div className="flex items-center gap-2">
-            <div className="flex-1 relative">
-              <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[#6c7086] pointer-events-none">
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                </svg>
-              </div>
-              <input
-                type="text"
-                value={tempUsername}
-                onChange={(e) => setTempUsername(e.target.value)}
-                placeholder="Your name (for card)"
-                className="w-full px-3 py-2 rounded-md border-2 border-[#d0d0d8] text-sm focus:outline-none focus:border-[#4a86f7] transition bg-white pl-9"
-              />
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <div className="flex-1 relative">
-              <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[#6c7086] pointer-events-none">
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.15 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.62.24 2.85.12 3.15.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
-                </svg>
-              </div>
-              <input
-                type="text"
-                value={tempGithubUsername}
-                onChange={(e) => setTempGithubUsername(e.target.value.trim())}
-                placeholder="Enter your GitHub username only (e.g., sadat006363)"
-                className="w-full px-3 py-2 rounded-md border-2 border-[#d0d0d8] text-sm focus:outline-none focus:border-[#4a86f7] transition bg-white pl-9"
-              />
-            </div>
-          </div>
-          
-          <div className="flex gap-2 pt-2 border-t border-[#d0d0d8]">
-            <button
-              onClick={updateCardImage}
-              disabled={isUpdating}
-              className="flex-1 bg-[#4a86f7] hover:bg-[#3b6fd4] text-white px-4 py-2 rounded-md text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              💾 Update Card
-            </button>
-            <button
-              onClick={() => setShowUsernameInput(false)}
-              className="px-4 py-2 rounded-md text-sm border-2 border-[#d0d0d8] hover:bg-[#e8e8f0] transition"
-            >
-              Close
-            </button>
-          </div>
-          
-          <p className="text-xs text-[#6c7086] flex items-center gap-1">
-            <span>💡</span> Enter your GitHub username only (e.g., sadat006363). The full URL will be generated automatically.
-          </p>
-        </div>
-      )}
-
-      {/* ===== Card Preview ===== */}
+      {/* ============================================================
+          🔥 Card Preview
+          ============================================================ */}
       {isGeneratingCard ? (
         <div className="flex items-center justify-center w-full max-w-[600px] h-[400px] bg-[#fafbfc] rounded-lg border-2 border-[#d0d0d8]">
           <p className="text-[#4a4a6a]">⏳ Generating card...</p>
