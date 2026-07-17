@@ -25,21 +25,43 @@ export default function ExplanationTab({
 }: ExplanationTabProps) {
   const [copySuccess, setCopySuccess] = useState(false);
   
+  // ===== تابع پاک‌سازی متن از علامت‌های ### و فرمت‌های مارک‌داون =====
+  const cleanTextForCopy = (text: string) => {
+    if (!text) return '';
+    
+    // حذف ### از ابتدای خطوط
+    let cleaned = text.replace(/^###\s*/gm, '');
+    
+    // حذف ### که با خط جدید جدا شده‌اند
+    cleaned = cleaned.replace(/\n###\s*/g, '\n');
+    
+    // تبدیل - به •
+    cleaned = cleaned.replace(/^-\s*/gm, '• ');
+    
+    // حذف ** برای متن ساده
+    cleaned = cleaned.replace(/\*\*/g, '');
+    
+    // حذف آیکون‌های تکراری از ابتدای خطوط
+    cleaned = cleaned.replace(/^[📝🐛⚡💡🔍🔧📊✅🧪🔒💼🖼️📖📌⭐🔬🛡️🏁✨🚨]\s*/gm, '');
+    
+    return cleaned;
+  };
+
   // ===== تابع جمع‌آوری متن کامل برای کپی و دانلود =====
   const getFullContent = () => {
     let content = '';
     
     if (isAdvanced) {
-      content += `📌 ${safeString(cardTitle)}\n\n`;
-      content += `💡 Key Concept:\n${safeString(keyConcept)}\n\n`;
-      content += `🔍 What This Code Does:\n${safeString(analysisText)}\n\n`;
-      content += `🐛 Debug Analysis:\n${safeString(debugAnalysis)}\n\n`;
-      content += `⚡ Optimization:\n${safeString(optimization)}\n\n`;
+      content += `📌 ${cleanTextForCopy(cardTitle)}\n\n`;
+      content += `💡 Key Concept:\n${cleanTextForCopy(keyConcept)}\n\n`;
+      content += `🔍 What This Code Does:\n${cleanTextForCopy(analysisText)}\n\n`;
+      content += `🐛 Debug Analysis:\n${cleanTextForCopy(debugAnalysis)}\n\n`;
+      content += `⚡ Optimization:\n${cleanTextForCopy(optimization)}\n\n`;
     } else {
-      content += `📌 ${safeString(cardTitle)}\n\n`;
-      content += `📝 Summary:\n${safeString(keyConcept)}\n\n`;
+      content += `📌 ${cleanTextForCopy(cardTitle)}\n\n`;
+      content += `📝 Summary:\n${cleanTextForCopy(keyConcept)}\n\n`;
       if (debugAnalysis && debugAnalysis !== '-') {
-        content += `🐛 Debug Analysis:\n${safeString(debugAnalysis)}\n\n`;
+        content += `🐛 Debug Analysis:\n${cleanTextForCopy(debugAnalysis)}\n\n`;
       }
     }
     
