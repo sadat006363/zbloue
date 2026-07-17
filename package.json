@@ -24,6 +24,7 @@
     "@resvg/resvg-wasm": "^2.6.2",
     "@supabase/supabase-js": "^2.110.0",
     "@uiw/react-codemirror": "^4.23.0",
+    "@vercel/blob": "^2.6.1",
     "@vercel/og": "^0.11.1",
     "dotenv": "^17.4.2",
     "html-to-image": "^1.11.13",
