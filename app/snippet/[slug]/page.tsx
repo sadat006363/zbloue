@@ -152,7 +152,7 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
     const hasGeneratedPrompt = snippet.generated_prompt;
 
     return (
-      <main className="min-h-screen bg-gradient-to-br from-[#0f0f14] via-[#1a1a2e] to-[#0f0f14] text-[#cdd6f4] p-4 md:p-6 flex flex-col items-center">
+      <main className="min-h-screen bg-[#0f0f14] text-[#cdd6f4] p-4 md:p-6 flex flex-col items-center">
         <div className="w-full max-w-[1400px] mx-auto space-y-6">
 
           {/* ===== HEADER ===== */}
@@ -208,7 +208,7 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
             )}
           </div>
 
-          {/* ===== کد منبع (زمینه هماهنگ با بقیه بخش‌ها) ===== */}
+          {/* ===== کد منبع ===== */}
           <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 overflow-hidden">
             <div className="flex items-center justify-between px-4 py-2 bg-white/5 border-b border-white/5">
               <span className="text-sm font-semibold text-[#89b4fa]">💻 کد منبع</span>
