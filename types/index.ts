@@ -139,6 +139,13 @@ export interface FinalVerdict {
   nextSteps: string;
 }
 
+// ===== NEW: LineExplanation for line-by-line explanations =====
+export interface LineExplanation {
+  lineNumber: number;
+  code: string;
+  explanation: string;
+}
+
 // ============ GenerateResponse ============
 export interface GenerateResponse {
   // For Advanced mode
