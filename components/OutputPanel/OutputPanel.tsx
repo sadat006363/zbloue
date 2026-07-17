@@ -83,9 +83,7 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
     const isUpdatingCard = useRef(false);
     const isDownloading = useRef(false);
 
-    // ============================================================
-    // 🔥 STATEهای جدید برای آپلود تصویر
-    // ============================================================
+    // ===== STATEهای جدید برای آپلود تصویر =====
     const [savedImageUrl, setSavedImageUrl] = useState<string | null>(null);
     const [isUploading, setIsUploading] = useState(false);
     const [hasUploaded, setHasUploaded] = useState(false);
@@ -104,17 +102,10 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
       },
     }));
 
-    // ============================================================
-    // 🔥 تابع آپلود تصویر کارت (با استفاده از imageDataUrl موجود)
-    // ============================================================
+    // ===== تابع آپلود تصویر کارت =====
     const handleUploadImage = useCallback(async () => {
-      if (!snippet?.slug) {
-        showToast('❌ No snippet available');
-        return;
-      }
-
-      if (!cardImageDataUrl) {
-        showToast('❌ No card image to upload. Please generate card first.');
+      if (!snippet?.slug || !cardImageDataUrl) {
+        showToast('❌ No image to upload');
         return;
       }
 
@@ -138,9 +129,7 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
           throw new Error(data.error || 'Upload failed');
         }
       } catch (error: any) {
-        if (process.env.NODE_ENV === 'development') {
-          console.error('Upload error:', error);
-        }
+        console.error('Upload error:', error);
         showToast(`❌ ${error.message || 'Failed to upload'}`);
       } finally {
         setIsUploading(false);

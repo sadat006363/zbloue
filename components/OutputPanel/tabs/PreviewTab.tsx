@@ -81,9 +81,7 @@ export default function PreviewTab({
   const [localSavedImageUrl, setLocalSavedImageUrl] = useState<string | null>(savedImageUrl);
   const [localHasUploaded, setLocalHasUploaded] = useState<boolean>(hasUploaded);
 
-  // ============================================================
-  // 🔥 همگام‌سازی با props
-  // ============================================================
+  // ===== همگام‌سازی با props =====
   useEffect(() => {
     setLocalSavedImageUrl(savedImageUrl);
   }, [savedImageUrl]);
@@ -92,9 +90,7 @@ export default function PreviewTab({
     setLocalHasUploaded(hasUploaded);
   }, [hasUploaded]);
 
-  // ============================================================
-  // 🔥 وقتی کارت جدید تولید شد، لینک ذخیره‌شده را پاک کن
-  // ============================================================
+  // ===== وقتی کارت جدید تولید شد، لینک ذخیره‌شده را پاک کن =====
   useEffect(() => {
     if (cardImageDataUrl && !isGeneratingCard) {
       setLocalSavedImageUrl(null);
@@ -103,20 +99,15 @@ export default function PreviewTab({
   }, [cardImageDataUrl, isGeneratingCard]);
 
   // ============================================================
-  // 🔥 لینک‌ها
+  // 🔥 لینک صفحه کارت (HTML) – برای کپی قبل از آپلود
   // ============================================================
-  // ===== لینک صفحه کارت (برای کپی در صورت عدم وجود تصویر) =====
   const cardPageUrl = `${appUrl}/snippet/${snippet?.slug}/card?theme=${selectedTheme}`;
-  
-  // ===== لینک صفحه اسنیپت (برای اشتراک‌گذاری در شبکه‌های اجتماعی) =====
-  const snippetPageUrl = `${appUrl}/snippet/${snippet?.slug}`;
 
   // ============================================================
-  // 🔥 دکمه کپی اختصاصی
+  // 🔥 دکمه کپی – اگر تصویر آپلود شده، لینک تصویر را کپی کن،
+  // در غیر این صورت لینک صفحه کارت را کپی کن (نه صفحه اسنیپت)
   // ============================================================
   const handleCopyLink = async () => {
-    // اگر تصویر قبلاً آپلود شده، لینک تصویر را کپی کن
-    // در غیر این صورت لینک صفحه کارت را کپی کن
     const linkToCopy = localSavedImageUrl || cardPageUrl;
     try {
       await navigator.clipboard.writeText(linkToCopy);
@@ -129,9 +120,6 @@ export default function PreviewTab({
     }
   };
 
-  // ============================================================
-  // 🔥 دکمه آپلود تصویر
-  // ============================================================
   const handleUploadImage = async () => {
     if (onUploadImage) {
       await onUploadImage();
@@ -140,9 +128,6 @@ export default function PreviewTab({
     }
   };
 
-  // ============================================================
-  // 🔥 دکمه دانلود کارت
-  // ============================================================
   const handleDownload = async () => {
     if (isDownloading) return;
     setIsDownloading(true);
@@ -156,18 +141,13 @@ export default function PreviewTab({
     }
   };
 
-  // ============================================================
-  // 🔥 اشتراک‌گذاری
-  // ============================================================
   const toggleDropdown = () => {
     setShowShareDropdown(!showShareDropdown);
   };
 
   const handleShare = (platform: string) => {
     setShowShareDropdown(false);
-    // برای اشتراک‌گذاری، اگر تصویر آپلود شده باشد از لینک تصویر استفاده کن
-    // در غیر این صورت از لینک صفحه اسنیپت استفاده کن
-    const shareUrl = localSavedImageUrl || snippetPageUrl;
+    const shareUrl = localSavedImageUrl || cardPageUrl;
     const title = snippet?.card_title || 'Check out this code analysis on Zbloue!';
     const fullText = `${title} - Analyze your code with AI and share it with the world! #Zbloue #CodeReview #AI #Developer`;
 
@@ -189,9 +169,7 @@ export default function PreviewTab({
 
   return (
     <div className="flex flex-col items-center gap-4">
-      {/* ============================================================
-          🔥 هدر با دکمه‌ها
-          ============================================================ */}
+      {/* ===== هدر با دکمه‌ها ===== */}
       <div className="flex flex-wrap items-center justify-between w-full max-w-[600px]">
         <h2 className="text-lg font-semibold text-[#1a1a2e] flex items-center gap-2">
           <span>🖼️</span> Card Preview
