@@ -105,16 +105,38 @@ export default function PreviewTab({
   }, [cardImageDataUrl, isGeneratingCard]);
 
   // ============================================================
-  // 🔥 دکمه کپی – اگر تصویر آپلود شده، لینک تصویر را کپی کن،
-  // در غیر این صورت از cardPageUrl (که از والد می‌آید) استفاده کن
+  // 🔥 دکمه کپی با لاگ دیباگ و منطق دفاعی
   // ============================================================
   const handleCopyLink = async () => {
     const linkToCopy = localSavedImageUrl || cardPageUrl;
+
+    // ===== لاگ دیباگ برای عیب‌یابی =====
+    console.log('[🔍 Debug Copy Link]', {
+      mountedFile: 'components/OutputPanel/tabs/PreviewTab.tsx',
+      localSavedImageUrl,
+      savedImageUrl,
+      cardPageUrl,
+      publicUrl,
+      selectedTheme,
+      slug: snippet?.slug,
+      linkToCopy,
+      pathname: window?.location?.pathname || 'N/A',
+    });
+
+    if (!linkToCopy) {
+      showToast('❌ Card link is not available yet');
+      return;
+    }
+
     try {
       await navigator.clipboard.writeText(linkToCopy);
       setCopySuccess(true);
       setTimeout(() => setCopySuccess(false), 2000);
-      showToast(`✅ ${localSavedImageUrl ? 'Image link' : 'Card page link'} copied!`);
+      showToast(
+        localSavedImageUrl
+          ? '✅ Image link copied!'
+          : '✅ Card page link copied!'
+      );
     } catch (error) {
       console.error('Copy failed:', error);
       showToast('❌ Failed to copy link');
