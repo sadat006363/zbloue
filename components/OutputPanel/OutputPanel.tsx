@@ -83,6 +83,13 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
     const isUpdatingCard = useRef(false);
     const isDownloading = useRef(false);
 
+    // ============================================================
+    // 🔥 STATEهای جدید برای آپلود تصویر
+    // ============================================================
+    const [savedImageUrl, setSavedImageUrl] = useState<string | null>(null);
+    const [isUploading, setIsUploading] = useState(false);
+    const [hasUploaded, setHasUploaded] = useState(false);
+
     const isAdvanced = analysisMode === 'advanced';
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://Zbloue.vercel.app';
 
@@ -96,6 +103,46 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
         setActiveTab(tab);
       },
     }));
+
+    // ============================================================
+    // 🔥 تابع آپلود تصویر کارت
+    // ============================================================
+    const handleUploadImage = useCallback(async () => {
+      if (!snippet?.slug) {
+        showToast('❌ No snippet available');
+        return;
+      }
+
+      setIsUploading(true);
+      try {
+        const response = await fetch('/api/upload-card-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            slug: snippet.slug,
+            title: snippet.card_title || 'Code Analysis',
+            username: displayUsername || 'Developer',
+            theme: selectedTheme,
+          }),
+        });
+
+        const data = await response.json();
+        if (data.success) {
+          setSavedImageUrl(data.imageUrl);
+          setHasUploaded(true);
+          showToast('✅ Card image uploaded successfully!');
+          return data.imageUrl;
+        } else {
+          throw new Error(data.error || 'Upload failed');
+        }
+      } catch (error: any) {
+        console.error('Upload error:', error);
+        showToast(`❌ ${error.message || 'Failed to upload'}`);
+        return null;
+      } finally {
+        setIsUploading(false);
+      }
+    }, [snippet, displayUsername, selectedTheme]);
 
     const updateSnippetInDatabase = useCallback(async (username: string, githubUsername: string) => {
       if (!snippet || !snippet.slug) return;
@@ -682,6 +729,10 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
               publicUrl={publicUrl}
               appUrl={appUrl}
               downloadCard={downloadCard}
+              savedImageUrl={savedImageUrl}
+              isUploading={isUploading}
+              hasUploaded={hasUploaded}
+              onUploadImage={handleUploadImage}
             />
           )}
 

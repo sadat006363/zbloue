@@ -22,6 +22,10 @@ interface PreviewTabProps {
   publicUrl: string;
   appUrl: string;
   downloadCard: () => void;
+  savedImageUrl?: string | null; // ← اضافه شد
+  isUploading?: boolean; // ← اضافه شد
+  hasUploaded?: boolean; // ← اضافه شد
+  onUploadImage?: () => Promise<void>; // ← اضافه شد
 }
 
 const themes: CardTheme[] = [
@@ -67,84 +71,54 @@ export default function PreviewTab({
   publicUrl,
   appUrl,
   downloadCard,
+  savedImageUrl = null,
+  isUploading = false,
+  hasUploaded = false,
+  onUploadImage,
 }: PreviewTabProps) {
   const [showShareDropdown, setShowShareDropdown] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
-  
-  // ============================================================
-  // 🔥 STATE جدید: لینک تصویر ذخیره‌شده
-  // ============================================================
-  const [savedImageUrl, setSavedImageUrl] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [hasUploaded, setHasUploaded] = useState(false);
+  const [localSavedImageUrl, setLocalSavedImageUrl] = useState<string | null>(savedImageUrl);
+  const [localHasUploaded, setLocalHasUploaded] = useState<boolean>(hasUploaded);
 
   // ============================================================
-  // 🔥 تابع آپلود تصویر در Blob
+  // 🔥 همگام‌سازی با props
   // ============================================================
-  const uploadCardImage = async () => {
-    if (!snippet?.slug) {
-      showToast('❌ No snippet available');
-      return;
-    }
+  useEffect(() => {
+    setLocalSavedImageUrl(savedImageUrl);
+  }, [savedImageUrl]);
 
-    setIsUploading(true);
-    try {
-      const response = await fetch('/api/upload-card-image', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          slug: snippet.slug,
-          title: snippet.card_title || 'Code Analysis',
-          username: tempUsername || 'Developer',
-          theme: selectedTheme,
-        }),
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        setSavedImageUrl(data.imageUrl);
-        setHasUploaded(true);
-        showToast('✅ Card image uploaded successfully!');
-        return data.imageUrl;
-      } else {
-        throw new Error(data.error || 'Upload failed');
-      }
-    } catch (error: any) {
-      console.error('Upload error:', error);
-      showToast(`❌ ${error.message || 'Failed to upload'}`);
-      return null;
-    } finally {
-      setIsUploading(false);
-    }
-  };
+  useEffect(() => {
+    setLocalHasUploaded(hasUploaded);
+  }, [hasUploaded]);
 
   // ============================================================
   // 🔥 وقتی کارت جدید تولید شد، لینک ذخیره‌شده را پاک کن
   // ============================================================
   useEffect(() => {
     if (cardImageDataUrl && !isGeneratingCard) {
-      setSavedImageUrl(null);
-      setHasUploaded(false);
+      setLocalSavedImageUrl(null);
+      setLocalHasUploaded(false);
     }
   }, [cardImageDataUrl, isGeneratingCard]);
 
   // ============================================================
-  // 🔥 لینک کارت (تصویر مستقیم یا صفحه HTML)
+  // 🔥 لینک کارت (صفحه HTML)
   // ============================================================
   const cardPageUrl = `${appUrl}/snippet/${snippet?.slug}/card?theme=${selectedTheme}`;
 
   // ============================================================
-  // 🔥 دکمه کپی اختصاصی (لینک تصویر ذخیره‌شده یا لینک صفحه)
+  // 🔥 دکمه کپی اختصاصی (لینک تصویر ذخیره‌شده یا لینک صفحه کارت)
   // ============================================================
   const handleCopyLink = async () => {
     // اگر تصویر قبلاً آپلود شده، لینک آن را کپی کن
-    const linkToCopy = savedImageUrl || cardPageUrl;
+    const linkToCopy = localSavedImageUrl || cardPageUrl;
     try {
       await navigator.clipboard.writeText(linkToCopy);
       setCopySuccess(true);
       setTimeout(() => setCopySuccess(false), 2000);
-      showToast(`✅ ${savedImageUrl ? 'Image' : 'Page'} link copied!`);
+      showToast(`✅ ${localSavedImageUrl ? 'Image link' : 'Card page link'} copied!`);
     } catch (error) {
       console.error('Copy failed:', error);
       showToast('❌ Failed to copy link');
@@ -155,7 +129,12 @@ export default function PreviewTab({
   // 🔥 دکمه آپلود تصویر
   // ============================================================
   const handleUploadImage = async () => {
-    await uploadCardImage();
+    if (onUploadImage) {
+      await onUploadImage();
+      // وضعیت‌ها از طریق props به‌روز می‌شوند
+    } else {
+      showToast('❌ Upload function not available');
+    }
   };
 
   // ============================================================
@@ -183,7 +162,7 @@ export default function PreviewTab({
 
   const handleShare = (platform: string) => {
     setShowShareDropdown(false);
-    const shareUrl = savedImageUrl || cardPageUrl;
+    const shareUrl = localSavedImageUrl || cardPageUrl;
     const title = snippet?.card_title || 'Check out this code analysis on Zbloue!';
     const fullText = `${title} - Analyze your code with AI and share it with the world! #Zbloue #CodeReview #AI #Developer`;
 
@@ -218,29 +197,29 @@ export default function PreviewTab({
           <button
             onClick={handleCopyLink}
             className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md transition border border-[#d0d0d8] text-[#4a4a6a] hover:text-[#4a86f7] hover:bg-[#f1f3f5]"
-            title={savedImageUrl ? 'Copy image link' : 'Copy page link'}
+            title={localSavedImageUrl ? 'Copy image link' : 'Copy card page link'}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
             </svg>
-            <span>{copySuccess ? '✅ Copied!' : (savedImageUrl ? 'Copy Image Link' : 'Copy Link')}</span>
+            <span>{copySuccess ? '✅ Copied!' : (localSavedImageUrl ? 'Copy Image Link' : 'Copy Link')}</span>
           </button>
 
           {/* ===== دکمه آپلود تصویر ===== */}
           <button
             onClick={handleUploadImage}
-            disabled={isUploading || !cardImageDataUrl || hasUploaded}
+            disabled={isUploading || !cardImageDataUrl || localHasUploaded}
             className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md transition border ${
-              isUploading || !cardImageDataUrl || hasUploaded
+              isUploading || !cardImageDataUrl || localHasUploaded
                 ? 'border-[#d0d0d8] text-[#a0a0b0] cursor-not-allowed bg-[#f8f9fa]'
                 : 'border-[#4a86f7] text-[#4a86f7] hover:bg-[#f1f3f5]'
             }`}
-            title={hasUploaded ? 'Already uploaded' : 'Upload card image to get permanent link'}
+            title={localHasUploaded ? 'Already uploaded' : 'Upload card image to get permanent link'}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
             </svg>
-            <span>{isUploading ? 'Uploading...' : (hasUploaded ? '✅ Uploaded' : 'Upload Image')}</span>
+            <span>{isUploading ? 'Uploading...' : (localHasUploaded ? '✅ Uploaded' : 'Upload Image')}</span>
           </button>
 
           {/* ===== دکمه دانلود کارت ===== */}
@@ -424,9 +403,9 @@ export default function PreviewTab({
       )}
 
       {/* ===== لینک ذخیره‌شده (اگر وجود داشته باشد) ===== */}
-      {savedImageUrl && (
+      {localSavedImageUrl && (
         <div className="w-full max-w-[600px] text-xs text-[#6c7086] bg-[#f1f3f5] p-2 rounded border border-[#d0d0d8] break-all">
-          <span className="font-medium">✅ Permanent image link:</span> {savedImageUrl}
+          <span className="font-medium">✅ Permanent image link:</span> {localSavedImageUrl}
         </div>
       )}
     </div>

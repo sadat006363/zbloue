@@ -3,6 +3,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { put } from '@vercel/blob';
 import { generateCardImageBuffer } from '@/lib/cardImageGenerator';
 
+// ============================================================
+// 🔥 تغییر runtime به edge برای رفع خطای @vercel/og
+// ============================================================
+export const runtime = 'edge';
+
 export async function POST(req: NextRequest) {
   try {
     const { slug, title, username, theme } = await req.json();
