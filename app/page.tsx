@@ -489,8 +489,7 @@ export default function Home() {
           linkedin_post,
           username: username || 'Developer',
           github_username: githubUsername || null,
-          // ===== NEW: Pass current avatar URL to new snippet =====
-          avatar_url: currentAvatarUrl,
+          avatar_url: currentAvatarUrl, // ← 🔥 مهم: ارسال avatar_url به اسنیپت جدید
           code_walkthrough: genData.codeWalkthrough || null,
           what_works_well: genData.whatWorksWell || null,
           bugs_and_risky_cases: genData.bugsAndRiskyCases || null,
@@ -523,8 +522,7 @@ export default function Home() {
           linkedin_post,
           username: username || 'Developer',
           github_username: githubUsername || null,
-          // ===== NEW: Pass current avatar URL to new snippet =====
-          avatar_url: currentAvatarUrl,
+          avatar_url: currentAvatarUrl, // ← 🔥 مهم: ارسال avatar_url به اسنیپت جدید
           code_walkthrough: null,
           what_works_well: null,
           bugs_and_risky_cases: null,
@@ -687,7 +685,7 @@ export default function Home() {
             onLineHover={setHoveredLine}
             generatedPrompt={displayGeneratedPrompt}
             isGeneratingPrompt={isGeneratingPrompt}
-            onAvatarChange={handleAvatarChange}
+            onAvatarChange={handleAvatarChange} // ← NEW: پاس دادن callback
           />
         </div>
       </div>

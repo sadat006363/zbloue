@@ -6,9 +6,10 @@ import {
   MAX_CODE_LENGTH,
   MAX_PAYLOAD_SIZE,
   SUPPORTED_LANGUAGES,
+  MAX_REQUESTS_PER_IP,
+  TIME_WINDOW,
 } from '@/lib/constants';
 
-// ===== Rate Limiting (In-Memory) =====
 const requestLog = new Map<string, { count: number; firstRequest: number }>();
 
 function getClientIP(req: NextRequest): string {
@@ -23,13 +24,15 @@ function getClientIP(req: NextRequest): string {
   return '127.0.0.1';
 }
 
-// ===== Supabase Admin Client (با fallback برای build) =====
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder-url.supabase.co';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-key';
+if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  throw new Error('Missing Supabase environment variables');
+}
 
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
-// ===== Type Guard برای زبان‌ها =====
 function isSupportedLanguage(lang: string): lang is typeof SUPPORTED_LANGUAGES[number] {
   return SUPPORTED_LANGUAGES.includes(lang as any);
 }
@@ -42,11 +45,11 @@ export async function POST(req: NextRequest) {
     const log = requestLog.get(ip);
 
     if (log) {
-      if (now - log.firstRequest > 24 * 60 * 60 * 1000) {
+      if (now - log.firstRequest > TIME_WINDOW) {
         requestLog.set(ip, { count: 1, firstRequest: now });
-      } else if (log.count >= 20) {
+      } else if (log.count >= MAX_REQUESTS_PER_IP) {
         return NextResponse.json(
-          { error: 'Too many requests. Maximum 20 requests per 24 hours.' },
+          { error: `Too many requests. Maximum ${MAX_REQUESTS_PER_IP} requests per 24 hours.` },
           { status: 429 }
         );
       } else {
@@ -78,6 +81,7 @@ export async function POST(req: NextRequest) {
       linkedin_post,
       username,
       github_username,
+      avatar_url, // ← این خط مهم است
       code_walkthrough,
       what_works_well,
       bugs_and_risky_cases,
@@ -100,15 +104,10 @@ export async function POST(req: NextRequest) {
     if (!code || !code.trim()) {
       return NextResponse.json({ error: 'Code is required' }, { status: 400 });
     }
-
     if (!language) {
       return NextResponse.json({ error: 'Language is required' }, { status: 400 });
     }
-
-    if (
-      !card_title || !key_concept || !what_this_code_does ||
-      !debug_analysis || !optimization || !linkedin_post
-    ) {
+    if (!card_title || !key_concept || !what_this_code_does || !debug_analysis || !optimization || !linkedin_post) {
       return NextResponse.json(
         { error: 'All AI-generated fields are required' },
         { status: 400 }
@@ -123,7 +122,6 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-
     if (code.length > MAX_CODE_LENGTH) {
       return NextResponse.json(
         { error: `Code is too long (${code.length} characters)` },
@@ -139,12 +137,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ===== 6. Generate slug and sanitize username =====
+    // ===== 6. Sanitize username only (NOT code) =====
     const slug = nanoid(10);
     const sanitizedUsername = username ? username.trim().slice(0, 50) : null;
     const sanitizedGithubUsername = github_username ? github_username.trim().slice(0, 50) : null;
 
-    // ===== 7. Build payload (code stored RAW) =====
+    // ===== 7. Build payload (code is stored RAW, no sanitization) =====
     const payload = {
       slug,
       raw_code: code,
@@ -157,6 +155,7 @@ export async function POST(req: NextRequest) {
       linkedin_post: linkedin_post.slice(0, 1000),
       username: sanitizedUsername,
       github_username: sanitizedGithubUsername,
+      avatar_url: avatar_url || null, // ← این خط مهم است
       is_public: true,
       user_id: null,
       code_walkthrough: code_walkthrough || null,
@@ -206,6 +205,7 @@ export async function POST(req: NextRequest) {
       linkedin_post: data.linkedin_post,
       username: data.username,
       github_username: data.github_username,
+      avatar_url: data.avatar_url,
       code_walkthrough: data.code_walkthrough,
       what_works_well: data.what_works_well,
       bugs_and_risky_cases: data.bugs_and_risky_cases,
