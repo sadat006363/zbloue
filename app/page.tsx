@@ -23,7 +23,7 @@ const MODE_DESCRIPTIONS = {
 };
 
 // ============================================================
-// 🔥 تابع کمکی برای حذف خطوط خالی
+// 🔥 Helper to remove empty lines
 // ============================================================
 const removeEmptyLines = (text: string): string => {
   return text
@@ -72,7 +72,6 @@ export default function Home() {
   const [hoveredLine, setHoveredLine] = useState<number | null>(null);
   const outputPanelRef = useRef<any>(null);
 
-  // ===== NEW: State for avatar URL from OutputPanel =====
   const [currentAvatarUrl, setCurrentAvatarUrl] = useState<string | null>(null);
 
   const showToast = useCallback((message: string) => {
@@ -145,9 +144,6 @@ export default function Home() {
     return result;
   }, []);
 
-  // ============================================================
-  // 🔥 NEW: Handle avatar change from OutputPanel
-  // ============================================================
   const handleAvatarChange = useCallback((avatarUrl: string | null) => {
     setCurrentAvatarUrl(avatarUrl);
   }, []);
@@ -170,9 +166,6 @@ export default function Home() {
     }));
   }, [mode]);
 
-  // ============================================================
-  // 🔥 اصلاح: حذف خطوط خالی در تبدیل کد
-  // ============================================================
   const handleConvertCode = useCallback(async (targetLang: string) => {
     const trimmedCode = removeEmptyLines(code);
     
@@ -231,9 +224,6 @@ export default function Home() {
     }
   }, [code, language, showToast]);
 
-  // ============================================================
-  // 🔥 اصلاح: حذف خطوط خالی در توضیح خط به خط
-  // ============================================================
   const handleGenerateExplanation = useCallback(async () => {
     const trimmedCode = removeEmptyLines(code);
     
@@ -302,9 +292,6 @@ export default function Home() {
     }
   }, [code, language, displaySnippet, updateSnippet, showToast]);
 
-  // ============================================================
-  // 🔥 اصلاح: حذف خطوط خالی در تولید پرامپت
-  // ============================================================
   const handleGeneratePrompt = useCallback(async () => {
     const trimmedCode = removeEmptyLines(code);
     
@@ -401,28 +388,19 @@ export default function Home() {
     }
   }, [showToast]);
 
-  // ============================================================
-  // 🔥 اصلاح اصلی: حذف خطوط خالی + آپلود خودکار تصویر + avatar_url
-  // ============================================================
   const handleGenerate = useCallback(async () => {
-    // ===== 1. حذف خطوط خالی =====
     const cleanCode = removeEmptyLines(code);
 
-    // ===== 2. به‌روزرسانی ادیتور =====
     if (cleanCode !== code) {
       setCode(cleanCode);
     }
 
-    // ===== 3. اعتبارسنجی =====
     if (!cleanCode.trim()) {
       setErrorMessage('Please enter your code.');
       return;
     }
 
     const isCode = isCodeLike(cleanCode);
-    if (process.env.NODE_ENV === 'development') {
-      console.log('isCodeLike result:', isCode);
-    }
 
     if (!isCode) {
       setErrorMessage('⚠️ The input does not appear to be valid source code. Please paste your code and try again.');
@@ -440,7 +418,6 @@ export default function Home() {
       return;
     }
 
-    // ===== 4. لغو درخواست قبلی =====
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
@@ -489,7 +466,7 @@ export default function Home() {
           linkedin_post,
           username: username || 'Developer',
           github_username: githubUsername || null,
-          avatar_url: currentAvatarUrl, // ← 🔥 مهم: ارسال avatar_url به اسنیپت جدید
+          avatar_url: currentAvatarUrl,
           code_walkthrough: genData.codeWalkthrough || null,
           what_works_well: genData.whatWorksWell || null,
           bugs_and_risky_cases: genData.bugsAndRiskyCases || null,
@@ -522,7 +499,7 @@ export default function Home() {
           linkedin_post,
           username: username || 'Developer',
           github_username: githubUsername || null,
-          avatar_url: currentAvatarUrl, // ← 🔥 مهم: ارسال avatar_url به اسنیپت جدید
+          avatar_url: currentAvatarUrl,
           code_walkthrough: null,
           what_works_well: null,
           bugs_and_risky_cases: null,
@@ -591,9 +568,6 @@ export default function Home() {
       }
     } catch (error: unknown) {
       if (error instanceof Error && error.name === 'AbortError') {
-        if (process.env.NODE_ENV === 'development') {
-          console.log('Fetch aborted by user');
-        }
         setErrorMessage(null);
         setDisplaySnippet(null);
         setDisplayFullAnalysis(null);
@@ -685,7 +659,7 @@ export default function Home() {
             onLineHover={setHoveredLine}
             generatedPrompt={displayGeneratedPrompt}
             isGeneratingPrompt={isGeneratingPrompt}
-            onAvatarChange={handleAvatarChange} // ← NEW: پاس دادن callback
+            onAvatarChange={handleAvatarChange}
           />
         </div>
       </div>

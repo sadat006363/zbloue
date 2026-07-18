@@ -164,7 +164,6 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
         const data = await response.json();
         if (data.success) {
           setAvatarUrl(data.avatarUrl);
-          // ===== 🔥 Notify parent about avatar change =====
           if (onAvatarChange) {
             onAvatarChange(data.avatarUrl);
           }
@@ -245,9 +244,7 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
 
     const downloadCard = useCallback(async () => {
       if (isDownloading.current) {
-        if (process.env.NODE_ENV === 'development') {
-          console.log('⏳ Download already in progress...');
-        }
+        // Silently ignore if already downloading
         return;
       }
 
@@ -327,7 +324,7 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
     }, [snippet, activeTab, generateCardImage, tempUsername, tempGithubUsername, onUsernameChange, onGithubChange, updateSnippetInDatabase]);
 
     // ============================================================
-    // 🔥 FIX: Load avatar from snippet when snippet changes
+    // 🔥 Load avatar from snippet when snippet changes
     // ============================================================
     useEffect(() => {
       if (snippet && activeTab === 'preview' && isFirstRender.current) {
@@ -341,15 +338,12 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
           setDisplayGithubUsername(snippet.github_username);
           setTempGithubUsername(snippet.github_username);
         }
-        // Load avatar from snippet (if exists)
         if (snippet.avatar_url) {
           setAvatarUrl(snippet.avatar_url);
-          // Also notify parent
           if (onAvatarChange) {
             onAvatarChange(snippet.avatar_url);
           }
         } else {
-          // Reset avatar if snippet has no avatar
           setAvatarUrl(null);
           if (onAvatarChange) {
             onAvatarChange(null);
