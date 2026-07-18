@@ -1,13 +1,35 @@
 import OpenAI from 'openai';
 
-// ===== Check API Key with fallback for build =====
+// ============================================================
+// 🔥 OpenAI Client با fallback برای build
+// ============================================================
 const openaiApiKey = process.env.OPENAI_API_KEY || 'placeholder-key';
 const openai = new OpenAI({ apiKey: openaiApiKey });
 
-// ===== Model configuration =====
-const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
-const OPENAI_TIMEOUT = parseInt(process.env.OPENAI_TIMEOUT || '60000', 10); // 60 seconds
+// ============================================================
+// 🔥 تنظیمات مدل بر اساس حالت (با قابلیت override از محیط)
+// ============================================================
+const MODEL_CONFIG = {
+  simple: {
+    model: process.env.OPENAI_MODEL_SIMPLE || 'gpt-4o-mini',
+    maxTokens: parseInt(process.env.OPENAI_MAX_TOKENS_SIMPLE || '4000', 10),
+    timeout: parseInt(process.env.OPENAI_TIMEOUT_SIMPLE || '30000', 10),
+  },
+  medium: {
+    model: process.env.OPENAI_MODEL_MEDIUM || 'gpt-4o-mini',
+    maxTokens: parseInt(process.env.OPENAI_MAX_TOKENS_MEDIUM || '6000', 10),
+    timeout: parseInt(process.env.OPENAI_TIMEOUT_MEDIUM || '45000', 10),
+  },
+  advanced: {
+    model: process.env.OPENAI_MODEL_ADVANCED || 'gpt-4o', // ← پیش‌فرض gpt-4o
+    maxTokens: parseInt(process.env.OPENAI_MAX_TOKENS_ADVANCED || '12000', 10),
+    timeout: parseInt(process.env.OPENAI_TIMEOUT_ADVANCED || '90000', 10),
+  },
+};
 
+// ============================================================
+// 🔥 پرامپت‌ها (بدون تغییر)
+// ============================================================
 export const SIMPLE_PROMPT = `
 You are a fast, concise code assistant. Analyze the provided code snippet quickly.
 Rules:
@@ -131,6 +153,9 @@ Return your analysis as a JSON object with the following fields:
 
 type AnalysisMode = 'simple' | 'medium' | 'advanced';
 
+// ============================================================
+// 🔥 تابع اصلی تولید تحلیل
+// ============================================================
 export const generateEducationalContent = async (
   code: string,
   language: string,
@@ -151,23 +176,23 @@ export const generateEducationalContent = async (
       break;
   }
 
+  const config = MODEL_CONFIG[mode];
+
   try {
-    // ===== AbortController with timeout =====
+    // ===== AbortController با timeout پویا =====
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => {
-      controller.abort();
-    }, OPENAI_TIMEOUT);
+    const timeoutId = setTimeout(() => controller.abort(), config.timeout);
 
     const response = await openai.chat.completions.create(
       {
-        model: OPENAI_MODEL,
+        model: config.model,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: `Language: ${language}\n\nCode:\n${code}` },
         ],
         response_format: { type: 'json_object' },
         temperature: 0.3,
-        max_tokens: 12000, // ← افزایش برای پاسخ‌های طولانی
+        max_tokens: config.maxTokens,
       },
       { signal: controller.signal }
     );
@@ -175,11 +200,10 @@ export const generateEducationalContent = async (
     clearTimeout(timeoutId);
 
     const content = response.choices[0].message.content || '{}';
-    
-    // ===== Safe JSON parsing with error handling =====
-    let parsedData;
+
+    // ===== Parse JSON با مدیریت خطا =====
     try {
-      parsedData = JSON.parse(content);
+      return JSON.parse(content);
     } catch (parseError) {
       if (process.env.NODE_ENV === 'development') {
         console.error('JSON Parse Error:', parseError);
@@ -187,11 +211,9 @@ export const generateEducationalContent = async (
       }
       throw new Error('AI response format error. Please try with shorter code.');
     }
-
-    return parsedData;
   } catch (error: unknown) {
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('Analysis request timed out. Please try with shorter code.');
+      throw new Error(`Analysis timed out (${config.timeout / 1000}s). Please try with shorter code.`);
     }
     if (process.env.NODE_ENV === 'development') {
       console.error('OpenAI API error:', error);
