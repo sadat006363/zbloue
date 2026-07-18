@@ -99,3 +99,124 @@ export function getScoreLabel(score: number): {
     color: 'text-red-600',
   };
 }
+
+// ============================================================
+// 🔥 NEW: Remove comments from source code
+// ============================================================
+
+/**
+ * Removes comments from source code based on language.
+ * Supports: JavaScript, TypeScript, Python, Java, C, C++, C#, Rust, Go, PHP, etc.
+ */
+export function removeComments(code: string, language: string): string {
+  const lines = code.split('\n');
+  const result: string[] = [];
+
+  let inMultiLineComment = false;
+
+  for (const line of lines) {
+    // Handle multi-line comments for C-style languages (/* ... */)
+    if (['javascript', 'typescript', 'java', 'c', 'cpp', 'csharp', 'go', 'rust', 'php'].includes(language)) {
+      if (inMultiLineComment) {
+        const endIndex = line.indexOf('*/');
+        if (endIndex !== -1) {
+          const afterComment = line.substring(endIndex + 2);
+          inMultiLineComment = false;
+          if (afterComment.trim().length > 0) {
+            result.push(afterComment);
+          }
+          continue;
+        } else {
+          continue;
+        }
+      }
+
+      const startIndex = line.indexOf('/*');
+      if (startIndex !== -1) {
+        const endIndex = line.indexOf('*/', startIndex + 2);
+        if (endIndex !== -1) {
+          const beforeComment = line.substring(0, startIndex);
+          const afterComment = line.substring(endIndex + 2);
+          const combined = beforeComment + afterComment;
+          if (combined.trim().length > 0) {
+            result.push(combined);
+          }
+          continue;
+        } else {
+          const beforeComment = line.substring(0, startIndex);
+          if (beforeComment.trim().length > 0) {
+            result.push(beforeComment);
+          }
+          inMultiLineComment = true;
+          continue;
+        }
+      }
+
+      // Single-line comments (//) - handle strings properly
+      let strippedLine = line;
+      let inString = false;
+      let inChar = false;
+      let escape = false;
+      for (let i = 0; i < strippedLine.length; i++) {
+        const char = strippedLine[i];
+        if (escape) {
+          escape = false;
+          continue;
+        }
+        if (char === '\\') {
+          escape = true;
+          continue;
+        }
+        if (char === '"' && !inChar) {
+          inString = !inString;
+          continue;
+        }
+        if (char === "'" && !inString) {
+          inChar = !inChar;
+          continue;
+        }
+        if (!inString && !inChar && char === '/' && i + 1 < strippedLine.length && strippedLine[i + 1] === '/') {
+          strippedLine = strippedLine.substring(0, i);
+          break;
+        }
+      }
+      if (strippedLine.trim().length > 0) {
+        result.push(strippedLine);
+      }
+    } else if (language === 'python') {
+      // Python: handle strings and # comments
+      let strippedLine = line;
+      let inString = false;
+      let escape = false;
+      for (let i = 0; i < strippedLine.length; i++) {
+        const char = strippedLine[i];
+        if (escape) {
+          escape = false;
+          continue;
+        }
+        if (char === '\\') {
+          escape = true;
+          continue;
+        }
+        if (char === '"' || char === "'") {
+          inString = !inString;
+          continue;
+        }
+        if (!inString && char === '#') {
+          strippedLine = strippedLine.substring(0, i);
+          break;
+        }
+      }
+      if (strippedLine.trim().length > 0) {
+        result.push(strippedLine);
+      }
+    } else {
+      // Default: keep line as is
+      if (line.trim().length > 0) {
+        result.push(line);
+      }
+    }
+  }
+
+  return result.join('\n');
+}

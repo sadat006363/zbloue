@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { MAX_LINES_PROMPT, MAX_CODE_LENGTH } from '@/lib/constants';
+import { removeComments } from '@/lib/utils';
 
 // ============================================================
 // 🔥 OpenAI Client با fallback (برای build بدون خطا)
@@ -19,8 +20,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ===== محدودیت خطوط =====
-    const lines = code.split('\n').filter((line: string) => line.trim().length > 0);
+    // ============================================================
+    // 🔥 NEW: Remove comments before processing
+    // ============================================================
+    const codeWithoutComments = removeComments(code, language);
+
+    // ===== محدودیت خطوط (با کد بدون کامنت) =====
+    const lines = codeWithoutComments.split('\n').filter((line: string) => line.trim().length > 0);
     if (lines.length > MAX_LINES_PROMPT) {
       return NextResponse.json(
         { error: `Code exceeds ${MAX_LINES_PROMPT} lines (${lines.length} lines). Please shorten your code.` },
@@ -28,14 +34,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (code.length > MAX_CODE_LENGTH) {
+    if (codeWithoutComments.length > MAX_CODE_LENGTH) {
       return NextResponse.json(
-        { error: `Code is too long (${code.length} characters).` },
+        { error: `Code is too long (${codeWithoutComments.length} characters).` },
         { status: 400 }
       );
     }
 
-    // ===== ساخت پرامپت برای تولید پرامپت =====
+    // ===== ساخت پرامپت =====
     const systemPrompt = `
 You are an expert AI prompt engineer. Your task is to generate a high-quality prompt that can be used to analyze the provided code.
 
@@ -55,7 +61,7 @@ You are an expert AI prompt engineer. Your task is to generate a high-quality pr
 Generate a detailed analysis prompt for the following ${language} code:
 
 \`\`\`${language}
-${code}
+${codeWithoutComments}
 \`\`\`
 
 Create a prompt that would help someone understand this code deeply.
@@ -83,15 +89,24 @@ Create a prompt that would help someone understand this code deeply.
     clearTimeout(timeoutId);
 
     const content = response.choices[0].message.content || '{}';
-    const data = JSON.parse(content);
+    let data;
+    try {
+      data = JSON.parse(content);
+    } catch (parseError) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('JSON Parse Error:', parseError);
+        console.error('Raw content:', content);
+      }
+      return NextResponse.json(
+        { error: 'AI response format error. Please try again.' },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       prompt: data.prompt || '',
     });
   } catch (error: any) {
-    // ============================================================
-    // 🔥 مدیریت خطا با شرط development
-    // ============================================================
     if (process.env.NODE_ENV === 'development') {
       console.error('Prompt generation error:', error);
     }

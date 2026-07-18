@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { MAX_LINES_EXPLAIN, MAX_CODE_LENGTH } from '@/lib/constants';
+import { removeComments } from '@/lib/utils';
 
 // ============================================================
 // 🔥 OpenAI Client با fallback (برای build بدون خطا)
@@ -19,8 +20,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ===== محدودیت خطوط =====
-    const lines = code.split('\n').filter((line: string) => line.trim().length > 0);
+    // ============================================================
+    // 🔥 NEW: Remove comments before processing
+    // ============================================================
+    const codeWithoutComments = removeComments(code, language);
+
+    // ===== محدودیت خطوط (با کد بدون کامنت) =====
+    const lines = codeWithoutComments.split('\n').filter((line: string) => line.trim().length > 0);
     if (lines.length > MAX_LINES_EXPLAIN) {
       return NextResponse.json(
         { error: `Code exceeds ${MAX_LINES_EXPLAIN} lines (${lines.length} lines). Please shorten your code.` },
@@ -28,9 +34,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (code.length > MAX_CODE_LENGTH) {
+    if (codeWithoutComments.length > MAX_CODE_LENGTH) {
       return NextResponse.json(
-        { error: `Code is too long (${code.length} characters).` },
+        { error: `Code is too long (${codeWithoutComments.length} characters).` },
         { status: 400 }
       );
     }
@@ -62,7 +68,7 @@ You are an expert programming tutor. Explain the provided code line by line.
 Explain the following ${language} code line by line:
 
 \`\`\`${language}
-${code}
+${codeWithoutComments}
 \`\`\`
 
 Provide a clear explanation for each line of code.
@@ -72,7 +78,7 @@ Provide a clear explanation for each line of code.
     // 🔥 AbortController با timeout
     // ============================================================
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 45000); // 45 seconds
+    const timeoutId = setTimeout(() => controller.abort(), 45000);
 
     const response = await openai.chat.completions.create(
       {
@@ -83,7 +89,7 @@ Provide a clear explanation for each line of code.
         ],
         temperature: 0.3,
         response_format: { type: 'json_object' },
-        max_tokens: 8000, // ← افزایش یافته
+        max_tokens: 8000,
       },
       { signal: controller.signal }
     );
@@ -111,9 +117,6 @@ Provide a clear explanation for each line of code.
       explanations: data.explanations || [],
     });
   } catch (error: any) {
-    // ============================================================
-    // 🔥 مدیریت خطا با شرط development
-    // ============================================================
     if (process.env.NODE_ENV === 'development') {
       console.error('Explanation error:', error);
     }

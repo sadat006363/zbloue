@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateEducationalContent } from '@/lib/ai';
 import { GenerateRequest } from '@/types';
+import { removeComments } from '@/lib/utils';
 import {
   MAX_LINES_GENERATE,
   MAX_CODE_LENGTH,
@@ -9,9 +10,7 @@ import {
   SUPPORTED_LANGUAGES,
 } from '@/lib/constants';
 
-// ============================================================
-// 🔥 Rate Limiting (In-Memory)
-// ============================================================
+// ===== Rate Limiting =====
 const requestLog = new Map<string, { count: number; firstRequest: number }>();
 
 function getClientIP(req: NextRequest): string {
@@ -26,9 +25,7 @@ function getClientIP(req: NextRequest): string {
   return '127.0.0.1';
 }
 
-// ============================================================
-// 🔥 Type Guard برای زبان‌ها
-// ============================================================
+// ===== Type Guard برای زبان‌ها =====
 function isSupportedLanguage(lang: string): lang is typeof SUPPORTED_LANGUAGES[number] {
   return SUPPORTED_LANGUAGES.includes(lang as any);
 }
@@ -115,13 +112,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // ============================================================
+    // 🔥 NEW: Remove comments before sending to AI (especially for Advanced mode)
+    // ============================================================
+    let processedCode = code;
+    if (mode === 'advanced') {
+      processedCode = removeComments(code, language);
+    }
+
     // ===== 6. Execute AI =====
-    const result = await generateEducationalContent(code, language, mode);
+    const result = await generateEducationalContent(processedCode, language, mode);
     return NextResponse.json(result);
   } catch (error: any) {
-    // ============================================================
-    // 🔥 مدیریت خطا با شرط development
-    // ============================================================
     if (process.env.NODE_ENV === 'development') {
       console.error('AI Generation error:', error);
     }
