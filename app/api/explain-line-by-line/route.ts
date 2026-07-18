@@ -35,16 +35,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ===== ساخت پرامپت برای توضیح خط به خط =====
+    // ===== ساخت پرامپت =====
     const systemPrompt = `
-You are an expert programming tutor. Your task is to explain the provided code line by line.
+You are an expert programming tutor. Explain the provided code line by line.
 
 **IMPORTANT RULES:**
-1. Provide a clear, concise explanation for each line of code.
+1. Provide a concise explanation for each line (max 2 sentences per line).
 2. Focus on WHAT the line does and WHY it's important.
 3. Use simple, easy-to-understand language.
-4. Output MUST be in valid JSON format.
-5. ALL explanations MUST be in English.
+4. For long code, prioritize important lines and group similar ones.
+5. Output MUST be in valid JSON format.
 
 **Output Format:**
 {
@@ -53,8 +53,7 @@ You are an expert programming tutor. Your task is to explain the provided code l
       "lineNumber": 1,
       "code": "const x = 5;",
       "explanation": "Declares a constant variable x and assigns it the value 5."
-    },
-    ...
+    }
   ]
 }
 `;
@@ -73,7 +72,7 @@ Provide a clear explanation for each line of code.
     // 🔥 AbortController با timeout
     // ============================================================
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    const timeoutId = setTimeout(() => controller.abort(), 45000); // 45 seconds
 
     const response = await openai.chat.completions.create(
       {
@@ -84,6 +83,7 @@ Provide a clear explanation for each line of code.
         ],
         temperature: 0.3,
         response_format: { type: 'json_object' },
+        max_tokens: 8000, // ← افزایش یافته
       },
       { signal: controller.signal }
     );
@@ -91,7 +91,21 @@ Provide a clear explanation for each line of code.
     clearTimeout(timeoutId);
 
     const content = response.choices[0].message.content || '{}';
-    const data = JSON.parse(content);
+    
+    // ===== مدیریت خطای JSON Parsing =====
+    let data;
+    try {
+      data = JSON.parse(content);
+    } catch (parseError) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('JSON Parse Error:', parseError);
+        console.error('Raw content:', content);
+      }
+      return NextResponse.json(
+        { error: 'AI response format error. Please try again with shorter code.' },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       explanations: data.explanations || [],
@@ -106,7 +120,7 @@ Provide a clear explanation for each line of code.
 
     if (error.name === 'AbortError') {
       return NextResponse.json(
-        { error: 'Explanation request timed out after 30 seconds' },
+        { error: 'Explanation request timed out after 45 seconds' },
         { status: 504 }
       );
     }
