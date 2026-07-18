@@ -10,6 +10,7 @@ import {
   TIME_WINDOW,
 } from '@/lib/constants';
 
+// ===== Rate Limiting =====
 const requestLog = new Map<string, { count: number; firstRequest: number }>();
 
 function getClientIP(req: NextRequest): string {
@@ -24,15 +25,13 @@ function getClientIP(req: NextRequest): string {
   return '127.0.0.1';
 }
 
-if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-  throw new Error('Missing Supabase environment variables');
-}
+// ===== Supabase Admin Client (با fallback برای build) =====
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder-url.supabase.co';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-key';
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
+// ===== Type Guard برای زبان‌ها =====
 function isSupportedLanguage(lang: string): lang is typeof SUPPORTED_LANGUAGES[number] {
   return SUPPORTED_LANGUAGES.includes(lang as any);
 }
@@ -81,7 +80,7 @@ export async function POST(req: NextRequest) {
       linkedin_post,
       username,
       github_username,
-      avatar_url, // ← این خط مهم است
+      avatar_url,
       code_walkthrough,
       what_works_well,
       bugs_and_risky_cases,
@@ -107,7 +106,10 @@ export async function POST(req: NextRequest) {
     if (!language) {
       return NextResponse.json({ error: 'Language is required' }, { status: 400 });
     }
-    if (!card_title || !key_concept || !what_this_code_does || !debug_analysis || !optimization || !linkedin_post) {
+    if (
+      !card_title || !key_concept || !what_this_code_does ||
+      !debug_analysis || !optimization || !linkedin_post
+    ) {
       return NextResponse.json(
         { error: 'All AI-generated fields are required' },
         { status: 400 }
@@ -142,7 +144,7 @@ export async function POST(req: NextRequest) {
     const sanitizedUsername = username ? username.trim().slice(0, 50) : null;
     const sanitizedGithubUsername = github_username ? github_username.trim().slice(0, 50) : null;
 
-    // ===== 7. Build payload (code is stored RAW, no sanitization) =====
+    // ===== 7. Build payload (code is stored RAW) =====
     const payload = {
       slug,
       raw_code: code,
@@ -155,7 +157,7 @@ export async function POST(req: NextRequest) {
       linkedin_post: linkedin_post.slice(0, 1000),
       username: sanitizedUsername,
       github_username: sanitizedGithubUsername,
-      avatar_url: avatar_url || null, // ← این خط مهم است
+      avatar_url: avatar_url || null,
       is_public: true,
       user_id: null,
       code_walkthrough: code_walkthrough || null,
