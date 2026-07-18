@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateEducationalContent } from '@/lib/ai';
 import { GenerateRequest } from '@/types';
-import { removeComments } from '@/lib/utils';
 import {
   MAX_LINES_GENERATE,
   MAX_CODE_LENGTH,
@@ -25,7 +24,6 @@ function getClientIP(req: NextRequest): string {
   return '127.0.0.1';
 }
 
-// ===== Type Guard برای زبان‌ها =====
 function isSupportedLanguage(lang: string): lang is typeof SUPPORTED_LANGUAGES[number] {
   return SUPPORTED_LANGUAGES.includes(lang as any);
 }
@@ -112,16 +110,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ============================================================
-    // 🔥 NEW: Remove comments before sending to AI (especially for Advanced mode)
-    // ============================================================
-    let processedCode = code;
-    if (mode === 'advanced') {
-      processedCode = removeComments(code, language);
-    }
-
     // ===== 6. Execute AI =====
-    const result = await generateEducationalContent(processedCode, language, mode);
+    const result = await generateEducationalContent(code, language, mode);
     return NextResponse.json(result);
   } catch (error: any) {
     if (process.env.NODE_ENV === 'development') {
