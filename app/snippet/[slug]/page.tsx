@@ -135,27 +135,15 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
     };
 
     const hasUserInfo = snippet.username || snippet.github_username;
-    const hasAdvancedAnalysis = snippet.code_walkthrough ||
-      snippet.what_works_well ||
-      snippet.bugs_and_risky_cases ||
-      snippet.edge_cases ||
-      snippet.performance_analysis ||
-      snippet.security_analysis ||
-      snippet.production_readiness ||
-      snippet.recommended_improvements ||
-      snippet.improved_code ||
-      snippet.suggested_tests ||
-      snippet.scorecard ||
-      snippet.final_verdict_summary;
+    const hasAdvancedAnalysis = !!(snippet.code_walkthrough || snippet.what_works_well || snippet.bugs_and_risky_cases || snippet.edge_cases || snippet.performance_analysis || snippet.security_analysis || snippet.production_readiness || snippet.recommended_improvements || snippet.improved_code || snippet.suggested_tests || snippet.scorecard || snippet.final_verdict_summary);
 
     const hasLineExplanations = snippet.line_explanations && snippet.line_explanations.length > 0;
     const hasGeneratedPrompt = snippet.generated_prompt;
 
-    // Extract top 3 bugs for "Top 3 Fixes"
+    // SAFE: use optional chaining and default empty array
     const topBugs = snippet.bugs_and_risky_cases?.slice(0, 3) || [];
     const topImprovements = snippet.recommended_improvements?.slice(0, 3) || [];
 
-    // Generate simple explanation for each bug (for beginners)
     const getBugExplanation = (issue: string): string => {
       if (issue.includes('off-by-one') || issue.includes('i <=') || issue.includes('i <')) {
         return '💡 The loop runs one extra time, causing incorrect calculations.';
@@ -172,7 +160,6 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
       return '💡 This issue could cause incorrect behavior in specific situations.';
     };
 
-    // Generate encouraging verdict
     const getKindVerdict = (verdict: any) => {
       if (!verdict) {
         return {
@@ -205,63 +192,30 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
       <main className="min-h-screen bg-gray-50 text-gray-800 p-4 md:p-6 flex flex-col items-center">
         <div className="w-full max-w-[1400px] mx-auto space-y-6">
 
-          {/* ============================================================
-              🔥 HEADER - TWO ROWS
-              ============================================================ */}
+          {/* ===== HEADER ===== */}
           <div className="bg-white shadow-sm rounded-2xl border border-gray-200 overflow-hidden">
-            {/* Row 1: Logo + User Profile + Share Buttons */}
             <div className="flex flex-wrap items-center justify-between gap-3 p-3 md:p-4 border-b border-gray-100">
-              {/* Left: Logo + User Info */}
               <div className="flex items-center gap-3 flex-wrap">
                 <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity flex-shrink-0">
                   <span className="text-xl font-bold text-blue-600">Zbloue</span>
                   <span className="text-xs text-gray-400 hidden sm:inline">| AI Code Analysis</span>
                 </Link>
-
-                {/* User Profile (Avatar + Name + GitHub) */}
                 {hasUserInfo && (
                   <div className="flex items-center gap-2 ml-2 pl-3 border-l border-gray-200">
-                    {/* Avatar */}
                     {snippet.avatar_url ? (
-                      <img
-                        src={snippet.avatar_url}
-                        alt={snippet.username || 'User'}
-                        className="w-8 h-8 rounded-full object-cover border-2 border-blue-400"
-                      />
+                      <img src={snippet.avatar_url} alt={snippet.username || 'User'} className="w-8 h-8 rounded-full object-cover border-2 border-blue-400" />
                     ) : snippet.username ? (
-                      <img
-                        src={`https://ui-avatars.com/api/?name=${encodeURIComponent(snippet.username)}&background=4a86f7&color=fff&size=32&bold=true`}
-                        alt={snippet.username}
-                        className="w-8 h-8 rounded-full"
-                      />
+                      <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(snippet.username)}&background=4a86f7&color=fff&size=32&bold=true`} alt={snippet.username} className="w-8 h-8 rounded-full" />
                     ) : null}
-
-                    {/* Username */}
-                    {snippet.username && (
-                      <span className="text-sm font-medium text-gray-700">
-                        {safeString(snippet.username)}
-                      </span>
-                    )}
-
-                    {/* GitHub Icon */}
+                    {snippet.username && <span className="text-sm font-medium text-gray-700">{safeString(snippet.username)}</span>}
                     {snippet.github_username && (
-                      <a
-                        href={`https://github.com/${snippet.github_username}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-gray-400 hover:text-gray-600 transition-colors"
-                        title={`GitHub: ${snippet.github_username}`}
-                      >
-                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.15 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.62.24 2.85.12 3.15.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
-                        </svg>
+                      <a href={`https://github.com/${snippet.github_username}`} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-gray-600 transition-colors" title={`GitHub: ${snippet.github_username}`}>
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.15 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.62.24 2.85.12 3.15.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
                       </a>
                     )}
                   </div>
                 )}
               </div>
-
-              {/* Right: Share Buttons (larger icons - w-6 h-6) */}
               <div className="flex items-center gap-2 flex-shrink-0">
                 <span className="text-xs text-gray-400 hidden sm:inline">Share:</span>
                 <a href={shareUrls.linkedin} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg hover:bg-gray-100 transition" title="LinkedIn">
@@ -278,8 +232,6 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
                 </a>
               </div>
             </div>
-
-            {/* Row 2: Title + Mode Badge */}
             <div className="flex flex-wrap items-center gap-3 p-3 md:p-4">
               <h1 className="text-xl md:text-2xl font-bold text-gray-900 tracking-tight">
                 {safeString(snippet.card_title || 'Code Analysis')}
@@ -293,9 +245,7 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
             </div>
           </div>
 
-          {/* ============================================================
-              🔥 1. Executive Summary
-              ============================================================ */}
+          {/* ===== 1. Executive Summary ===== */}
           <div className="bg-blue-50 p-4 rounded-xl border border-blue-200">
             <p className="text-gray-800 text-sm leading-relaxed">
               💡 <strong>Summary:</strong>{' '}
@@ -308,14 +258,12 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
             </p>
           </div>
 
-          {/* ============================================================
-              🔥 2. Top 3 Fixes
-              ============================================================ */}
+          {/* ===== 2. Top 3 Fixes ===== */}
           {(topBugs.length > 0 || topImprovements.length > 0) && (
             <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-200">
               <h3 className="text-yellow-800 font-semibold mb-3 text-base">🚨 Top 3 things to fix first:</h3>
               <ol className="space-y-3 text-sm text-gray-800 list-decimal list-inside">
-                {topBugs.slice(0, 3).map((bug: BugAndRiskyCase, idx: number) => (
+                {topBugs.map((bug: BugAndRiskyCase, idx: number) => (
                   <li key={idx} className="border-b border-gray-200 pb-2 last:border-0">
                     <div className="flex flex-col gap-1">
                       <div>
@@ -345,9 +293,7 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
             </div>
           )}
 
-          {/* ============================================================
-              🔥 3. Source Code
-              ============================================================ */}
+          {/* ===== 3. Source Code ===== */}
           <div className="bg-white shadow-sm rounded-2xl border border-gray-200 overflow-hidden">
             <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200">
               <span className="text-sm font-semibold text-blue-600">💻 Source Code</span>
@@ -357,9 +303,7 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
             </div>
           </div>
 
-          {/* ============================================================
-              🔥 4. Friendly Scorecard
-              ============================================================ */}
+          {/* ===== 4. Friendly Scorecard ===== */}
           {snippet.scorecard && Object.keys(snippet.scorecard).length > 0 && (
             <div className="bg-white shadow-sm p-4 rounded-2xl border border-gray-200">
               <h3 className="text-gray-800 font-semibold mb-3 text-base">📊 Your Code Scorecard</h3>
@@ -380,9 +324,7 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
             </div>
           )}
 
-          {/* ============================================================
-              🔥 5. Main Analysis Sections (always open)
-              ============================================================ */}
+          {/* ===== 5. Main Analysis Sections ===== */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-white shadow-sm p-4 rounded-2xl border border-gray-200">
               <h3 className="text-lg font-semibold text-blue-600 flex items-center gap-2">💡 Key Concept</h3>
@@ -394,9 +336,7 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
             </div>
           </div>
 
-          {/* ============================================================
-              🔥 6. Debug & Optimization
-              ============================================================ */}
+          {/* ===== 6. Debug & Optimization ===== */}
           {(isMedium || isAdvanced) && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="bg-white shadow-sm p-4 rounded-2xl border border-gray-200">
@@ -418,9 +358,7 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
             </div>
           )}
 
-          {/* ============================================================
-              🔥 7. Advanced Analysis (collapsible)
-              ============================================================ */}
+          {/* ===== 7. Advanced Analysis (collapsible) ===== */}
           {isAdvanced && hasAdvancedAnalysis && (
             <details className="bg-white shadow-sm rounded-2xl border border-gray-200 p-4 group open:pb-6 transition-all">
               <summary className="text-lg font-semibold text-gray-900 cursor-pointer list-none flex items-center justify-between">
@@ -432,7 +370,7 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
                   <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
                     <h3 className="text-lg font-semibold text-blue-600">🧩 Code Walkthrough</h3>
                     <div className="space-y-2 mt-2">
-                      {snippet.code_walkthrough.map((item: CodeWalkthroughItem, idx: number) => (
+                      {(snippet.code_walkthrough || []).map((item: CodeWalkthroughItem, idx: number) => (
                         <div key={idx} className="border-b border-gray-200 pb-2 last:border-0">
                           <p className="font-medium text-gray-800">{item.section}</p>
                           <p className="text-gray-600 text-sm">{item.explanation}</p>
@@ -445,7 +383,7 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
                   <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
                     <h3 className="text-lg font-semibold text-green-600">✅ What Works Well</h3>
                     <ul className="list-disc list-inside text-gray-700 text-sm mt-2">
-                      {snippet.what_works_well.map((item: string, idx: number) => (
+                      {(snippet.what_works_well || []).map((item: string, idx: number) => (
                         <li key={idx}>{item}</li>
                       ))}
                     </ul>
@@ -455,7 +393,7 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
                   <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
                     <h3 className="text-lg font-semibold text-red-600">🐛 Bugs and Risky Cases</h3>
                     <div className="space-y-2 mt-2">
-                      {snippet.bugs_and_risky_cases.map((item: BugAndRiskyCase, idx: number) => (
+                      {(snippet.bugs_and_risky_cases || []).map((item: BugAndRiskyCase, idx: number) => (
                         <div key={idx} className="border-b border-gray-200 pb-2 last:border-0">
                           <p className="font-medium text-gray-800">{item.issue}</p>
                           <p className="text-gray-600 text-sm">Impact: {item.impact}</p>
@@ -470,7 +408,7 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
                   <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
                     <h3 className="text-lg font-semibold text-blue-600">🧪 Edge Cases</h3>
                     <div className="space-y-2 mt-2">
-                      {snippet.edge_cases.map((item: EdgeCase, idx: number) => (
+                      {(snippet.edge_cases || []).map((item: EdgeCase, idx: number) => (
                         <div key={idx} className="border-b border-gray-200 pb-2 last:border-0">
                           <p className="font-medium text-gray-800">{item.case}</p>
                           <p className="text-gray-600 text-sm">Current: {item.currentBehavior}</p>
@@ -485,14 +423,14 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
                   <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
                     <h3 className="text-lg font-semibold text-blue-600">⚡ Performance Analysis</h3>
                     <div className="mt-2 text-gray-700 text-sm">
-                      {snippet.performance_analysis.timeComplexity && (
-                        <div><span className="font-medium">Time:</span> {snippet.performance_analysis.timeComplexity.map((t: any) => `${t.target}: ${t.complexity}`).join(', ')}</div>
+                      {snippet.performance_analysis?.timeComplexity && (
+                        <div><span className="font-medium">Time:</span> {(snippet.performance_analysis.timeComplexity || []).map((t: any) => `${t.target}: ${t.complexity}`).join(', ')}</div>
                       )}
-                      {snippet.performance_analysis.spaceComplexity && (
-                        <div><span className="font-medium">Memory:</span> {snippet.performance_analysis.spaceComplexity.map((t: any) => `${t.target}: ${t.complexity}`).join(', ')}</div>
+                      {snippet.performance_analysis?.spaceComplexity && (
+                        <div><span className="font-medium">Memory:</span> {(snippet.performance_analysis.spaceComplexity || []).map((t: any) => `${t.target}: ${t.complexity}`).join(', ')}</div>
                       )}
-                      {snippet.performance_analysis.scalabilityNotes && (
-                        <ul className="list-disc list-inside mt-1">{snippet.performance_analysis.scalabilityNotes.map((note: string, idx: number) => <li key={idx}>{note}</li>)}</ul>
+                      {snippet.performance_analysis?.scalabilityNotes && (
+                        <ul className="list-disc list-inside mt-1">{(snippet.performance_analysis.scalabilityNotes || []).map((note: string, idx: number) => <li key={idx}>{note}</li>)}</ul>
                       )}
                     </div>
                   </div>
@@ -501,9 +439,9 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
                   <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
                     <h3 className="text-lg font-semibold text-red-600">🔒 Security Analysis</h3>
                     <div className="mt-2 text-gray-700 text-sm">
-                      <p>Severity: {snippet.security_analysis.severity}</p>
-                      {snippet.security_analysis.issues && <ul className="list-disc list-inside">{snippet.security_analysis.issues.map((issue: string, idx: number) => <li key={idx}>{issue}</li>)}</ul>}
-                      {snippet.security_analysis.recommendations && <ul className="list-disc list-inside">{snippet.security_analysis.recommendations.map((rec: string, idx: number) => <li key={idx}>{rec}</li>)}</ul>}
+                      <p>Severity: {snippet.security_analysis?.severity || 'N/A'}</p>
+                      {snippet.security_analysis?.issues && <ul className="list-disc list-inside">{(snippet.security_analysis.issues || []).map((issue: string, idx: number) => <li key={idx}>{issue}</li>)}</ul>}
+                      {snippet.security_analysis?.recommendations && <ul className="list-disc list-inside">{(snippet.security_analysis.recommendations || []).map((rec: string, idx: number) => <li key={idx}>{rec}</li>)}</ul>}
                     </div>
                   </div>
                 )}
@@ -511,8 +449,8 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
                   <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
                     <h3 className="text-lg font-semibold text-blue-600">🛡️ Production Readiness</h3>
                     <div className="mt-2 text-gray-700 text-sm">
-                      <p>Ready: {snippet.production_readiness.isProductionReady ? '✅ Yes' : '❌ No'}</p>
-                      <ul className="list-disc list-inside">{snippet.production_readiness.reasons?.map((reason: string, idx: number) => <li key={idx}>{reason}</li>)}</ul>
+                      <p>Ready: {snippet.production_readiness?.isProductionReady ? '✅ Yes' : '❌ No'}</p>
+                      <ul className="list-disc list-inside">{(snippet.production_readiness?.reasons || []).map((reason: string, idx: number) => <li key={idx}>{reason}</li>)}</ul>
                     </div>
                   </div>
                 )}
@@ -520,7 +458,7 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
                   <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
                     <h3 className="text-lg font-semibold text-green-600">🔧 Recommended Improvements</h3>
                     <div className="space-y-2 mt-2">
-                      {snippet.recommended_improvements.map((item: RecommendedImprovement, idx: number) => (
+                      {(snippet.recommended_improvements || []).map((item: RecommendedImprovement, idx: number) => (
                         <div key={idx} className="border-b border-gray-200 pb-2 last:border-0">
                           <p className="font-medium text-gray-800">[{item.priority}] {item.improvement}</p>
                           <p className="text-gray-600 text-sm">Reason: {item.reason}</p>
@@ -566,7 +504,7 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
                   <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
                     <h3 className="text-lg font-semibold text-blue-600">🧪 Suggested Tests</h3>
                     <div className="space-y-2 mt-2">
-                      {snippet.suggested_tests.map((test: SuggestedTest, idx: number) => (
+                      {(snippet.suggested_tests || []).map((test: SuggestedTest, idx: number) => (
                         <div key={idx} className="border-b border-gray-200 pb-2 last:border-0">
                           <p className="font-medium text-gray-800">{test.name}</p>
                           <p className="text-gray-600 text-sm">Input: {test.input}</p>
@@ -581,9 +519,7 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
             </details>
           )}
 
-          {/* ============================================================
-              🔥 8. Line-by-Line and Prompt (collapsible)
-              ============================================================ */}
+          {/* ===== 8. Line-by-Line and Prompt ===== */}
           {isAdvanced && (
             <>
               {hasLineExplanations && (
@@ -593,7 +529,7 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
                     <span className="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
                   </summary>
                   <div className="mt-4 space-y-2 max-h-[500px] overflow-y-auto">
-                    {snippet.line_explanations.map((item: LineExplanation, idx: number) => (
+                    {(snippet.line_explanations || []).map((item: LineExplanation, idx: number) => (
                       <div key={idx} className="border-b border-gray-200 pb-2 last:border-0">
                         <p className="font-mono text-sm text-gray-800">Line {item.lineNumber}: {item.code}</p>
                         <p className="text-gray-600 text-sm">💡 {item.explanation}</p>
@@ -610,16 +546,14 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
                     <span className="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
                   </summary>
                   <div className="mt-4 bg-gray-50 p-4 rounded-xl text-gray-800 text-sm whitespace-pre-wrap max-h-[400px] overflow-y-auto border border-gray-200">
-                    {snippet.generated_prompt}
+                    {snippet.generated_prompt || 'No prompt generated.'}
                   </div>
                 </details>
               )}
             </>
           )}
 
-          {/* ============================================================
-              🔥 9. LinkedIn Post
-              ============================================================ */}
+          {/* ===== 9. LinkedIn Post ===== */}
           <div className="bg-white shadow-sm p-6 rounded-2xl border border-gray-200">
             <h3 className="text-lg font-semibold text-orange-600 flex items-center gap-2">💼 LinkedIn Post</h3>
             <p className="mt-2 text-gray-700 text-sm whitespace-pre-wrap leading-relaxed">{safeString(snippet.linkedin_post || 'No LinkedIn post available.')}</p>
