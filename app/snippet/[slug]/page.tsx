@@ -140,21 +140,21 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
     const hasLineExplanations = snippet.line_explanations && snippet.line_explanations.length > 0;
     const hasGeneratedPrompt = snippet.generated_prompt;
 
-    // SAFE: use optional chaining and default empty array
     const topBugs = snippet.bugs_and_risky_cases?.slice(0, 3) || [];
     const topImprovements = snippet.recommended_improvements?.slice(0, 3) || [];
 
     const getBugExplanation = (issue: string): string => {
-      if (issue.includes('off-by-one') || issue.includes('i <=') || issue.includes('i <')) {
+      const issueStr = safeString(issue);
+      if (issueStr.includes('off-by-one') || issueStr.includes('i <=') || issueStr.includes('i <')) {
         return '💡 The loop runs one extra time, causing incorrect calculations.';
       }
-      if (issue.includes('validation') || issue.includes('validate') || issue.includes('input')) {
+      if (issueStr.includes('validation') || issueStr.includes('validate') || issueStr.includes('input')) {
         return '💡 Inputs are used without validation, which may cause runtime errors.';
       }
-      if (issue.includes('null') || issue.includes('undefined') || issue.includes('empty')) {
+      if (issueStr.includes('null') || issueStr.includes('undefined') || issueStr.includes('empty')) {
         return '💡 The code does not handle empty or unexpected inputs gracefully.';
       }
-      if (issue.includes('security') || issue.includes('password') || issue.includes('hash')) {
+      if (issueStr.includes('security') || issueStr.includes('password') || issueStr.includes('hash')) {
         return '💡 This security issue could lead to system vulnerabilities.';
       }
       return '💡 This issue could cause incorrect behavior in specific situations.';
@@ -170,8 +170,8 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
       }
       const isApproved = verdict.approved;
       const summary = isApproved
-        ? `✅ Your code is in good shape! ${verdict.summary || 'It has many positive aspects.'}`
-        : `🔧 Your code has good potential. ${verdict.summary || 'Fixing a few simple issues will greatly improve its quality.'}`;
+        ? `✅ Your code is in good shape! ${safeString(verdict.summary) || 'It has many positive aspects.'}`
+        : `🔧 Your code has good potential. ${safeString(verdict.summary) || 'Fixing a few simple issues will greatly improve its quality.'}`;
       const nextSteps = isApproved
         ? '💪 To make your code even more professional, review the "Recommended Improvements" section.'
         : '🚀 Start with the "Top 3 Fixes" and then work through the rest.';
@@ -249,7 +249,7 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
           <div className="bg-blue-50 p-4 rounded-xl border border-blue-200">
             <p className="text-gray-800 text-sm leading-relaxed">
               💡 <strong>Summary:</strong>{' '}
-              {snippet.final_verdict_summary || 'Your code has a solid structure and with a few tweaks can reach a professional level.'}
+              {safeString(snippet.final_verdict_summary || 'Your code has a solid structure and with a few tweaks can reach a professional level.')}
               {isAdvanced && snippet.final_verdict_approved !== undefined && (
                 <span className="ml-2">
                   {snippet.final_verdict_approved ? '✅ Overall status: Acceptable' : '🔧 Overall status: Needs improvement'}
@@ -267,12 +267,12 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
                   <li key={idx} className="border-b border-gray-200 pb-2 last:border-0">
                     <div className="flex flex-col gap-1">
                       <div>
-                        <span className="font-medium text-red-600">{bug.issue}</span>
-                        <span className="text-xs text-gray-500 ml-2">(Impact: {bug.impact || 'Medium'})</span>
+                        <span className="font-medium text-red-600">{safeString(bug.issue)}</span>
+                        <span className="text-xs text-gray-500 ml-2">(Impact: {safeString(bug.impact || 'Medium')})</span>
                       </div>
                       <p className="text-xs text-gray-600 leading-relaxed">
-                        {getBugExplanation(bug.issue)}
-                        {bug.example && <span className="block mt-1 text-gray-500">Example: {bug.example}</span>}
+                        {getBugExplanation(safeString(bug.issue))}
+                        {bug.example && <span className="block mt-1 text-gray-500">Example: {safeString(bug.example)}</span>}
                       </p>
                     </div>
                   </li>
@@ -281,10 +281,10 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
                   <li key={idx} className="border-b border-gray-200 pb-2 last:border-0">
                     <div className="flex flex-col gap-1">
                       <div>
-                        <span className="font-medium text-green-600">[{imp.priority}] {imp.improvement}</span>
+                        <span className="font-medium text-green-600">[{safeString(imp.priority)}] {safeString(imp.improvement)}</span>
                       </div>
                       <p className="text-xs text-gray-600 leading-relaxed">
-                        💡 {imp.reason || 'This improvement will boost your code quality.'}
+                        💡 {safeString(imp.reason || 'This improvement will boost your code quality.')}
                       </p>
                     </div>
                   </li>
@@ -372,8 +372,8 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
                     <div className="space-y-2 mt-2">
                       {(snippet.code_walkthrough || []).map((item: CodeWalkthroughItem, idx: number) => (
                         <div key={idx} className="border-b border-gray-200 pb-2 last:border-0">
-                          <p className="font-medium text-gray-800">{item.section}</p>
-                          <p className="text-gray-600 text-sm">{item.explanation}</p>
+                          <p className="font-medium text-gray-800">{safeString(item.section)}</p>
+                          <p className="text-gray-600 text-sm">{safeString(item.explanation)}</p>
                         </div>
                       ))}
                     </div>
@@ -384,7 +384,7 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
                     <h3 className="text-lg font-semibold text-green-600">✅ What Works Well</h3>
                     <ul className="list-disc list-inside text-gray-700 text-sm mt-2">
                       {(snippet.what_works_well || []).map((item: string, idx: number) => (
-                        <li key={idx}>{item}</li>
+                        <li key={idx}>{safeString(item)}</li>
                       ))}
                     </ul>
                   </div>
@@ -395,10 +395,10 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
                     <div className="space-y-2 mt-2">
                       {(snippet.bugs_and_risky_cases || []).map((item: BugAndRiskyCase, idx: number) => (
                         <div key={idx} className="border-b border-gray-200 pb-2 last:border-0">
-                          <p className="font-medium text-gray-800">{item.issue}</p>
-                          <p className="text-gray-600 text-sm">Impact: {item.impact}</p>
-                          {item.example && <p className="text-gray-500 text-xs">Example: {item.example}</p>}
-                          <p className="text-xs text-gray-600 mt-1">{getBugExplanation(item.issue)}</p>
+                          <p className="font-medium text-gray-800">{safeString(item.issue)}</p>
+                          <p className="text-gray-600 text-sm">Impact: {safeString(item.impact)}</p>
+                          {item.example && <p className="text-gray-500 text-xs">Example: {safeString(item.example)}</p>}
+                          <p className="text-xs text-gray-600 mt-1">{getBugExplanation(safeString(item.issue))}</p>
                         </div>
                       ))}
                     </div>
@@ -410,10 +410,10 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
                     <div className="space-y-2 mt-2">
                       {(snippet.edge_cases || []).map((item: EdgeCase, idx: number) => (
                         <div key={idx} className="border-b border-gray-200 pb-2 last:border-0">
-                          <p className="font-medium text-gray-800">{item.case}</p>
-                          <p className="text-gray-600 text-sm">Current: {item.currentBehavior}</p>
-                          <p className="text-gray-600 text-sm">Expected: {item.expectedBehavior}</p>
-                          <p className="text-gray-500 text-xs">Risk: {item.risk}</p>
+                          <p className="font-medium text-gray-800">{safeString(item.case)}</p>
+                          <p className="text-gray-600 text-sm">Current: {safeString(item.currentBehavior)}</p>
+                          <p className="text-gray-600 text-sm">Expected: {safeString(item.expectedBehavior)}</p>
+                          <p className="text-gray-500 text-xs">Risk: {safeString(item.risk)}</p>
                         </div>
                       ))}
                     </div>
@@ -424,13 +424,13 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
                     <h3 className="text-lg font-semibold text-blue-600">⚡ Performance Analysis</h3>
                     <div className="mt-2 text-gray-700 text-sm">
                       {snippet.performance_analysis?.timeComplexity && (
-                        <div><span className="font-medium">Time:</span> {(snippet.performance_analysis.timeComplexity || []).map((t: any) => `${t.target}: ${t.complexity}`).join(', ')}</div>
+                        <div><span className="font-medium">Time:</span> {(snippet.performance_analysis.timeComplexity || []).map((t: any) => `${safeString(t.target)}: ${safeString(t.complexity)}`).join(', ')}</div>
                       )}
                       {snippet.performance_analysis?.spaceComplexity && (
-                        <div><span className="font-medium">Memory:</span> {(snippet.performance_analysis.spaceComplexity || []).map((t: any) => `${t.target}: ${t.complexity}`).join(', ')}</div>
+                        <div><span className="font-medium">Memory:</span> {(snippet.performance_analysis.spaceComplexity || []).map((t: any) => `${safeString(t.target)}: ${safeString(t.complexity)}`).join(', ')}</div>
                       )}
                       {snippet.performance_analysis?.scalabilityNotes && (
-                        <ul className="list-disc list-inside mt-1">{(snippet.performance_analysis.scalabilityNotes || []).map((note: string, idx: number) => <li key={idx}>{note}</li>)}</ul>
+                        <ul className="list-disc list-inside mt-1">{(snippet.performance_analysis.scalabilityNotes || []).map((note: string, idx: number) => <li key={idx}>{safeString(note)}</li>)}</ul>
                       )}
                     </div>
                   </div>
@@ -439,9 +439,9 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
                   <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
                     <h3 className="text-lg font-semibold text-red-600">🔒 Security Analysis</h3>
                     <div className="mt-2 text-gray-700 text-sm">
-                      <p>Severity: {snippet.security_analysis?.severity || 'N/A'}</p>
-                      {snippet.security_analysis?.issues && <ul className="list-disc list-inside">{(snippet.security_analysis.issues || []).map((issue: string, idx: number) => <li key={idx}>{issue}</li>)}</ul>}
-                      {snippet.security_analysis?.recommendations && <ul className="list-disc list-inside">{(snippet.security_analysis.recommendations || []).map((rec: string, idx: number) => <li key={idx}>{rec}</li>)}</ul>}
+                      <p>Severity: {safeString(snippet.security_analysis?.severity || 'N/A')}</p>
+                      {snippet.security_analysis?.issues && <ul className="list-disc list-inside">{(snippet.security_analysis.issues || []).map((issue: string, idx: number) => <li key={idx}>{safeString(issue)}</li>)}</ul>}
+                      {snippet.security_analysis?.recommendations && <ul className="list-disc list-inside">{(snippet.security_analysis.recommendations || []).map((rec: string, idx: number) => <li key={idx}>{safeString(rec)}</li>)}</ul>}
                     </div>
                   </div>
                 )}
@@ -450,7 +450,7 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
                     <h3 className="text-lg font-semibold text-blue-600">🛡️ Production Readiness</h3>
                     <div className="mt-2 text-gray-700 text-sm">
                       <p>Ready: {snippet.production_readiness?.isProductionReady ? '✅ Yes' : '❌ No'}</p>
-                      <ul className="list-disc list-inside">{(snippet.production_readiness?.reasons || []).map((reason: string, idx: number) => <li key={idx}>{reason}</li>)}</ul>
+                      <ul className="list-disc list-inside">{(snippet.production_readiness?.reasons || []).map((reason: string, idx: number) => <li key={idx}>{safeString(reason)}</li>)}</ul>
                     </div>
                   </div>
                 )}
@@ -460,8 +460,8 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
                     <div className="space-y-2 mt-2">
                       {(snippet.recommended_improvements || []).map((item: RecommendedImprovement, idx: number) => (
                         <div key={idx} className="border-b border-gray-200 pb-2 last:border-0">
-                          <p className="font-medium text-gray-800">[{item.priority}] {item.improvement}</p>
-                          <p className="text-gray-600 text-sm">Reason: {item.reason}</p>
+                          <p className="font-medium text-gray-800">[{safeString(item.priority)}] {safeString(item.improvement)}</p>
+                          <p className="text-gray-600 text-sm">Reason: {safeString(item.reason)}</p>
                         </div>
                       ))}
                     </div>
@@ -497,7 +497,7 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
                 {snippet.improved_code && (
                   <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
                     <h3 className="text-lg font-semibold text-blue-600">✨ Improved Code</h3>
-                    <pre className="text-gray-800 text-sm whitespace-pre-wrap overflow-auto max-h-[400px] mt-2 bg-white p-3 rounded border border-gray-200">{snippet.improved_code}</pre>
+                    <pre className="text-gray-800 text-sm whitespace-pre-wrap overflow-auto max-h-[400px] mt-2 bg-white p-3 rounded border border-gray-200">{safeString(snippet.improved_code)}</pre>
                   </div>
                 )}
                 {snippet.suggested_tests && snippet.suggested_tests.length > 0 && (
@@ -506,10 +506,10 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
                     <div className="space-y-2 mt-2">
                       {(snippet.suggested_tests || []).map((test: SuggestedTest, idx: number) => (
                         <div key={idx} className="border-b border-gray-200 pb-2 last:border-0">
-                          <p className="font-medium text-gray-800">{test.name}</p>
-                          <p className="text-gray-600 text-sm">Input: {test.input}</p>
-                          <p className="text-gray-600 text-sm">Expected: {test.expectedOutput}</p>
-                          <p className="text-gray-500 text-xs">Type: {test.type}</p>
+                          <p className="font-medium text-gray-800">{safeString(test.name)}</p>
+                          <p className="text-gray-600 text-sm">Input: {safeString(test.input)}</p>
+                          <p className="text-gray-600 text-sm">Expected: {safeString(test.expectedOutput)}</p>
+                          <p className="text-gray-500 text-xs">Type: {safeString(test.type)}</p>
                         </div>
                       ))}
                     </div>
@@ -531,8 +531,8 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
                   <div className="mt-4 space-y-2 max-h-[500px] overflow-y-auto">
                     {(snippet.line_explanations || []).map((item: LineExplanation, idx: number) => (
                       <div key={idx} className="border-b border-gray-200 pb-2 last:border-0">
-                        <p className="font-mono text-sm text-gray-800">Line {item.lineNumber}: {item.code}</p>
-                        <p className="text-gray-600 text-sm">💡 {item.explanation}</p>
+                        <p className="font-mono text-sm text-gray-800">Line {item.lineNumber}: {safeString(item.code)}</p>
+                        <p className="text-gray-600 text-sm">💡 {safeString(item.explanation)}</p>
                       </div>
                     ))}
                   </div>
@@ -546,7 +546,7 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
                     <span className="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
                   </summary>
                   <div className="mt-4 bg-gray-50 p-4 rounded-xl text-gray-800 text-sm whitespace-pre-wrap max-h-[400px] overflow-y-auto border border-gray-200">
-                    {snippet.generated_prompt || 'No prompt generated.'}
+                    {safeString(snippet.generated_prompt || 'No prompt generated.')}
                   </div>
                 </details>
               )}
