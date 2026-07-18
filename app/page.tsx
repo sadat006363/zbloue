@@ -5,7 +5,7 @@ import Editor from '@/components/Editor';
 import OutputPanel from '@/components/OutputPanel';
 import { Snippet, GenerateResponse } from '@/types';
 import { detectLanguage } from '@/lib/languageDetector';
-import { isCodeLike } from '@/lib/utils';
+import { isCodeLike, removeComments } from '@/lib/utils';
 import {
   MAX_LINES_GENERATE,
   MAX_LINES_EXPLAIN,
@@ -388,36 +388,47 @@ export default function Home() {
     }
   }, [showToast]);
 
+  // ============================================================
+  // 🔥 اصلاح اصلی: حذف خطوط خالی + کامنت‌ها + به‌روزرسانی ادیتور
+  // ============================================================
   const handleGenerate = useCallback(async () => {
-    const cleanCode = removeEmptyLines(code);
+    // ===== 1. حذف خطوط خالی =====
+    let processedCode = removeEmptyLines(code);
 
-    if (cleanCode !== code) {
-      setCode(cleanCode);
+    // ===== 2. حذف کامنت‌ها (برای همه حالت‌ها) =====
+    // کاربر می‌خواهد کامنت‌ها در ادیتور هم حذف شوند
+    processedCode = removeComments(processedCode, language);
+
+    // ===== 3. به‌روزرسانی ادیتور با کد پردازش‌شده =====
+    if (processedCode !== code) {
+      setCode(processedCode);
     }
 
-    if (!cleanCode.trim()) {
+    // ===== 4. اعتبارسنجی =====
+    if (!processedCode.trim()) {
       setErrorMessage('Please enter your code.');
       return;
     }
 
-    const isCode = isCodeLike(cleanCode);
+    const isCode = isCodeLike(processedCode);
 
     if (!isCode) {
       setErrorMessage('⚠️ The input does not appear to be valid source code. Please paste your code and try again.');
       return;
     }
 
-    const lines = cleanCode.split('\n').length;
+    const lines = processedCode.split('\n').length;
     if (lines > MAX_LINES_GENERATE) {
       setErrorMessage(`Code exceeds ${MAX_LINES_GENERATE} lines (${lines} lines). Please shorten your code.`);
       return;
     }
 
-    if (cleanCode.length > MAX_CODE_LENGTH) {
-      setErrorMessage(`Code is too long (${cleanCode.length} characters). Maximum is ${MAX_CODE_LENGTH} characters.`);
+    if (processedCode.length > MAX_CODE_LENGTH) {
+      setErrorMessage(`Code is too long (${processedCode.length} characters). Maximum is ${MAX_CODE_LENGTH} characters.`);
       return;
     }
 
+    // ===== 5. لغو درخواست قبلی =====
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
@@ -429,7 +440,7 @@ export default function Home() {
       const genRes = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: cleanCode, language, mode }),
+        body: JSON.stringify({ code: processedCode, language, mode }),
         signal: abortControllerRef.current.signal,
       });
 
@@ -456,7 +467,7 @@ export default function Home() {
           : 'No improvements suggested.';
 
         saveData = await saveSnippet({
-          code: cleanCode,
+          code: processedCode,
           language,
           card_title,
           key_concept,
@@ -489,7 +500,7 @@ export default function Home() {
         const card_title = mode === 'simple' ? 'Quick Analysis' : 'Standard Analysis';
 
         saveData = await saveSnippet({
-          code: cleanCode,
+          code: processedCode,
           language,
           card_title,
           key_concept: summaryLines,
@@ -521,7 +532,7 @@ export default function Home() {
       const newSnippet: Snippet = {
         id: saveData.id,
         slug: saveData.slug,
-        raw_code: cleanCode,
+        raw_code: processedCode,
         language,
         card_title: saveData.card_title || 'Code Analysis',
         key_concept: saveData.key_concept || '',
