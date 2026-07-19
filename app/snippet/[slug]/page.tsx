@@ -13,7 +13,7 @@ import {
   SuggestedTest,
   Scorecard,
   LineExplanation,
-  GenerateResponse, // <-- اضافه شد
+  GenerateResponse,
 } from '@/types';
 import AnalysisTab from '@/components/OutputPanel/tabs/AnalysisTab';
 
@@ -158,7 +158,8 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
         securityAnalysis: snippet.security_analysis,
         productionReadiness: snippet.production_readiness,
         recommendedImprovements: snippet.recommended_improvements,
-        improvedCode: snippet.improved_code ? { available: true, code: snippet.improved_code, notes: '' } : null,
+        // ===== اصلاح: استفاده از undefined به جای null =====
+        improvedCode: snippet.improved_code ? { available: true, code: snippet.improved_code, notes: '' } : undefined,
         suggestedTestsLegacy: snippet.suggested_tests,
         scorecardLegacy: snippet.scorecard,
         finalVerdict: snippet.final_verdict_summary ? {
@@ -178,10 +179,10 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
         scorecard: snippet.scorecard_new,
         verdict: snippet.verdict,
         limitations: snippet.limitations,
-        auditType: 'concurrency',
-        status: 'complete',
+        auditType: 'concurrency' as const,
+        status: 'complete' as const,
         language: snippet.language,
-        schemaVersion: '1.0' as const, // <-- رفع خطای TypeScript
+        schemaVersion: '1.0' as const,
       };
     }
 
