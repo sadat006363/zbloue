@@ -1,6 +1,7 @@
 // ============================================================
-// 📁 فایل: app/page.tsx
+// 📁 فایل: app/page.tsx (اصلاح شده - رفع مشکل پاک شدن کد)
 // ============================================================
+
 'use client';
 
 import { useState, useEffect, useCallback, useRef, useMemo, useReducer } from 'react';
@@ -78,7 +79,8 @@ type Action =
   | { type: 'SET_CONVERT_LANGUAGE'; payload: string }
   | { type: 'SET_HOVERED_LINE'; payload: number | null }
   | { type: 'SET_TOAST'; payload: string | null }
-  | { type: 'CLEAR_ALL' };
+  | { type: 'CLEAR_ALL' }
+  | { type: 'CLEAR_OUTPUTS' }; // ✅ Action جدید برای پاک کردن فقط خروجی‌ها
 
 const initialState: AppState = {
   code: '',
@@ -153,18 +155,33 @@ function appReducer(state: AppState, action: Action): AppState {
         isExplaining: false,
         isGeneratingPrompt: false,
       };
+    case 'CLEAR_OUTPUTS': // ✅ فقط خروجی‌ها را پاک کن، کد را دست نخورده نگه دار
+      return {
+        ...state,
+        errorMessage: null,
+        convertError: null,
+        explainError: null,
+        promptError: null,
+        outputs: {
+          simple: { snippet: null, fullAnalysis: null, lineExplanations: [], generatedPrompt: '' },
+          medium: { snippet: null, fullAnalysis: null, lineExplanations: [], generatedPrompt: '' },
+          advanced: { snippet: null, fullAnalysis: null, lineExplanations: [], generatedPrompt: '' },
+        },
+        convertLanguage: '',
+        hoveredLine: null,
+        loading: false,
+        isConverting: false,
+        isExplaining: false,
+        isGeneratingPrompt: false,
+      };
     default: return state;
   }
 }
 
-// ============================================================
-// 🔥 Hook سفارشی برای عملیات ناهمگام (اصلاح‌شده)
-// ============================================================
 function useAsyncAction() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 🔥 اصلاح: اضافه کردن کاما بعد از T
   const execute = useCallback(<T,>(
     action: () => Promise<T>,
     onSuccess?: (data: T) => void,
@@ -231,6 +248,7 @@ export default function Home() {
     dispatch({ type: 'SET_AVATAR', payload: newAvatar });
   }, []);
 
+  // ✅ اصلاح: تشخیص خودکار زبان بدون پاک کردن خروجی‌ها
   useEffect(() => {
     if (code.trim().length > 0) {
       const detected = detectLanguage(code);
@@ -240,8 +258,11 @@ export default function Home() {
     }
   }, [code, language]);
 
+  // ✅ اصلاح: فقط خروجی‌ها را پاک کن، کد را نه!
   useEffect(() => {
-    dispatch({ type: 'CLEAR_ALL' });
+    if (code.trim().length > 0 || language) {
+      dispatch({ type: 'CLEAR_OUTPUTS' });
+    }
   }, [code, language]);
 
   const currentOutput = useMemo(() => outputs[mode], [outputs, mode]);
