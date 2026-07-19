@@ -48,6 +48,16 @@ const FindingCard = ({ finding }: { finding: AuditFinding }) => {
     conditional: '⚠️ Conditional',
   };
 
+  // ===== Safe array helpers =====
+  const safeArray = (arr: any[] | undefined | null): any[] => {
+    return Array.isArray(arr) ? arr : [];
+  };
+
+  const safeJoin = (arr: any[] | undefined | null, separator: string): string => {
+    const safe = safeArray(arr);
+    return safe.length > 0 ? safe.join(separator) : '';
+  };
+
   return (
     <div className={`p-4 rounded-lg border ${severityColors[finding.severity] || 'bg-gray-50 border-gray-200'}`}>
       <div className="flex flex-wrap items-center gap-2">
@@ -74,22 +84,22 @@ const FindingCard = ({ finding }: { finding: AuditFinding }) => {
         </div>
       )}
 
-      {finding.executionPath && finding.executionPath.length > 0 && (
+      {safeArray(finding.executionPath).length > 0 && (
         <div className="mt-2">
           <span className="text-xs font-medium text-[#4a86f7]">Execution Path:</span>
           <div className="text-xs text-[#4a4a6a] bg-white/50 p-2 rounded border border-[#e8e8f0] mt-1">
-            {finding.executionPath.map((step, idx) => (
+            {safeArray(finding.executionPath).map((step, idx) => (
               <div key={idx}>→ {safeString(step)}</div>
             ))}
           </div>
         </div>
       )}
 
-      {finding.triggerConditions && finding.triggerConditions.length > 0 && (
+      {safeArray(finding.triggerConditions).length > 0 && (
         <div className="mt-2">
           <span className="text-xs font-medium text-[#4a86f7]">Trigger Conditions:</span>
           <ul className="list-disc list-inside text-xs text-[#4a4a6a] mt-1">
-            {finding.triggerConditions.map((cond, idx) => (
+            {safeArray(finding.triggerConditions).map((cond, idx) => (
               <li key={idx}>{safeString(cond)}</li>
             ))}
           </ul>
@@ -130,6 +140,11 @@ export default function AnalysisTab({
 }: AnalysisTabProps) {
   const [copySuccess, setCopySuccess] = useState(false);
 
+  // ===== Safe array helpers =====
+  const safeArray = (arr: any[] | undefined | null): any[] => {
+    return Array.isArray(arr) ? arr : [];
+  };
+
   // ===== Generate full analysis text for copy/download =====
   const getAnalysisText = () => {
     if (!fullAnalysis) return '';
@@ -144,7 +159,7 @@ export default function AnalysisTab({
         text += `💡 Summary:\n${safeString(fullAnalysis.summary || fullAnalysis.highLevelSummary)}\n\n`;
       }
       text += `🔍 Findings:\n`;
-      fullAnalysis.findings.forEach((f) => {
+      safeArray(fullAnalysis.findings).forEach((f) => {
         text += `  • ${safeString(f.title)} [${safeString(f.severity)}] (${safeString(f.confidence)})\n`;
         if (f.evidence && f.evidence.length > 0) {
           text += `    Lines: ${f.evidence.map(e => `${e.startLine}-${e.endLine}`).join(', ')}\n`;
@@ -262,7 +277,7 @@ export default function AnalysisTab({
               <div>
                 <span className="font-medium">Entry Points:</span>
                 <ul className="list-disc list-inside mt-1">
-                  {fullAnalysis.executionOverview.entryPoints.map((ep, idx) => (
+                  {safeArray(fullAnalysis.executionOverview.entryPoints).map((ep, idx) => (
                     <li key={idx}>{safeString(ep)}</li>
                   ))}
                 </ul>
@@ -270,7 +285,7 @@ export default function AnalysisTab({
               <div>
                 <span className="font-medium">Task Submission Points:</span>
                 <ul className="list-disc list-inside mt-1">
-                  {fullAnalysis.executionOverview.taskSubmissionPoints.map((tsp, idx) => (
+                  {safeArray(fullAnalysis.executionOverview.taskSubmissionPoints).map((tsp, idx) => (
                     <li key={idx}>{safeString(tsp)}</li>
                   ))}
                 </ul>
@@ -280,11 +295,11 @@ export default function AnalysisTab({
         )}
 
         {/* ===== Findings ===== */}
-        {fullAnalysis.findings && fullAnalysis.findings.length > 0 && (
+        {safeArray(fullAnalysis.findings).length > 0 && (
           <div>
             <h3 className="text-lg font-semibold text-[#1a1a2e] mb-3">🔍 Findings</h3>
             <div className="space-y-3">
-              {fullAnalysis.findings.map((finding) => (
+              {safeArray(fullAnalysis.findings).map((finding) => (
                 <FindingCard key={finding.id} finding={finding} />
               ))}
             </div>
@@ -292,10 +307,10 @@ export default function AnalysisTab({
         )}
 
         {/* ===== Architectural Observations ===== */}
-        {fullAnalysis.architecturalObservations && fullAnalysis.architecturalObservations.length > 0 && (
+        {safeArray(fullAnalysis.architecturalObservations).length > 0 && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-2">🏗️ Architectural Observations</h3>
-            {fullAnalysis.architecturalObservations.map((obs, idx) => (
+            {safeArray(fullAnalysis.architecturalObservations).map((obs, idx) => (
               <div key={idx} className="border-b border-[#d0d0d8] pb-2 last:border-0 last:pb-0">
                 <p className="font-medium text-[#1a1a2e]">{safeString(obs.title)}</p>
                 <p className="text-sm text-[#4a4a6a]">{safeString(obs.explanation)}</p>
@@ -305,11 +320,11 @@ export default function AnalysisTab({
         )}
 
         {/* ===== Recommended Actions ===== */}
-        {fullAnalysis.recommendedActions && fullAnalysis.recommendedActions.length > 0 && (
+        {safeArray(fullAnalysis.recommendedActions).length > 0 && (
           <div>
             <h3 className="text-lg font-semibold text-[#1a1a2e] mb-3">🔧 Recommended Actions</h3>
             <div className="space-y-2">
-              {fullAnalysis.recommendedActions
+              {safeArray(fullAnalysis.recommendedActions)
                 .sort((a, b) => a.priority - b.priority)
                 .map((action, idx) => (
                   <div key={idx} className="flex items-start gap-2 p-3 bg-[#f8f9fa] rounded-lg border border-[#d0d0d8]">
@@ -333,20 +348,24 @@ export default function AnalysisTab({
         )}
 
         {/* ===== Suggested Tests ===== */}
-        {fullAnalysis.suggestedTests && fullAnalysis.suggestedTests.length > 0 && (
+        {safeArray(fullAnalysis.suggestedTests).length > 0 && (
           <div>
             <h3 className="text-lg font-semibold text-[#1a1a2e] mb-3">🧪 Suggested Tests</h3>
             <div className="space-y-2">
-              {fullAnalysis.suggestedTests.map((test, idx) => (
+              {safeArray(fullAnalysis.suggestedTests).map((test, idx) => (
                 <div key={idx} className="p-3 bg-[#f8f9fa] rounded-lg border border-[#d0d0d8]">
-                  <p className="font-medium text-[#1a1a2e]">{safeString(test.title)}</p>
+                  <p className="font-medium text-[#1a1a2e]">{safeString(test.title || test.name || 'Test')}</p>
                   <p className="text-sm text-[#4a4a6a]">{safeString(test.purpose)}</p>
                   <details className="mt-1">
                     <summary className="text-xs text-[#4a86f7] cursor-pointer">Show details</summary>
                     <div className="mt-1 text-xs text-[#4a4a6a] space-y-1">
-                      <div><span className="font-medium">Setup:</span> {test.setup.join(', ')}</div>
-                      <div><span className="font-medium">Steps:</span> {test.steps.join(' → ')}</div>
-                      <div><span className="font-medium">Expected:</span> {safeString(test.expectedResult)}</div>
+                      {safeArray(test.setup).length > 0 && (
+                        <div><span className="font-medium">Setup:</span> {safeArray(test.setup).join(', ')}</div>
+                      )}
+                      {safeArray(test.steps).length > 0 && (
+                        <div><span className="font-medium">Steps:</span> {safeArray(test.steps).join(' → ')}</div>
+                      )}
+                      <div><span className="font-medium">Expected:</span> {safeString(test.expectedResult || test.expectedOutput)}</div>
                     </div>
                   </details>
                 </div>
@@ -368,9 +387,9 @@ export default function AnalysisTab({
                 <span className="font-medium">Resource Growth:</span> {safeString(fullAnalysis.complexity.resourceGrowth)}
               </div>
             )}
-            {fullAnalysis.complexity.assumptions && fullAnalysis.complexity.assumptions.length > 0 && (
+            {safeArray(fullAnalysis.complexity.assumptions).length > 0 && (
               <div className="mt-2 text-xs text-[#6c7086]">
-                <span className="font-medium">Assumptions:</span> {fullAnalysis.complexity.assumptions.join(', ')}
+                <span className="font-medium">Assumptions:</span> {safeArray(fullAnalysis.complexity.assumptions).join(', ')}
               </div>
             )}
           </div>
@@ -408,11 +427,11 @@ export default function AnalysisTab({
         )}
 
         {/* ===== Limitations ===== */}
-        {fullAnalysis.limitations && fullAnalysis.limitations.length > 0 && (
+        {safeArray(fullAnalysis.limitations).length > 0 && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-2">⚠️ Limitations</h3>
             <ul className="list-disc list-inside text-sm text-[#4a4a6a]">
-              {fullAnalysis.limitations.map((lim, idx) => (
+              {safeArray(fullAnalysis.limitations).map((lim, idx) => (
                 <li key={idx}>{safeString(lim)}</li>
               ))}
             </ul>
