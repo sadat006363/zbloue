@@ -749,18 +749,19 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
         />
 
         <div className="flex-1 p-4 md:p-6 overflow-y-auto max-h-[calc(100vh-200px)] text-[#1a1a2e]">
-          {activeTab === 'explanation' && (
-            <ExplanationTab
-              snippet={snippet}
-              isAdvanced={isAdvanced}
-              quickAnalysisText={quickAnalysisText}
-              analysisText={snippet.what_this_code_does || ''}
-              debugAnalysis={snippet.debug_analysis || ''}
-              optimization={snippet.optimization || ''}
-              keyConcept={snippet.key_concept || ''}
-              cardTitle={snippet.card_title || ''}
-            />
-          )}
+        {activeTab === 'explanation' && (
+  <ExplanationTab
+    snippet={snippet}
+    isAdvanced={isAdvanced}
+    quickAnalysisText={quickAnalysisText}
+    analysisText={snippet.what_this_code_does || ''}
+    debugAnalysis={snippet.debug_analysis || ''}
+    optimization={snippet.optimization || ''}
+    keyConcept={snippet.key_concept || ''}
+    cardTitle={snippet.card_title || ''}
+    fullAnalysis={fullAnalysis} // ← NEW: pass fullAnalysis
+  />
+)}
 
           {activeTab === 'linkedin' && (
             <LinkedInTab

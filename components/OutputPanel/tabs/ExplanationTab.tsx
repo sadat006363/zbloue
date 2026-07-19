@@ -11,68 +11,66 @@ interface ExplanationTabProps {
   optimization: string;
   keyConcept: string;
   cardTitle: string;
+  fullAnalysis?: any; // NEW: for new Advanced output
 }
 
-export default function ExplanationTab({ 
-  snippet, 
-  isAdvanced, 
+export default function ExplanationTab({
+  snippet,
+  isAdvanced,
   quickAnalysisText,
   analysisText,
   debugAnalysis,
   optimization,
   keyConcept,
   cardTitle,
+  fullAnalysis,
 }: ExplanationTabProps) {
   const [copySuccess, setCopySuccess] = useState(false);
-  
-  // ===== تابع پاک‌سازی متن از علامت‌های ### و فرمت‌های مارک‌داون =====
-  const cleanTextForCopy = (text: string) => {
-    if (!text) return '';
-    
-    // حذف ### از ابتدای خطوط
-    let cleaned = text.replace(/^###\s*/gm, '');
-    
-    // حذف ### که با خط جدید جدا شده‌اند
-    cleaned = cleaned.replace(/\n###\s*/g, '\n');
-    
-    // تبدیل - به •
-    cleaned = cleaned.replace(/^-\s*/gm, '• ');
-    
-    // حذف ** برای متن ساده
-    cleaned = cleaned.replace(/\*\*/g, '');
-    
-    // حذف آیکون‌های تکراری از ابتدای خطوط
-    cleaned = cleaned.replace(/^[📝🐛⚡💡🔍🔧📊✅🧪🔒💼🖼️📖📌⭐🔬🛡️🏁✨🚨]\s*/gm, '');
-    
-    return cleaned;
-  };
 
-  // ===== تابع جمع‌آوری متن کامل برای کپی و دانلود =====
+  // ===== Get content for copy/download =====
   const getFullContent = () => {
     let content = '';
-    
-    if (isAdvanced) {
-      content += `📌 ${cleanTextForCopy(cardTitle)}\n\n`;
-      content += `💡 Key Concept:\n${cleanTextForCopy(keyConcept)}\n\n`;
-      content += `🔍 What This Code Does:\n${cleanTextForCopy(analysisText)}\n\n`;
-      content += `🐛 Debug Analysis:\n${cleanTextForCopy(debugAnalysis)}\n\n`;
-      content += `⚡ Optimization:\n${cleanTextForCopy(optimization)}\n\n`;
+
+    if (isAdvanced && fullAnalysis) {
+      // NEW: Use structured data from advanced analysis
+      content += `📌 ${safeString(fullAnalysis.title || cardTitle)}\n\n`;
+      if (fullAnalysis.summary || fullAnalysis.highLevelSummary) {
+        content += `💡 Summary:\n${safeString(fullAnalysis.summary || fullAnalysis.highLevelSummary)}\n\n`;
+      }
+      if (fullAnalysis.findings && fullAnalysis.findings.length > 0) {
+        content += `🔍 Findings:\n`;
+        fullAnalysis.findings.forEach((f: any) => {
+          content += `  • ${safeString(f.title)} [${safeString(f.severity)}] (${safeString(f.confidence)})\n`;
+          content += `    ${safeString(f.consequence)}\n`;
+        });
+        content += '\n';
+      }
+      if (fullAnalysis.complexity) {
+        content += `⚡ Complexity: Time ${safeString(fullAnalysis.complexity.time)} | Space ${safeString(fullAnalysis.complexity.space)}\n\n`;
+      }
+      if (fullAnalysis.verdict) {
+        content += `🏁 Verdict: ${safeString(fullAnalysis.verdict.status)} - ${safeString(fullAnalysis.verdict.explanation)}\n\n`;
+      }
+    } else if (isAdvanced) {
+      // Legacy Advanced
+      content += `📌 ${safeString(cardTitle)}\n\n`;
+      content += `💡 Key Concept:\n${safeString(keyConcept)}\n\n`;
+      content += `🔍 What This Code Does:\n${safeString(analysisText)}\n\n`;
+      content += `🐛 Debug Analysis:\n${safeString(debugAnalysis)}\n\n`;
+      content += `⚡ Optimization:\n${safeString(optimization)}\n\n`;
     } else {
-      content += `📌 ${cleanTextForCopy(cardTitle)}\n\n`;
-      content += `📝 Summary:\n${cleanTextForCopy(keyConcept)}\n\n`;
+      content += `📌 ${safeString(cardTitle)}\n\n`;
+      content += `📝 Summary:\n${safeString(keyConcept)}\n\n`;
       if (debugAnalysis && debugAnalysis !== '-') {
-        content += `🐛 Debug Analysis:\n${cleanTextForCopy(debugAnalysis)}\n\n`;
+        content += `🐛 Debug Analysis:\n${safeString(debugAnalysis)}\n\n`;
       }
     }
-    
+
     return content;
   };
 
   const fullContent = getFullContent();
 
-  // ============================================================
-  // 🔥 دکمه کپی اختصاصی
-  // ============================================================
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(fullContent);
@@ -83,9 +81,6 @@ export default function ExplanationTab({
     }
   };
 
-  // ============================================================
-  // 🔥 دکمه دانلود اختصاصی
-  // ============================================================
   const handleDownload = () => {
     const blob = new Blob([fullContent], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -96,60 +91,43 @@ export default function ExplanationTab({
     URL.revokeObjectURL(url);
   };
 
-  // ===== تابع پاک‌سازی آیکون‌های تکراری از ابتدای متن =====
+  // ===== Clean duplicate icons =====
   const cleanDuplicateIcons = (text: string) => {
     if (!text) return '';
     const iconPattern = /^[📝🐛⚡💡🔍🔧📊✅🧪🔒💼🖼️📖📌⭐🔬🛡️🏁✨🚨🛡️🧩]\s*/;
     return text.replace(iconPattern, '');
   };
 
-  // ===== تابع پردازش متن برای حذف ### و فرمت‌دهی =====
+  // ===== Format text =====
   const formatText = (text: string) => {
     if (!text) return '';
-    
     let formatted = text.replace(/^###\s*/gm, '');
     const lines = formatted.split('\n');
-    const cleanedLines = lines.map(line => cleanDuplicateIcons(line));
+    const cleanedLines = lines.map((line) => cleanDuplicateIcons(line));
     formatted = cleanedLines.join('\n');
     formatted = formatted.replace(/^-\s*/gm, '• ');
     formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    
     return formatted;
   };
 
-  // ===== تابع تشخیص و نمایش بخش‌ها با آیکون =====
+  // ===== Render section =====
   const renderSection = (title: string, content: string) => {
     if (!content || content === '-') return null;
-    
+
     const iconMap: Record<string, string> = {
-      'summary': '📝',
+      summary: '📝',
       'key concept': '💡',
       'what this code does': '🔍',
       'debug analysis': '🐛',
-      'optimization': '⚡',
-      'critical issues': '🚨',
-      'quick fix': '⚡',
-      'code overview': '📌',
-      'logical & edge case analysis': '🔍',
-      'refactoring & improvements': '🔧',
+      optimization: '⚡',
       'high-level summary': '💡',
-      'code walkthrough': '🧩',
-      'what works well': '✅',
-      'bugs and risky cases': '🐛',
-      'edge cases': '🧪',
-      'performance analysis': '⚡',
-      'security analysis': '🔒',
-      'production readiness': '🛡️',
-      'recommended improvements': '🔧',
-      'improved code': '✨',
-      'suggested tests': '🧪',
-      'scorecard': '📊',
-      'final verdict': '🏁',
+      findings: '🔍',
+      verdict: '🏁',
+      complexity: '⚡',
     };
 
     const lowerTitle = title.toLowerCase();
     let icon = '📌';
-    
     for (const [key, value] of Object.entries(iconMap)) {
       if (lowerTitle.includes(key)) {
         icon = value;
@@ -165,7 +143,7 @@ export default function ExplanationTab({
         <h3 className="font-semibold text-[#4a86f7] flex items-center gap-2 mb-2">
           <span>{icon}</span> {cleanTitle}
         </h3>
-        <div 
+        <div
           className="text-[#1a1a2e] leading-relaxed whitespace-pre-wrap"
           dangerouslySetInnerHTML={{ __html: formattedContent }}
         />
@@ -173,24 +151,19 @@ export default function ExplanationTab({
     );
   };
 
-  // ===== تابع parse برای حالت Simple/Medium =====
+  // ===== Parse quick analysis =====
   const parseQuickAnalysis = (text: string) => {
     if (!text) return null;
-    
-    const lines = text.split('\n').filter(line => line.trim().length > 0);
+    const lines = text.split('\n').filter((line) => line.trim().length > 0);
     const sections: { title: string; content: string }[] = [];
     let currentTitle = '';
     let currentContent: string[] = [];
 
     for (const line of lines) {
       const trimmed = line.trim();
-      
       if (trimmed.startsWith('###') || trimmed.match(/^[📝🐛⚡💡🔍🔧📊✅🧪🔒💼🖼️📖📌⭐🔬🛡️🏁✨🚨🛡️🧩]\s/)) {
         if (currentTitle && currentContent.length > 0) {
-          sections.push({
-            title: currentTitle,
-            content: currentContent.join('\n')
-          });
+          sections.push({ title: currentTitle, content: currentContent.join('\n') });
         }
         currentTitle = trimmed
           .replace(/^###\s*/, '')
@@ -201,27 +174,96 @@ export default function ExplanationTab({
         currentContent.push(line);
       }
     }
-    
+
     if (currentTitle && currentContent.length > 0) {
-      sections.push({
-        title: currentTitle,
-        content: currentContent.join('\n')
-      });
+      sections.push({ title: currentTitle, content: currentContent.join('\n') });
     }
-    
+
     return sections.length > 0 ? sections : null;
+  };
+
+  // ===== Render findings for new advanced output =====
+  const renderFindings = (findings: any[]) => {
+    if (!findings || findings.length === 0) return null;
+    return (
+      <div className="mt-4 space-y-3">
+        <h3 className="font-semibold text-[#4a86f7] flex items-center gap-2">🔍 Findings</h3>
+        {findings.map((f: any, idx: number) => (
+          <div key={idx} className="bg-[#f8f9fa] p-3 rounded-lg border border-[#d0d0d8]">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-medium text-[#1a1a2e]">{safeString(f.title)}</span>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                f.severity === 'critical' ? 'bg-red-100 text-red-700' :
+                f.severity === 'high' ? 'bg-orange-100 text-orange-700' :
+                f.severity === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                'bg-blue-100 text-blue-700'
+              }`}>
+                {safeString(f.severity)}
+              </span>
+              <span className="text-xs text-[#6c7086]">({safeString(f.confidence)})</span>
+            </div>
+            {f.evidence && f.evidence.length > 0 && (
+              <div className="mt-1 text-xs text-[#6c7086]">
+                Lines: {f.evidence.map((e: any) => `${e.startLine}-${e.endLine}`).join(', ')}
+              </div>
+            )}
+            <p className="text-sm text-[#4a4a6a] mt-1">{safeString(f.consequence)}</p>
+            {f.remediation && (
+              <p className="text-sm text-[#43a047] mt-1">💡 {safeString(f.remediation)}</p>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // ===== Render complexity for new advanced output =====
+  const renderComplexity = (complexity: any) => {
+    if (!complexity) return null;
+    return (
+      <div className="mt-4 bg-[#f8f9fa] p-3 rounded-lg border border-[#d0d0d8]">
+        <h3 className="font-semibold text-[#4a86f7] flex items-center gap-2">⚡ Complexity</h3>
+        <div className="text-sm text-[#4a4a6a] space-y-1">
+          <div><span className="font-medium">Time:</span> {safeString(complexity.time)}</div>
+          <div><span className="font-medium">Space:</span> {safeString(complexity.space)}</div>
+          {complexity.resourceGrowth && (
+            <div><span className="font-medium">Resource Growth:</span> {safeString(complexity.resourceGrowth)}</div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // ===== Render verdict for new advanced output =====
+  const renderVerdict = (verdict: any) => {
+    if (!verdict) return null;
+    const statusColors: Record<string, string> = {
+      'not-production-ready': 'bg-red-100 text-red-700',
+      'requires-major-changes': 'bg-orange-100 text-orange-700',
+      'requires-minor-changes': 'bg-yellow-100 text-yellow-700',
+      'production-ready-with-monitoring': 'bg-green-100 text-green-700',
+    };
+    return (
+      <div className="mt-4 bg-[#f8f9fa] p-3 rounded-lg border border-[#d0d0d8]">
+        <h3 className="font-semibold text-[#4a86f7] flex items-center gap-2">🏁 Verdict</h3>
+        <div className="flex items-center gap-2">
+          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColors[verdict.status] || 'bg-gray-100 text-gray-700'}`}>
+            {safeString(verdict.status)}
+          </span>
+        </div>
+        <p className="text-sm text-[#4a4a6a] mt-1">{safeString(verdict.explanation)}</p>
+      </div>
+    );
   };
 
   return (
     <div className="space-y-4">
-      {/* ============================================================
-          🔥 دکمه‌های کپی و دانلود (ساخته شده با دست خودمان)
-          ============================================================ */}
+      {/* ===== Copy & Download Buttons ===== */}
       <div className="flex justify-end items-center gap-3 pb-2 border-b-2 border-[#e8e8f0]">
         <button
           onClick={handleCopy}
           className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md transition border border-[#d0d0d8] text-[#4a4a6a] hover:text-[#4a86f7] hover:bg-[#f1f3f5]"
-          title="Copy all explanation content to clipboard"
+          title="Copy all explanation content"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
@@ -240,40 +282,63 @@ export default function ExplanationTab({
         </button>
       </div>
 
-      {isAdvanced ? (
-        // ===== حالت Advanced =====
+      {isAdvanced && fullAnalysis ? (
+        // ===== NEW Advanced Analysis Output =====
+        <div className="space-y-4">
+          <h2 className="text-xl md:text-2xl font-bold text-[#1a1a2e] flex items-center gap-2">
+            <span>📌</span> {safeString(fullAnalysis.title || cardTitle)}
+          </h2>
+
+          {fullAnalysis.summary || fullAnalysis.highLevelSummary ? (
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+              <p className="text-[#1a1a2e] text-sm leading-relaxed">
+                {safeString(fullAnalysis.summary || fullAnalysis.highLevelSummary)}
+              </p>
+            </div>
+          ) : null}
+
+          {renderFindings(fullAnalysis.findings)}
+          {renderComplexity(fullAnalysis.complexity)}
+          {renderVerdict(fullAnalysis.verdict)}
+
+          {fullAnalysis.limitations && fullAnalysis.limitations.length > 0 && (
+            <div className="mt-4 bg-[#f8f9fa] p-3 rounded-lg border border-[#d0d0d8]">
+              <h3 className="font-semibold text-[#4a86f7] flex items-center gap-2">⚠️ Limitations</h3>
+              <ul className="list-disc list-inside text-sm text-[#4a4a6a] mt-1">
+                {fullAnalysis.limitations.map((item: string, idx: number) => (
+                  <li key={idx}>{safeString(item)}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      ) : isAdvanced ? (
+        // ===== Legacy Advanced =====
         <div className="space-y-6">
           <h2 className="text-xl md:text-2xl font-bold text-[#1a1a2e] flex items-center gap-2">
             <span>📌</span> {safeString(cardTitle)}
           </h2>
-          
           {renderSection('💡 Key Concept', keyConcept)}
           {renderSection('🔍 What This Code Does', analysisText)}
           {renderSection('🐛 Debug Analysis', debugAnalysis)}
           {renderSection('⚡ Optimization', optimization)}
         </div>
       ) : (
-        // ===== حالت Simple/Medium =====
+        // ===== Simple / Medium =====
         <div className="space-y-6">
           <h2 className="text-xl md:text-2xl font-bold text-[#1a1a2e] flex items-center gap-2">
             <span>📌</span> {safeString(cardTitle)}
           </h2>
-          
           {(() => {
             const sections = parseQuickAnalysis(keyConcept);
             if (sections && sections.length > 0) {
               return sections.map((section, idx) => (
-                <div key={idx}>
-                  {renderSection(section.title, section.content)}
-                </div>
+                <div key={idx}>{renderSection(section.title, section.content)}</div>
               ));
             }
             return renderSection('📝 Summary', keyConcept);
           })()}
-          
-          {debugAnalysis && debugAnalysis !== '-' && (
-            renderSection('🐛 Debug Analysis', debugAnalysis)
-          )}
+          {debugAnalysis && debugAnalysis !== '-' && renderSection('🐛 Debug Analysis', debugAnalysis)}
         </div>
       )}
     </div>

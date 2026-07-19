@@ -1,5 +1,5 @@
 'use client';
-import { GenerateResponse } from '@/types';
+import { GenerateResponse, AuditFinding } from '@/types';
 import { safeString } from '@/lib/utils';
 import { useState } from 'react';
 
@@ -12,177 +12,117 @@ interface AnalysisTabProps {
   onDownloadFullAnalysis?: () => void;
 }
 
-// ===== تابع تولید متن کامل تحلیل برای کپی و دانلود =====
-const getFullAnalysisText = (analysis: GenerateResponse): string => {
-  let content = '';
-
-  content += `📌 Title: ${safeString(analysis.title)}\n\n`;
-  
-  if (analysis.highLevelSummary) {
-    content += `💡 High-Level Summary:\n${safeString(analysis.highLevelSummary)}\n\n`;
-  }
-  
-  if (analysis.codeWalkthrough && analysis.codeWalkthrough.length > 0) {
-    content += `🧩 Code Walkthrough:\n`;
-    analysis.codeWalkthrough.forEach((item) => {
-      content += `  • ${safeString(item.section)}: ${safeString(item.explanation)}\n`;
-    });
-    content += '\n';
-  }
-  
-  if (analysis.whatWorksWell && analysis.whatWorksWell.length > 0) {
-    content += `✅ What Works Well:\n`;
-    analysis.whatWorksWell.forEach((item) => {
-      content += `  • ${safeString(item)}\n`;
-    });
-    content += '\n';
-  }
-  
-  if (analysis.bugsAndRiskyCases && analysis.bugsAndRiskyCases.length > 0) {
-    content += `🐛 Bugs and Risky Cases:\n`;
-    analysis.bugsAndRiskyCases.forEach((item) => {
-      content += `  • ${safeString(item.issue)} – Impact: ${safeString(item.impact)}`;
-      if (item.example) content += ` (Example: ${safeString(item.example)})`;
-      content += '\n';
-    });
-    content += '\n';
-  }
-  
-  if (analysis.edgeCases && analysis.edgeCases.length > 0) {
-    content += `🧪 Edge Cases:\n`;
-    analysis.edgeCases.forEach((item) => {
-      content += `  • ${safeString(item.case)} – Current: ${safeString(item.currentBehavior)} – Expected: ${safeString(item.expectedBehavior)} – Risk: ${safeString(item.risk)}\n`;
-    });
-    content += '\n';
-  }
-  
-  if (analysis.performanceAnalysis) {
-    content += `⚡ Performance Analysis:\n`;
-    if (analysis.performanceAnalysis.timeComplexity) {
-      content += `  Time Complexity: ${analysis.performanceAnalysis.timeComplexity.map(t => `${t.target}: ${t.complexity}`).join(', ')}\n`;
-    }
-    if (analysis.performanceAnalysis.spaceComplexity) {
-      content += `  Space Complexity: ${analysis.performanceAnalysis.spaceComplexity.map(t => `${t.target}: ${t.complexity}`).join(', ')}\n`;
-    }
-    if (analysis.performanceAnalysis.scalabilityNotes) {
-      analysis.performanceAnalysis.scalabilityNotes.forEach((note) => {
-        content += `  • ${safeString(note)}\n`;
-      });
-    }
-    content += '\n';
-  }
-  
-  if (analysis.securityAnalysis) {
-    content += `🔒 Security Analysis:\n`;
-    content += `  Severity: ${safeString(analysis.securityAnalysis.severity)}\n`;
-    if (analysis.securityAnalysis.issues) {
-      analysis.securityAnalysis.issues.forEach((issue) => {
-        content += `  • ${safeString(issue)}\n`;
-      });
-    }
-    if (analysis.securityAnalysis.recommendations) {
-      content += `  Recommendations:\n`;
-      analysis.securityAnalysis.recommendations.forEach((rec) => {
-        content += `    • ${safeString(rec)}\n`;
-      });
-    }
-    content += '\n';
-  }
-  
-  if (analysis.productionReadiness) {
-    content += `🛡️ Production Readiness:\n`;
-    content += `  Ready: ${analysis.productionReadiness.isProductionReady ? '✅ Yes' : '❌ No'}\n`;
-    if (analysis.productionReadiness.reasons) {
-      analysis.productionReadiness.reasons.forEach((reason) => {
-        content += `  • ${safeString(reason)}\n`;
-      });
-    }
-    if (analysis.productionReadiness.requiredChanges) {
-      analysis.productionReadiness.requiredChanges.forEach((change) => {
-        content += `  • ${safeString(change)}\n`;
-      });
-    }
-    content += '\n';
-  }
-  
-  if (analysis.recommendedImprovements && analysis.recommendedImprovements.length > 0) {
-    content += `🔧 Recommended Improvements:\n`;
-    analysis.recommendedImprovements.forEach((item) => {
-      content += `  [${safeString(item.priority)}] ${safeString(item.improvement)}\n`;
-      content += `    Reason: ${safeString(item.reason)}\n`;
-    });
-    content += '\n';
-  }
-  
-  if (analysis.improvedCode && analysis.improvedCode.available) {
-    content += `✨ Improved Code:\n`;
-    content += `Notes: ${safeString(analysis.improvedCode.notes)}\n`;
-    content += `${safeString(analysis.improvedCode.code)}\n\n`;
-  }
-  
-  if (analysis.suggestedTests && analysis.suggestedTests.length > 0) {
-    content += `🧪 Suggested Tests:\n`;
-    analysis.suggestedTests.forEach((test) => {
-      content += `  • ${safeString(test.name)}\n`;
-      content += `    Input: ${safeString(test.input)}\n`;
-      content += `    Expected: ${safeString(test.expectedOutput)}\n`;
-      content += `    Type: ${safeString(test.type)}\n`;
-    });
-    content += '\n';
-  }
-  
-  if (analysis.scorecard) {
-    content += `📊 Scorecard:\n`;
-    const scores = analysis.scorecard;
-    content += `  Correctness: ${safeString(scores.correctness)}/10\n`;
-    content += `  Readability: ${safeString(scores.readability)}/10\n`;
-    content += `  Performance: ${safeString(scores.performance)}/10\n`;
-    content += `  Maintainability: ${safeString(scores.maintainability)}/10\n`;
-    content += `  Production Readiness: ${safeString(scores.productionReadiness)}/10\n`;
-    if (scores.security !== undefined) content += `  Security: ${safeString(scores.security)}/10\n`;
-    if (scores.overall) content += `  Overall: ${safeString(scores.overall)}/10\n`;
-    content += '\n';
-  }
-  
-  if (analysis.finalVerdict) {
-    content += `🏁 Final Verdict:\n`;
-    content += `  Summary: ${safeString(analysis.finalVerdict.summary)}\n`;
-    content += `  Approved: ${analysis.finalVerdict.approved ? '✅ Yes' : '❌ No'}\n`;
-    if (analysis.finalVerdict.nextSteps) {
-      content += `  Next Steps: ${safeString(analysis.finalVerdict.nextSteps)}\n`;
-    }
-  }
-  
-  return content;
-};
-
-// ===== تابع پاکسازی متن از علامت‌های ### =====
+// ===== Clean markdown =====
 const cleanMarkdown = (text: string) => {
   if (!text) return '';
-  
   let cleaned = text.replace(/^###\s*/gm, '');
   cleaned = cleaned.replace(/\n###\s*/g, '\n');
   cleaned = cleaned.replace(/^-\s*/gm, '• ');
   cleaned = cleaned.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-  
   return cleaned;
 };
 
-// ===== تابع پاکسازی متن برای کپی و دانلود (بدون HTML) =====
+// ===== Clean text for copy =====
 const cleanTextForCopy = (text: string) => {
   if (!text) return '';
-  
   let cleaned = text.replace(/^###\s*/gm, '');
   cleaned = cleaned.replace(/\n###\s*/g, '\n');
   cleaned = cleaned.replace(/^-\s*/gm, '• ');
   cleaned = cleaned.replace(/\*\*/g, '');
-  
   return cleaned;
 };
 
-export default function AnalysisTab({ 
-  fullAnalysis, 
-  isAdvanced, 
+// ===== Render single finding =====
+const FindingCard = ({ finding }: { finding: AuditFinding }) => {
+  const severityColors: Record<string, string> = {
+    critical: 'bg-red-100 text-red-700 border-red-200',
+    high: 'bg-orange-100 text-orange-700 border-orange-200',
+    medium: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+    low: 'bg-blue-100 text-blue-700 border-blue-200',
+    info: 'bg-gray-100 text-gray-700 border-gray-200',
+  };
+
+  const confidenceLabels: Record<string, string> = {
+    definite: '✅ Definite',
+    likely: '🔶 Likely',
+    conditional: '⚠️ Conditional',
+  };
+
+  return (
+    <div className={`p-4 rounded-lg border ${severityColors[finding.severity] || 'bg-gray-50 border-gray-200'}`}>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="font-semibold text-[#1a1a2e]">{safeString(finding.title)}</span>
+        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+          finding.severity === 'critical' ? 'bg-red-500 text-white' :
+          finding.severity === 'high' ? 'bg-orange-500 text-white' :
+          finding.severity === 'medium' ? 'bg-yellow-500 text-white' :
+          'bg-blue-500 text-white'
+        }`}>
+          {safeString(finding.severity)}
+        </span>
+        <span className="text-xs text-[#6c7086]">{confidenceLabels[finding.confidence] || safeString(finding.confidence)}</span>
+      </div>
+
+      {finding.evidence && finding.evidence.length > 0 && (
+        <div className="mt-2 text-xs text-[#6c7086] space-y-1">
+          {finding.evidence.map((ev, idx) => (
+            <div key={idx} className="bg-white/50 p-2 rounded border border-[#e8e8f0] font-mono text-[#1a1a2e]">
+              <span className="text-[#6c7086]">Lines {ev.startLine}-{ev.endLine}:</span> {safeString(ev.code)}
+              <p className="text-[#4a4a6a] text-xs mt-1">{safeString(ev.explanation)}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {finding.executionPath && finding.executionPath.length > 0 && (
+        <div className="mt-2">
+          <span className="text-xs font-medium text-[#4a86f7]">Execution Path:</span>
+          <div className="text-xs text-[#4a4a6a] bg-white/50 p-2 rounded border border-[#e8e8f0] mt-1">
+            {finding.executionPath.map((step, idx) => (
+              <div key={idx}>→ {safeString(step)}</div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {finding.triggerConditions && finding.triggerConditions.length > 0 && (
+        <div className="mt-2">
+          <span className="text-xs font-medium text-[#4a86f7]">Trigger Conditions:</span>
+          <ul className="list-disc list-inside text-xs text-[#4a4a6a] mt-1">
+            {finding.triggerConditions.map((cond, idx) => (
+              <li key={idx}>{safeString(cond)}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {finding.consequence && (
+        <div className="mt-2">
+          <span className="text-xs font-medium text-[#e53935]">Consequence:</span>
+          <p className="text-sm text-[#4a4a6a]">{safeString(finding.consequence)}</p>
+        </div>
+      )}
+
+      {finding.remediation && (
+        <div className="mt-2">
+          <span className="text-xs font-medium text-[#43a047]">💡 Remediation:</span>
+          <p className="text-sm text-[#4a4a6a]">{safeString(finding.remediation)}</p>
+        </div>
+      )}
+
+      {finding.technicalExplanation && (
+        <div className="mt-2">
+          <span className="text-xs font-medium text-[#6c7086]">Technical Details:</span>
+          <p className="text-xs text-[#4a4a6a]">{safeString(finding.technicalExplanation)}</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default function AnalysisTab({
+  fullAnalysis,
+  isAdvanced,
   quickAnalysisText,
   snippet,
   onCopyFullAnalysis,
@@ -190,9 +130,66 @@ export default function AnalysisTab({
 }: AnalysisTabProps) {
   const [copySuccess, setCopySuccess] = useState(false);
 
-  const handleCopyAdvanced = async () => {
-    if (!fullAnalysis) return;
-    const text = getFullAnalysisText(fullAnalysis);
+  // ===== Generate full analysis text for copy/download =====
+  const getAnalysisText = () => {
+    if (!fullAnalysis) return '';
+
+    let text = '';
+
+    if (isAdvanced && fullAnalysis.findings) {
+      text += `📊 Zbloue Advanced Analysis Report\n`;
+      text += `═══════════════════════════════════════\n\n`;
+      text += `📌 Title: ${safeString(fullAnalysis.title)}\n\n`;
+      if (fullAnalysis.summary || fullAnalysis.highLevelSummary) {
+        text += `💡 Summary:\n${safeString(fullAnalysis.summary || fullAnalysis.highLevelSummary)}\n\n`;
+      }
+      text += `🔍 Findings:\n`;
+      fullAnalysis.findings.forEach((f) => {
+        text += `  • ${safeString(f.title)} [${safeString(f.severity)}] (${safeString(f.confidence)})\n`;
+        if (f.evidence && f.evidence.length > 0) {
+          text += `    Lines: ${f.evidence.map(e => `${e.startLine}-${e.endLine}`).join(', ')}\n`;
+        }
+        text += `    Consequence: ${safeString(f.consequence)}\n`;
+        if (f.remediation) text += `    Fix: ${safeString(f.remediation)}\n\n`;
+      });
+      if (fullAnalysis.complexity) {
+        text += `⚡ Complexity:\n`;
+        text += `  Time: ${safeString(fullAnalysis.complexity.time)}\n`;
+        text += `  Space: ${safeString(fullAnalysis.complexity.space)}\n`;
+        if (fullAnalysis.complexity.resourceGrowth) {
+          text += `  Resource Growth: ${safeString(fullAnalysis.complexity.resourceGrowth)}\n`;
+        }
+        text += '\n';
+      }
+      if (fullAnalysis.verdict) {
+        text += `🏁 Verdict:\n`;
+        text += `  Status: ${safeString(fullAnalysis.verdict.status)}\n`;
+        text += `  Explanation: ${safeString(fullAnalysis.verdict.explanation)}\n\n`;
+      }
+      if (fullAnalysis.scorecard) {
+        text += `📊 Scorecard:\n`;
+        const sc = fullAnalysis.scorecard;
+        text += `  Correctness: ${sc.correctness}/10\n`;
+        text += `  Concurrency Safety: ${sc.concurrencySafety}/10\n`;
+        text += `  Liveness: ${sc.liveness}/10\n`;
+        text += `  Error Handling: ${sc.errorHandling}/10\n`;
+        text += `  Resource Management: ${sc.resourceManagement}/10\n`;
+        text += `  Maintainability: ${sc.maintainability}/10\n`;
+        text += `  Production Readiness: ${sc.productionReadiness}/10\n\n`;
+      }
+      text += `Audit Type: ${safeString(fullAnalysis.auditType)}\n`;
+      text += `Status: ${safeString(fullAnalysis.status)}\n`;
+    } else if (fullAnalysis.analysis) {
+      text = fullAnalysis.analysis;
+    } else {
+      text = 'No analysis available.';
+    }
+
+    return text;
+  };
+
+  const handleCopy = async () => {
+    const text = getAnalysisText();
     try {
       await navigator.clipboard.writeText(text);
       setCopySuccess(true);
@@ -202,9 +199,8 @@ export default function AnalysisTab({
     }
   };
 
-  const handleDownloadAdvanced = () => {
-    if (!fullAnalysis) return;
-    const text = getFullAnalysisText(fullAnalysis);
+  const handleDownload = () => {
+    const text = getAnalysisText();
     const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -214,78 +210,219 @@ export default function AnalysisTab({
     URL.revokeObjectURL(url);
   };
 
-  if (isAdvanced) {
-    if (!fullAnalysis) {
-      return <div className="text-[#4a4a6a]">No advanced analysis available.</div>;
-    }
+  // ===== Advanced mode with new structure =====
+  if (isAdvanced && fullAnalysis) {
     return (
       <div className="space-y-6">
+        {/* ===== Header with Copy/Download ===== */}
         <div className="flex justify-end items-center gap-3 pb-2 border-b-2 border-[#e8e8f0]">
           <button
-            onClick={handleCopyAdvanced}
-            className="flex items-center gap-1.5 text-sm text-[#4a4a6a] hover:text-[#4a86f7] transition px-2 py-1 rounded-md hover:bg-[#f1f3f5] border border-[#d0d0d8] group relative"
-            title="Copy full analysis to clipboard"
+            onClick={handleCopy}
+            className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md transition border border-[#d0d0d8] text-[#4a4a6a] hover:text-[#4a86f7] hover:bg-[#f1f3f5]"
+            title="Copy full analysis"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
             </svg>
-            <span className="hidden sm:inline">{copySuccess ? '✅ Copied!' : 'Copy All'}</span>
+            <span>{copySuccess ? '✅ Copied!' : 'Copy'}</span>
           </button>
           <button
-            onClick={handleDownloadAdvanced}
-            className="flex items-center gap-1.5 text-sm text-[#4a4a6a] hover:text-[#4a86f7] transition px-2 py-1 rounded-md hover:bg-[#f1f3f5] border border-[#d0d0d8] group relative"
+            onClick={handleDownload}
+            className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md transition border border-[#d0d0d8] text-[#4a4a6a] hover:text-[#4a86f7] hover:bg-[#f1f3f5]"
             title="Download analysis as text file"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
-            <span className="hidden sm:inline">Download</span>
+            <span>Download</span>
           </button>
         </div>
 
-        <h2 className="text-xl font-bold">{safeString(fullAnalysis.title)}</h2>
-        {fullAnalysis.highLevelSummary && (
-          <div><h3 className="font-semibold text-[#4a86f7]">💡 High-Level Summary</h3><p>{safeString(fullAnalysis.highLevelSummary)}</p></div>
-        )}
-        {fullAnalysis.codeWalkthrough && fullAnalysis.codeWalkthrough.length > 0 && (
-          <div><h3 className="font-semibold text-[#4a86f7]">🧩 Code Walkthrough</h3><ul className="space-y-1">{fullAnalysis.codeWalkthrough.map((item, i) => <li key={i}><strong>{safeString(item.section)}</strong>: {safeString(item.explanation)}</li>)}</ul></div>
-        )}
-        {fullAnalysis.whatWorksWell && fullAnalysis.whatWorksWell.length > 0 && (
-          <div><h3 className="font-semibold text-[#43a047]">✅ What Works Well</h3><ul className="list-disc list-inside">{fullAnalysis.whatWorksWell.map((item, i) => <li key={i}>{safeString(item)}</li>)}</ul></div>
-        )}
-        {fullAnalysis.bugsAndRiskyCases && fullAnalysis.bugsAndRiskyCases.length > 0 && (
-          <div><h3 className="font-semibold text-[#e53935]">🐛 Bugs and Risky Cases</h3><ul>{fullAnalysis.bugsAndRiskyCases.map((item, i) => <li key={i}><strong>{safeString(item.issue)}</strong> – Impact: {safeString(item.impact)}{item.example && ` (Example: ${safeString(item.example)})`}</li>)}</ul></div>
-        )}
-        {fullAnalysis.edgeCases && fullAnalysis.edgeCases.length > 0 && (
-          <div><h3 className="font-semibold text-[#4a86f7]">🧪 Edge Cases</h3><ul>{fullAnalysis.edgeCases.map((item, i) => <li key={i}><strong>{safeString(item.case)}</strong> – Current: {safeString(item.currentBehavior)} – Expected: {safeString(item.expectedBehavior)} – Risk: {safeString(item.risk)}</li>)}</ul></div>
-        )}
-        {fullAnalysis.performanceAnalysis && (
-          <div><h3 className="font-semibold text-[#4a86f7]">⚡ Performance Analysis</h3>
-            <div><span className="font-medium">Time:</span> {fullAnalysis.performanceAnalysis.timeComplexity.map(t => `${t.target}: ${t.complexity}`).join(', ')}</div>
-            <div><span className="font-medium">Space:</span> {fullAnalysis.performanceAnalysis.spaceComplexity.map(t => `${t.target}: ${t.complexity}`).join(', ')}</div>
-            {fullAnalysis.performanceAnalysis.scalabilityNotes && <ul className="list-disc list-inside">{fullAnalysis.performanceAnalysis.scalabilityNotes.map((note,i) => <li key={i}>{safeString(note)}</li>)}</ul>}
+        {/* ===== Title and Summary ===== */}
+        <div>
+          <h2 className="text-2xl font-bold text-[#1a1a2e]">{safeString(fullAnalysis.title || 'Advanced Analysis')}</h2>
+          {fullAnalysis.summary || fullAnalysis.highLevelSummary ? (
+            <p className="mt-2 text-[#4a4a6a] bg-blue-50 p-3 rounded-lg border border-blue-200">
+              {safeString(fullAnalysis.summary || fullAnalysis.highLevelSummary)}
+            </p>
+          ) : null}
+          <div className="mt-2 flex flex-wrap gap-2 text-xs">
+            <span className="bg-gray-100 px-2 py-0.5 rounded-full">Audit: {safeString(fullAnalysis.auditType)}</span>
+            <span className="bg-gray-100 px-2 py-0.5 rounded-full">Status: {safeString(fullAnalysis.status)}</span>
+            <span className="bg-gray-100 px-2 py-0.5 rounded-full">Language: {safeString(fullAnalysis.language)}</span>
+            <span className="bg-gray-100 px-2 py-0.5 rounded-full">Schema: {safeString(fullAnalysis.schemaVersion)}</span>
+          </div>
+        </div>
+
+        {/* ===== Execution Overview ===== */}
+        {fullAnalysis.executionOverview && (
+          <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
+            <h3 className="font-semibold text-[#4a86f7] mb-2">🔄 Execution Overview</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-[#4a4a6a]">
+              <div>
+                <span className="font-medium">Entry Points:</span>
+                <ul className="list-disc list-inside mt-1">
+                  {fullAnalysis.executionOverview.entryPoints.map((ep, idx) => (
+                    <li key={idx}>{safeString(ep)}</li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <span className="font-medium">Task Submission Points:</span>
+                <ul className="list-disc list-inside mt-1">
+                  {fullAnalysis.executionOverview.taskSubmissionPoints.map((tsp, idx) => (
+                    <li key={idx}>{safeString(tsp)}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
           </div>
         )}
-        {fullAnalysis.securityAnalysis && (
-          <div><h3 className="font-semibold text-[#e53935]">🔒 Security Analysis</h3>
-            <p>Severity: {fullAnalysis.securityAnalysis.severity}</p>
-            {fullAnalysis.securityAnalysis.issues && <ul className="list-disc list-inside">{fullAnalysis.securityAnalysis.issues.map((issue,i) => <li key={i}>{safeString(issue)}</li>)}</ul>}
-            {fullAnalysis.securityAnalysis.recommendations && <div><span className="font-medium">Recommendations:</span><ul className="list-disc list-inside">{fullAnalysis.securityAnalysis.recommendations.map((rec,i) => <li key={i}>{safeString(rec)}</li>)}</ul></div>}
+
+        {/* ===== Findings ===== */}
+        {fullAnalysis.findings && fullAnalysis.findings.length > 0 && (
+          <div>
+            <h3 className="text-lg font-semibold text-[#1a1a2e] mb-3">🔍 Findings</h3>
+            <div className="space-y-3">
+              {fullAnalysis.findings.map((finding) => (
+                <FindingCard key={finding.id} finding={finding} />
+              ))}
+            </div>
           </div>
         )}
+
+        {/* ===== Architectural Observations ===== */}
+        {fullAnalysis.architecturalObservations && fullAnalysis.architecturalObservations.length > 0 && (
+          <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
+            <h3 className="font-semibold text-[#4a86f7] mb-2">🏗️ Architectural Observations</h3>
+            {fullAnalysis.architecturalObservations.map((obs, idx) => (
+              <div key={idx} className="border-b border-[#d0d0d8] pb-2 last:border-0 last:pb-0">
+                <p className="font-medium text-[#1a1a2e]">{safeString(obs.title)}</p>
+                <p className="text-sm text-[#4a4a6a]">{safeString(obs.explanation)}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ===== Recommended Actions ===== */}
+        {fullAnalysis.recommendedActions && fullAnalysis.recommendedActions.length > 0 && (
+          <div>
+            <h3 className="text-lg font-semibold text-[#1a1a2e] mb-3">🔧 Recommended Actions</h3>
+            <div className="space-y-2">
+              {fullAnalysis.recommendedActions
+                .sort((a, b) => a.priority - b.priority)
+                .map((action, idx) => (
+                  <div key={idx} className="flex items-start gap-2 p-3 bg-[#f8f9fa] rounded-lg border border-[#d0d0d8]">
+                    <span className="text-sm font-medium text-[#4a86f7]">#{action.priority}</span>
+                    <div>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                        action.severity === 'critical' ? 'bg-red-100 text-red-700' :
+                        action.severity === 'high' ? 'bg-orange-100 text-orange-700' :
+                        action.severity === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                        'bg-blue-100 text-blue-700'
+                      }`}>
+                        {safeString(action.severity)}
+                      </span>
+                      <p className="font-medium text-[#1a1a2e] mt-1">{safeString(action.title)}</p>
+                      <p className="text-sm text-[#4a4a6a]">{safeString(action.action)}</p>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+
+        {/* ===== Suggested Tests ===== */}
+        {fullAnalysis.suggestedTests && fullAnalysis.suggestedTests.length > 0 && (
+          <div>
+            <h3 className="text-lg font-semibold text-[#1a1a2e] mb-3">🧪 Suggested Tests</h3>
+            <div className="space-y-2">
+              {fullAnalysis.suggestedTests.map((test, idx) => (
+                <div key={idx} className="p-3 bg-[#f8f9fa] rounded-lg border border-[#d0d0d8]">
+                  <p className="font-medium text-[#1a1a2e]">{safeString(test.title)}</p>
+                  <p className="text-sm text-[#4a4a6a]">{safeString(test.purpose)}</p>
+                  <details className="mt-1">
+                    <summary className="text-xs text-[#4a86f7] cursor-pointer">Show details</summary>
+                    <div className="mt-1 text-xs text-[#4a4a6a] space-y-1">
+                      <div><span className="font-medium">Setup:</span> {test.setup.join(', ')}</div>
+                      <div><span className="font-medium">Steps:</span> {test.steps.join(' → ')}</div>
+                      <div><span className="font-medium">Expected:</span> {safeString(test.expectedResult)}</div>
+                    </div>
+                  </details>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ===== Complexity ===== */}
+        {fullAnalysis.complexity && (
+          <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
+            <h3 className="font-semibold text-[#4a86f7] mb-2">⚡ Complexity</h3>
+            <div className="grid grid-cols-2 gap-2 text-sm text-[#4a4a6a]">
+              <div><span className="font-medium">Time:</span> {safeString(fullAnalysis.complexity.time)}</div>
+              <div><span className="font-medium">Space:</span> {safeString(fullAnalysis.complexity.space)}</div>
+            </div>
+            {fullAnalysis.complexity.resourceGrowth && (
+              <div className="text-sm text-[#4a4a6a] mt-1">
+                <span className="font-medium">Resource Growth:</span> {safeString(fullAnalysis.complexity.resourceGrowth)}
+              </div>
+            )}
+            {fullAnalysis.complexity.assumptions && fullAnalysis.complexity.assumptions.length > 0 && (
+              <div className="mt-2 text-xs text-[#6c7086]">
+                <span className="font-medium">Assumptions:</span> {fullAnalysis.complexity.assumptions.join(', ')}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ===== Scorecard ===== */}
         {fullAnalysis.scorecard && (
-          <div><h3 className="font-semibold text-[#4a86f7]">📊 Scorecard</h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">{Object.entries(fullAnalysis.scorecard).map(([key, value]) => <div key={key} className="bg-[#f1f3f5] p-2 rounded-md text-center"><p className="text-xs capitalize">{key.replace(/([A-Z])/g, ' $1')}</p><p className="text-lg font-bold">{safeString(value)}/10</p></div>)}</div>
+          <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
+            <h3 className="font-semibold text-[#4a86f7] mb-2">📊 Scorecard</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              {Object.entries(fullAnalysis.scorecard).map(([key, value]) => (
+                <div key={key} className="bg-white p-2 rounded text-center border border-[#d0d0d8]">
+                  <p className="text-xs text-[#6c7086] capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</p>
+                  <p className="text-lg font-bold text-[#1a1a2e]">{typeof value === 'number' ? value : 0}/10</p>
+                </div>
+              ))}
+            </div>
           </div>
         )}
-        {fullAnalysis.finalVerdict && (
-          <div className="bg-[#f1f3f5] p-4 rounded-lg border-2 border-[#d0d0d8]"><h3 className="font-semibold text-[#4a86f7]">🏁 Final Verdict</h3><p><strong>Summary:</strong> {safeString(fullAnalysis.finalVerdict.summary)}</p><p><strong>Approved:</strong> {fullAnalysis.finalVerdict.approved ? '✅ Yes' : '❌ No'}</p>{fullAnalysis.finalVerdict.nextSteps && <p>💡 Next Steps: {safeString(fullAnalysis.finalVerdict.nextSteps)}</p>}</div>
+
+        {/* ===== Verdict ===== */}
+        {fullAnalysis.verdict && (
+          <div className={`p-4 rounded-lg border ${
+            fullAnalysis.verdict.status === 'production-ready-with-monitoring' ? 'bg-green-50 border-green-200' :
+            fullAnalysis.verdict.status === 'requires-minor-changes' ? 'bg-yellow-50 border-yellow-200' :
+            fullAnalysis.verdict.status === 'requires-major-changes' ? 'bg-orange-50 border-orange-200' :
+            'bg-red-50 border-red-200'
+          }`}>
+            <h3 className="font-semibold text-[#1a1a2e]">🏁 Verdict</h3>
+            <p className="mt-1 text-sm text-[#4a4a6a]">
+              <span className="font-medium">Status:</span> {safeString(fullAnalysis.verdict.status)}
+            </p>
+            <p className="mt-1 text-sm text-[#4a4a6a]">{safeString(fullAnalysis.verdict.explanation)}</p>
+          </div>
+        )}
+
+        {/* ===== Limitations ===== */}
+        {fullAnalysis.limitations && fullAnalysis.limitations.length > 0 && (
+          <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
+            <h3 className="font-semibold text-[#4a86f7] mb-2">⚠️ Limitations</h3>
+            <ul className="list-disc list-inside text-sm text-[#4a4a6a]">
+              {fullAnalysis.limitations.map((lim, idx) => (
+                <li key={idx}>{safeString(lim)}</li>
+              ))}
+            </ul>
+          </div>
         )}
       </div>
     );
   }
 
-  // ===== حالت Simple/Medium =====
+  // ===== Simple / Medium mode =====
   if (!quickAnalysisText) {
     return <div className="text-[#4a4a6a]">No quick analysis available.</div>;
   }
@@ -293,7 +430,7 @@ export default function AnalysisTab({
   const cleanedText = cleanMarkdown(quickAnalysisText);
   const cleanedTextForCopy = cleanTextForCopy(quickAnalysisText);
 
-  const handleCopy = async () => {
+  const handleCopySimple = async () => {
     try {
       await navigator.clipboard.writeText(cleanedTextForCopy);
       setCopySuccess(true);
@@ -303,7 +440,7 @@ export default function AnalysisTab({
     }
   };
 
-  const handleDownload = () => {
+  const handleDownloadSimple = () => {
     const blob = new Blob([cleanedTextForCopy], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -317,29 +454,27 @@ export default function AnalysisTab({
     <div className="space-y-4">
       <div className="flex justify-end items-center gap-3 pb-2 border-b-2 border-[#e8e8f0]">
         <button
-          onClick={handleCopy}
-          className="flex items-center gap-1.5 text-sm text-[#4a4a6a] hover:text-[#4a86f7] transition px-2 py-1 rounded-md hover:bg-[#f1f3f5] border border-[#d0d0d8] group relative"
-          title="Copy analysis to clipboard"
+          onClick={handleCopySimple}
+          className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md transition border border-[#d0d0d8] text-[#4a4a6a] hover:text-[#4a86f7] hover:bg-[#f1f3f5]"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
           </svg>
-          <span className="hidden sm:inline">{copySuccess ? '✅ Copied!' : 'Copy'}</span>
+          <span>{copySuccess ? '✅ Copied!' : 'Copy'}</span>
         </button>
         <button
-          onClick={handleDownload}
-          className="flex items-center gap-1.5 text-sm text-[#4a4a6a] hover:text-[#4a86f7] transition px-2 py-1 rounded-md hover:bg-[#f1f3f5] border border-[#d0d0d8] group relative"
-          title="Download analysis as text file"
+          onClick={handleDownloadSimple}
+          className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md transition border border-[#d0d0d8] text-[#4a4a6a] hover:text-[#4a86f7] hover:bg-[#f1f3f5]"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
           </svg>
-          <span className="hidden sm:inline">Download</span>
+          <span>Download</span>
         </button>
       </div>
       <div className="space-y-3">
         <h2 className="text-xl font-bold text-[#1a1a2e]">📊 Quick Analysis</h2>
-        <div 
+        <div
           className="bg-[#fafbfc] p-4 rounded-md border-2 border-[#d0d0d8] whitespace-pre-wrap leading-relaxed text-sm"
           dangerouslySetInnerHTML={{ __html: cleanedText }}
         />

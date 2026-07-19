@@ -1,3 +1,4 @@
+// types/index.ts
 // ============ Existing Types ============
 export interface Snippet {
   id: string;
@@ -14,8 +15,8 @@ export interface Snippet {
   created_at: string;
   username?: string | null;
   github_username?: string | null;
-
-  // ===== فیلدهای جدید برای تب Analysis (Advanced) =====
+  avatar_url?: string | null;
+  card_image_url?: string | null;
   code_walkthrough?: any[] | null;
   what_works_well?: string[] | null;
   bugs_and_risky_cases?: any[] | null;
@@ -30,18 +31,8 @@ export interface Snippet {
   final_verdict_summary?: string | null;
   final_verdict_approved?: boolean | null;
   final_verdict_next_steps?: string | null;
-
-  // ===== فیلدهای جدید برای تب Line by Line =====
   line_explanations?: any[] | null;
-
-  // ===== فیلدهای جدید برای تب Prompt =====
   generated_prompt?: string | null;
-
-  // ===== NEW: Avatar URL =====
-  avatar_url?: string | null;
-
-  // ===== NEW: Card image URL (for OG image) =====
-  card_image_url?: string | null;
 }
 
 export interface GenerateRequest {
@@ -60,8 +51,209 @@ export interface CreateSnippetResponse {
   error?: string;
 }
 
-// ============ New Types ============
+// ============ New Types for Advanced Analysis ============
 
+export type Severity = 'critical' | 'high' | 'medium' | 'low' | 'info';
+export type Confidence = 'definite' | 'likely' | 'conditional';
+export type AuditType = 'generic' | 'concurrency';
+export type AuditStatus = 'complete' | 'repaired' | 'partially_complete' | 'failed_validation';
+
+export type FindingCategory =
+  | 'liveness'
+  | 'thread-starvation'
+  | 'deadlock'
+  | 'queue-misuse'
+  | 'duplicate-submission'
+  | 'race-condition'
+  | 'shared-state'
+  | 'configuration'
+  | 'resource-lifecycle'
+  | 'timeout'
+  | 'interruption'
+  | 'cancellation'
+  | 'retry'
+  | 'error-handling'
+  | 'architectural-duplication'
+  | 'api-semantics'
+  | 'performance'
+  | 'security'
+  | 'maintainability'
+  | 'other';
+
+export interface EvidenceItem {
+  startLine: number;
+  endLine: number;
+  code: string;
+  explanation: string;
+}
+
+export interface AuditFinding {
+  id: string;
+  title: string;
+  category: FindingCategory;
+  severity: Severity;
+  confidence: Confidence;
+  evidence: EvidenceItem[];
+  executionPath: string[];
+  triggerConditions: string[];
+  consequence: string;
+  technicalExplanation: string;
+  remediation: string;
+  relatedSymbols: string[];
+  testToReproduce: {
+    title: string;
+    setup: string[];
+    steps: string[];
+    expectedResult: string;
+  } | null;
+}
+
+export interface AuditScorecard {
+  correctness: number;
+  concurrencySafety: number;
+  liveness: number;
+  errorHandling: number;
+  resourceManagement: number;
+  maintainability: number;
+  productionReadiness: number;
+}
+
+export interface AdvancedAuditResult {
+  schemaVersion: '1.0';
+  auditType: AuditType;
+  status: AuditStatus;
+  language: string;
+  summary: string;
+  executionOverview: {
+    entryPoints: string[];
+    taskSubmissionPoints: string[];
+    blockingWaitPoints: string[];
+    sharedResources: string[];
+    resourceLifecycle: string[];
+  };
+  findings: AuditFinding[];
+  architecturalObservations: Array<{
+    title: string;
+    explanation: string;
+    relatedFindingIds: string[];
+  }>;
+  recommendedActions: Array<{
+    priority: number;
+    severity: Severity;
+    title: string;
+    action: string;
+    relatedFindingIds: string[];
+  }>;
+  suggestedTests: Array<{
+    title: string;
+    purpose: string;
+    setup: string[];
+    steps: string[];
+    expectedResult: string;
+  }>;
+  complexity: {
+    time: string;
+    space: string;
+    resourceGrowth: string;
+    assumptions: string[];
+  };
+  scorecard: AuditScorecard;
+  verdict: {
+    status:
+      | 'not-production-ready'
+      | 'requires-major-changes'
+      | 'requires-minor-changes'
+      | 'production-ready-with-monitoring';
+    explanation: string;
+  };
+  limitations: string[];
+  // Legacy fields for compatibility
+  title?: string;
+  highLevelSummary?: string;
+  linkedin_post?: string;
+  analysis?: string;
+  improvedCode?: { available: boolean; code: string; notes: string };
+  scorecardLegacy?: { correctness: number; readability: number; performance: number; maintainability: number; productionReadiness: number; security: number; overall: number };
+}
+
+// ============ GenerateResponse (به‌روز شده) ============
+export interface GenerateResponse {
+  // For Advanced mode (new structure)
+  schemaVersion?: '1.0';
+  auditType?: AuditType;
+  status?: AuditStatus;
+  language?: string;
+  summary?: string;
+  executionOverview?: {
+    entryPoints: string[];
+    taskSubmissionPoints: string[];
+    blockingWaitPoints: string[];
+    sharedResources: string[];
+    resourceLifecycle: string[];
+  };
+  findings?: AuditFinding[];
+  architecturalObservations?: Array<{
+    title: string;
+    explanation: string;
+    relatedFindingIds: string[];
+  }>;
+  recommendedActions?: Array<{
+    priority: number;
+    severity: Severity;
+    title: string;
+    action: string;
+    relatedFindingIds: string[];
+  }>;
+  suggestedTests?: Array<{
+    title: string;
+    purpose: string;
+    setup: string[];
+    steps: string[];
+    expectedResult: string;
+  }>;
+  complexity?: {
+    time: string;
+    space: string;
+    resourceGrowth: string;
+    assumptions: string[];
+  };
+  scorecard?: AuditScorecard;
+  verdict?: {
+    status:
+      | 'not-production-ready'
+      | 'requires-major-changes'
+      | 'requires-minor-changes'
+      | 'production-ready-with-monitoring';
+    explanation: string;
+  };
+  limitations?: string[];
+
+  // Legacy fields (for Simple/Medium and backward compatibility)
+  title?: string;
+  highLevelSummary?: string;
+  codeWalkthrough?: CodeWalkthroughItem[];
+  whatWorksWell?: string[];
+  bugsAndRiskyCases?: BugAndRiskyCase[];
+  edgeCases?: EdgeCase[];
+  performanceAnalysis?: PerformanceAnalysis;
+  securityAnalysis?: SecurityAnalysis;
+  productionReadiness?: ProductionReadiness;
+  recommendedImprovements?: RecommendedImprovement[];
+  improvedCode?: ImprovedCode;
+  suggestedTestsLegacy?: SuggestedTest[];
+  scorecardLegacy?: Scorecard;
+  finalVerdict?: FinalVerdict;
+  analysis?: string;
+  linkedin_post?: string;
+  card_title?: string;
+  key_concept?: string;
+  what_this_code_does?: string;
+  debug_analysis?: string;
+  optimization?: string;
+  error?: string;
+}
+
+// ============ Existing Types (without changes) ============
 export interface CodeWalkthroughItem {
   section: string;
   explanation: string;
@@ -139,42 +331,8 @@ export interface FinalVerdict {
   nextSteps: string;
 }
 
-// ===== NEW: LineExplanation for line-by-line explanations =====
 export interface LineExplanation {
   lineNumber: number;
   code: string;
   explanation: string;
-}
-
-// ============ GenerateResponse ============
-export interface GenerateResponse {
-  // For Advanced mode
-  title?: string;
-  highLevelSummary?: string;
-  codeWalkthrough?: CodeWalkthroughItem[];
-  whatWorksWell?: string[];
-  bugsAndRiskyCases?: BugAndRiskyCase[];
-  edgeCases?: EdgeCase[];
-  performanceAnalysis?: PerformanceAnalysis;
-  securityAnalysis?: SecurityAnalysis;
-  productionReadiness?: ProductionReadiness;
-  recommendedImprovements?: RecommendedImprovement[];
-  improvedCode?: ImprovedCode;
-  suggestedTests?: SuggestedTest[];
-  scorecard?: Scorecard;
-  finalVerdict?: FinalVerdict;
-
-  // For Simple and Medium modes
-  analysis?: string;
-
-  // LinkedIn post for all modes
-  linkedin_post: string;
-
-  // Legacy fields for compatibility
-  card_title?: string;
-  key_concept?: string;
-  what_this_code_does?: string;
-  debug_analysis?: string;
-  optimization?: string;
-  error?: string;
 }
