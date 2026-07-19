@@ -91,7 +91,6 @@ export default function PreviewTab({
   const [localHasUploaded, setLocalHasUploaded] = useState<boolean>(hasUploaded);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // ===== همگام‌سازی با props =====
   useEffect(() => {
     setLocalSavedImageUrl(savedImageUrl);
   }, [savedImageUrl]);
@@ -100,7 +99,6 @@ export default function PreviewTab({
     setLocalHasUploaded(hasUploaded);
   }, [hasUploaded]);
 
-  // ===== وقتی کارت جدید تولید شد، لینک ذخیره‌شده را پاک کن =====
   useEffect(() => {
     if (cardImageDataUrl && !isGeneratingCard) {
       setLocalSavedImageUrl(null);
@@ -108,14 +106,11 @@ export default function PreviewTab({
     }
   }, [cardImageDataUrl, isGeneratingCard]);
 
-  // ============================================================
-  // 🔥 Avatar upload handler (اصلاح‌شده با مدیریت خطا)
-  // ============================================================
+  // ===== Avatar upload handler =====
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // اعتبارسنجی
     if (!file.type.startsWith('image/')) {
       showToast('❌ Please select an image file');
       e.target.value = '';
@@ -128,22 +123,18 @@ export default function PreviewTab({
       return;
     }
 
-    // اگر تابع آپلود وجود داشته باشد، آن را صدا بزن
     if (onUploadAvatar) {
-      // قبل از آپلود، وضعیت بارگذاری را نمایش بده
       showToast('⏳ Uploading avatar...');
       onUploadAvatar(file).catch((error) => {
         console.error('Upload error:', error);
         showToast(`❌ ${error.message || 'Upload failed'}`);
       });
     } else {
-      showToast('❌ Upload function not available. Please check your setup.');
+      showToast('❌ Upload function not available');
     }
-    // ریست کردن input برای اجازه‌ی آپلود مجدد
     e.target.value = '';
   };
 
-  // ===== تابع برای باز کردن دیالوگ انتخاب فایل =====
   const triggerFileUpload = () => {
     if (isUploadingAvatar) {
       showToast('⏳ Already uploading...');
@@ -156,9 +147,7 @@ export default function PreviewTab({
     fileInputRef.current?.click();
   };
 
-  // ============================================================
-  // 🔥 Copy handler
-  // ============================================================
+  // ===== Copy handler =====
   const handleCopyLink = async () => {
     const linkToCopy = localSavedImageUrl || cardPageUrl;
 
@@ -182,14 +171,7 @@ export default function PreviewTab({
     }
   };
 
-  const handleUploadImage = async () => {
-    if (onUploadImage) {
-      await onUploadImage();
-    } else {
-      showToast('❌ Upload function not available');
-    }
-  };
-
+  // ===== Download handler =====
   const handleDownload = async () => {
     if (isDownloading) return;
     setIsDownloading(true);
@@ -203,6 +185,7 @@ export default function PreviewTab({
     }
   };
 
+  // ===== Share dropdown =====
   const toggleDropdown = () => {
     setShowShareDropdown(!showShareDropdown);
   };
@@ -231,15 +214,14 @@ export default function PreviewTab({
 
   return (
     <div className="flex flex-col items-center gap-4">
-      {/* ============================================================
-          🔥 HEADER
-          ============================================================ */}
+      {/* ===== HEADER ===== */}
       <div className="flex flex-wrap items-center justify-between w-full max-w-[600px]">
         <h2 className="text-lg font-semibold text-[#1a1a2e] flex items-center gap-2">
           <span>🖼️</span> Card Preview
         </h2>
-        
+
         <div className="flex items-center gap-2 flex-wrap">
+          {/* 🔥 دکمه Copy */}
           <button
             onClick={handleCopyLink}
             className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md transition border border-[#d0d0d8] text-[#4a4a6a] hover:text-[#4a86f7] hover:bg-[#f1f3f5]"
@@ -251,22 +233,7 @@ export default function PreviewTab({
             <span>{copySuccess ? '✅ Copied!' : (localSavedImageUrl ? 'Copy Image Link' : 'Copy Link')}</span>
           </button>
 
-          <button
-            onClick={handleUploadImage}
-            disabled={isUploading || !cardImageDataUrl || localHasUploaded}
-            className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md transition border ${
-              isUploading || !cardImageDataUrl || localHasUploaded
-                ? 'border-[#d0d0d8] text-[#a0a0b0] cursor-not-allowed bg-[#f8f9fa]'
-                : 'border-[#4a86f7] text-[#4a86f7] hover:bg-[#f1f3f5]'
-            }`}
-            title={localHasUploaded ? 'Already uploaded' : 'Upload card image to get permanent link'}
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-            </svg>
-            <span>{isUploading ? 'Uploading...' : (localHasUploaded ? '✅ Uploaded' : 'Upload Image')}</span>
-          </button>
-
+          {/* 🔥 دکمه Download (کنار Copy) */}
           <button
             onClick={handleDownload}
             disabled={isGeneratingCard || !cardImageDataUrl || isDownloading}
@@ -282,6 +249,7 @@ export default function PreviewTab({
             <span>{isDownloading ? 'Downloading...' : 'Download'}</span>
           </button>
 
+          {/* 🔥 دکمه Share با Dropdown */}
           <div className="relative">
             <button
               onClick={toggleDropdown}
@@ -339,14 +307,10 @@ export default function PreviewTab({
         </div>
       </div>
 
-      {/* ============================================================
-          🔥 Avatar + Change Name - SIDE BY SIDE
-          ============================================================ */}
+      {/* ===== Avatar + Change Name ===== */}
       <div className="w-full max-w-[600px] flex flex-col md:flex-row gap-4">
-        {/* Left: Avatar Upload */}
         <div className="flex-1">
           <div className="flex items-center gap-4 p-3 bg-gray-50 rounded-xl border border-gray-200 h-full">
-            {/* Avatar preview */}
             <div className="relative flex-shrink-0">
               {avatarUrl ? (
                 <img
@@ -368,11 +332,9 @@ export default function PreviewTab({
               )}
             </div>
 
-            {/* Upload controls */}
             <div className="flex-1">
               <p className="text-sm font-medium text-gray-700">Profile Picture</p>
               <p className="text-xs text-gray-500">Upload a photo</p>
-              {/* فایل Input پنهان */}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -382,7 +344,7 @@ export default function PreviewTab({
               />
               <div className="flex items-center gap-3 mt-1">
                 <button
-                  onClick={triggerFileUpload} // 🔥 اصلاح: استفاده از تابع جداگانه
+                  onClick={triggerFileUpload}
                   disabled={isUploadingAvatar}
                   className={`text-xs transition ${
                     isUploadingAvatar
@@ -395,7 +357,6 @@ export default function PreviewTab({
                 {avatarUrl && (
                   <button
                     onClick={() => {
-                      // در صورت نیاز، حذف آواتار را پیاده‌سازی کنید
                       showToast('ℹ️ Remove avatar feature coming soon');
                     }}
                     className="text-xs text-red-500 hover:text-red-700 hover:underline transition"
@@ -408,7 +369,6 @@ export default function PreviewTab({
           </div>
         </div>
 
-        {/* Right: Change Name */}
         <div className="flex-1">
           <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 h-full flex flex-col justify-center">
             <button
@@ -470,9 +430,7 @@ export default function PreviewTab({
         </div>
       </div>
 
-      {/* ============================================================
-          🔥 Theme Selector
-          ============================================================ */}
+      {/* ===== Theme Selector ===== */}
       <div className="w-full max-w-[600px]">
         <ThemeSelector
           themes={themes}
@@ -483,9 +441,7 @@ export default function PreviewTab({
         />
       </div>
 
-      {/* ============================================================
-          🔥 Card Preview
-          ============================================================ */}
+      {/* ===== Card Preview ===== */}
       {isGeneratingCard ? (
         <div className="flex items-center justify-center w-full max-w-[600px] h-[400px] bg-[#fafbfc] rounded-lg border-2 border-[#d0d0d8]">
           <p className="text-[#4a4a6a]">⏳ Generating card...</p>
@@ -502,7 +458,6 @@ export default function PreviewTab({
         </div>
       )}
 
-      {/* ===== Saved image link ===== */}
       {localSavedImageUrl && (
         <div className="w-full max-w-[600px] text-xs text-[#6c7086] bg-[#f1f3f5] p-2 rounded border border-[#d0d0d8] break-all">
           <span className="font-medium">✅ Permanent image link:</span> {localSavedImageUrl}
