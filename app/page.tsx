@@ -292,6 +292,9 @@ export default function Home() {
     }
   }, [code, language, displaySnippet, updateSnippet, showToast]);
 
+  // ============================================================
+  // 🔥 اصلاح: ارسال mode به API پرامپت
+  // ============================================================
   const handleGeneratePrompt = useCallback(async () => {
     const trimmedCode = removeEmptyLines(code);
     
@@ -323,7 +326,8 @@ export default function Home() {
       const res = await fetch('/api/generate-prompt', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: trimmedCode, language }),
+        // ===== 🔥 ارسال mode به API =====
+        body: JSON.stringify({ code: trimmedCode, language, mode }),
       });
 
       const data = await res.json();
@@ -396,7 +400,6 @@ export default function Home() {
     let processedCode = removeEmptyLines(code);
 
     // ===== 2. حذف کامنت‌ها (برای همه حالت‌ها) =====
-    // کاربر می‌خواهد کامنت‌ها در ادیتور هم حذف شوند
     processedCode = removeComments(processedCode, language);
 
     // ===== 3. به‌روزرسانی ادیتور با کد پردازش‌شده =====
