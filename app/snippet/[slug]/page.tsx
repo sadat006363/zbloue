@@ -1,3 +1,7 @@
+// ============================================================
+// 📁 فایل: app/snippet/[slug]/page.tsx
+// ============================================================
+
 import { notFound } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import {
@@ -52,6 +56,7 @@ export default async function SnippetPage({ params }: PageProps) {
     notFound();
   }
 
+  // داده‌ها قبلاً توسط Supabase به‌صورت JSON parse شده‌اند
   const codeWalkthrough = snippet.code_walkthrough as CodeWalkthroughItem[] | null;
   const whatWorksWell = snippet.what_works_well as string[] | null;
   const bugsAndRiskyCases = snippet.bugs_and_risky_cases as BugAndRiskyCase[] | null;
@@ -64,9 +69,7 @@ export default async function SnippetPage({ params }: PageProps) {
   const scorecard = snippet.scorecard as ScorecardLegacy | null;
   const lineExplanations = snippet.line_explanations as LineExplanation[] | null;
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? '';
-  const shareUrl = `${appUrl}/snippet/${snippet.slug}`;
-
+  // Build fullAnalysis object
   const fullAnalysis: GenerateResponse = {
     title: snippet.card_title,
     highLevelSummary: snippet.key_concept,
@@ -106,28 +109,35 @@ export default async function SnippetPage({ params }: PageProps) {
   return (
     <main className="min-h-screen bg-[#f8f9fa]">
       <div className="max-w-5xl mx-auto px-4 py-6 md:py-8">
-        <SnippetHeader shareUrl={shareUrl} />
+        {/* Header */}
+        <SnippetHeader snippet={snippet} />
 
+        {/* User Info */}
         <SnippetUserInfo
-          username={snippet.username}
-          githubUsername={snippet.github_username}
+          username={snippet.username || undefined}
+          githubUsername={snippet.github_username || undefined}
+          avatarUrl={snippet.avatar_url || undefined}
         />
 
+        {/* Share Buttons - خط 116 اصلاح شد */}
         <SnippetShareButtons slug={snippet.slug} title={snippet.card_title} />
 
+        {/* Tab Links */}
         <SnippetTabLinks
           hasCode={!!snippet.raw_code}
-          hasAnalysis={!!hasFullAnalysis}
-          hasDebug={!!hasDebugAnalysis}
+          hasAnalysis={hasFullAnalysis}
+          hasDebug={hasDebugAnalysis}
           hasLinkedIn={!!snippet.linkedin_post}
         />
 
+        {/* Code Section */}
         <SnippetCode
           code={snippet.raw_code}
           language={snippet.language}
           lineExplanations={lineExplanations || undefined}
         />
 
+        {/* Full Analysis Section */}
         {hasFullAnalysis && (
           <SnippetFullAnalysis
             analysis={fullAnalysis}
@@ -144,12 +154,17 @@ export default async function SnippetPage({ params }: PageProps) {
           />
         )}
 
+        {/* Analysis Section (Legacy) */}
         {snippet.what_this_code_does && snippet.what_this_code_does !== 'No analysis generated.' && (
           <SnippetAnalysis analysis={snippet.what_this_code_does} />
         )}
 
-        {hasDebugAnalysis && <SnippetDebug debugAnalysis={snippet.debug_analysis} />}
+        {/* Debug Analysis Section */}
+        {hasDebugAnalysis && (
+          <SnippetDebug debugAnalysis={snippet.debug_analysis} />
+        )}
 
+        {/* Optimization Section */}
         {hasOptimization && (
           <div className="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-3">🚀 Optimization</h3>
@@ -157,10 +172,12 @@ export default async function SnippetPage({ params }: PageProps) {
           </div>
         )}
 
+        {/* LinkedIn Post Section */}
         {snippet.linkedin_post && (
           <SnippetLinkedIn linkedinPost={snippet.linkedin_post} />
         )}
 
+        {/* Footer */}
         <SnippetFooter createdAt={snippet.created_at} />
       </div>
     </main>
