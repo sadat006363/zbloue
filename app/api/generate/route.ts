@@ -1,5 +1,7 @@
+// app/api/generate/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { generateEducationalContent } from '@/lib/ai';
+import { runAdvancedPipeline } from '@/lib/analysis/pipeline';
 import { GenerateRequest } from '@/types';
 import {
   MAX_LINES_GENERATE,
@@ -71,7 +73,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ===== 3. Validate language (با type guard) =====
+    // ===== 3. Validate language =====
     if (!isSupportedLanguage(language)) {
       return NextResponse.json(
         {
@@ -111,7 +113,25 @@ export async function POST(req: NextRequest) {
     }
 
     // ===== 6. Execute AI =====
-    const result = await generateEducationalContent(code, language, mode);
+    let result;
+
+    if (mode === 'advanced') {
+      // Use the new pipeline for Advanced mode
+      const pipelineResult = await runAdvancedPipeline(code, language);
+      if (pipelineResult.result) {
+        result = pipelineResult.result;
+        // Add status to result for UI
+        result.status = pipelineResult.status;
+      } else {
+        // Fallback to legacy if pipeline fails
+        console.warn('Pipeline failed, falling back to legacy:', pipelineResult.error);
+        result = await generateEducationalContent(code, language, mode);
+      }
+    } else {
+      // Simple and Medium modes use legacy
+      result = await generateEducationalContent(code, language, mode);
+    }
+
     return NextResponse.json(result);
   } catch (error: any) {
     if (process.env.NODE_ENV === 'development') {

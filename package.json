@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
   },
   "dependencies": {
     "@codemirror/lang-cpp": "^6.0.3",
@@ -37,17 +40,21 @@
     "react-dropzone": "^17.0.0",
     "resvg": "^1.6.4",
     "satori": "^0.26.0",
-    "shiki": "^4.3.0"
+    "shiki": "^4.3.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/jest": "^29.5.12",
     "@types/node": "^20",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "^16.2.9",
+    "jest": "^29.7.0",
     "tailwindcss": "^4",
+    "ts-jest": "^29.1.2",
     "typescript": "^5"
   }
 }
