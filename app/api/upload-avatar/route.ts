@@ -2,12 +2,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-// ===== نام bucket (می‌توانید از env هم بخوانید) =====
 const STORAGE_BUCKET = process.env.SUPABASE_STORAGE_BUCKET || 'avatars';
 
 export async function POST(req: NextRequest) {
   try {
-    // ===== 1. دریافت فایل و slug =====
     const formData = await req.formData();
     const file = formData.get('avatar') as File;
     const slug = formData.get('slug') as string;
@@ -19,10 +17,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ===== 2. اعتبارسنجی فایل =====
+    // اعتبارسنجی
     if (!file.type.startsWith('image/')) {
       return NextResponse.json(
-        { error: 'File must be an image (jpeg, png, gif, etc.)' },
+        { error: 'File must be an image' },
         { status: 400 }
       );
     }
@@ -33,32 +31,28 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ===== 3. اتصال به Supabase (با Service Role Key) =====
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!supabaseUrl || !supabaseServiceKey) {
       console.error('❌ Missing Supabase environment variables');
       return NextResponse.json(
-        { 
-          error: 'Server configuration error: Missing Supabase credentials',
-          details: 'Check NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local'
-        },
+        { error: 'Server configuration error' },
         { status: 500 }
       );
     }
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    // ===== 4. تبدیل File به Buffer =====
+    // تبدیل فایل به Buffer
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // ===== 5. ساخت نام فایل یکتا =====
+    // نام فایل یکتا
     const fileExtension = file.name.split('.').pop() || 'png';
     const fileName = `${slug}-${Date.now()}.${fileExtension}`;
 
-    // ===== 6. آپلود به Supabase Storage =====
+    // ===== آپلود با تنظیمات explicit =====
     const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
       .from(STORAGE_BUCKET)
       .upload(fileName, buffer, {
@@ -68,33 +62,24 @@ export async function POST(req: NextRequest) {
       });
 
     if (uploadError) {
-      console.error('❌ Supabase upload error:', uploadError);
-      
-      // اگر bucket وجود نداشته باشد، پیام واضح بده
-      if (uploadError.message?.includes('bucket not found')) {
-        return NextResponse.json(
-          { 
-            error: `Storage bucket "${STORAGE_BUCKET}" not found in Supabase.`,
-            details: `Please create a public bucket named "${STORAGE_BUCKET}" in Supabase Dashboard → Storage.`
-          },
-          { status: 500 }
-        );
-      }
-      
+      console.error('❌ Upload error:', uploadError);
       return NextResponse.json(
-        { error: uploadError.message || 'Upload failed due to storage error' },
+        { 
+          error: 'Upload failed',
+          details: uploadError.message
+        },
         { status: 500 }
       );
     }
 
-    // ===== 7. دریافت URL عمومی =====
+    // ===== دریافت URL عمومی =====
     const { data: publicUrlData } = supabaseAdmin.storage
       .from(STORAGE_BUCKET)
       .getPublicUrl(fileName);
 
     const avatarUrl = publicUrlData.publicUrl;
 
-    // ===== 8. ذخیره لینک در دیتابیس =====
+    // ===== ذخیره در دیتابیس =====
     const { error: updateError } = await supabaseAdmin
       .from('snippets')
       .update({ avatar_url: avatarUrl })
@@ -103,12 +88,12 @@ export async function POST(req: NextRequest) {
     if (updateError) {
       console.error('❌ Database update error:', updateError);
       return NextResponse.json(
-        { error: 'Failed to save avatar URL in database' },
+        { error: 'Failed to update snippet' },
         { status: 500 }
       );
     }
 
-    console.log(`✅ Avatar uploaded successfully for snippet: ${slug}`);
+    console.log('✅ Avatar uploaded:', avatarUrl);
     return NextResponse.json({
       success: true,
       avatarUrl,
