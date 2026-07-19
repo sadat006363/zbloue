@@ -1,3 +1,4 @@
+// components/OutputPanel/tabs/PreviewTab.tsx
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { CardTheme } from '@/components/card/themes';
@@ -108,12 +109,13 @@ export default function PreviewTab({
   }, [cardImageDataUrl, isGeneratingCard]);
 
   // ============================================================
-  // 🔥 Avatar upload handler
+  // 🔥 Avatar upload handler (اصلاح‌شده با مدیریت خطا)
   // ============================================================
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // اعتبارسنجی
     if (!file.type.startsWith('image/')) {
       showToast('❌ Please select an image file');
       e.target.value = '';
@@ -126,12 +128,32 @@ export default function PreviewTab({
       return;
     }
 
+    // اگر تابع آپلود وجود داشته باشد، آن را صدا بزن
     if (onUploadAvatar) {
-      onUploadAvatar(file);
+      // قبل از آپلود، وضعیت بارگذاری را نمایش بده
+      showToast('⏳ Uploading avatar...');
+      onUploadAvatar(file).catch((error) => {
+        console.error('Upload error:', error);
+        showToast(`❌ ${error.message || 'Upload failed'}`);
+      });
     } else {
-      showToast('❌ Upload function not available');
+      showToast('❌ Upload function not available. Please check your setup.');
     }
+    // ریست کردن input برای اجازه‌ی آپلود مجدد
     e.target.value = '';
+  };
+
+  // ===== تابع برای باز کردن دیالوگ انتخاب فایل =====
+  const triggerFileUpload = () => {
+    if (isUploadingAvatar) {
+      showToast('⏳ Already uploading...');
+      return;
+    }
+    if (!onUploadAvatar) {
+      showToast('❌ Upload function not available');
+      return;
+    }
+    fileInputRef.current?.click();
   };
 
   // ============================================================
@@ -350,6 +372,7 @@ export default function PreviewTab({
             <div className="flex-1">
               <p className="text-sm font-medium text-gray-700">Profile Picture</p>
               <p className="text-xs text-gray-500">Upload a photo</p>
+              {/* فایل Input پنهان */}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -359,15 +382,20 @@ export default function PreviewTab({
               />
               <div className="flex items-center gap-3 mt-1">
                 <button
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={triggerFileUpload} // 🔥 اصلاح: استفاده از تابع جداگانه
                   disabled={isUploadingAvatar}
-                  className="text-xs text-blue-600 hover:text-blue-800 hover:underline transition disabled:opacity-50"
+                  className={`text-xs transition ${
+                    isUploadingAvatar
+                      ? 'text-gray-400 cursor-not-allowed'
+                      : 'text-blue-600 hover:text-blue-800 hover:underline'
+                  }`}
                 >
-                  {avatarUrl ? 'Change Photo' : 'Upload Photo'}
+                  {isUploadingAvatar ? 'Uploading...' : (avatarUrl ? 'Change Photo' : 'Upload Photo')}
                 </button>
                 {avatarUrl && (
                   <button
                     onClick={() => {
+                      // در صورت نیاز، حذف آواتار را پیاده‌سازی کنید
                       showToast('ℹ️ Remove avatar feature coming soon');
                     }}
                     className="text-xs text-red-500 hover:text-red-700 hover:underline transition"
