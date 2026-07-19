@@ -142,6 +142,89 @@ DO NOT report these without specific evidence, execution path, and trigger condi
 
 Every finding must have: evidence, executionPath, triggerConditions, consequence, remediation.
 
+==================== EXAMPLE OUTPUT (FOR REFERENCE) ====================
+
+Here is an example of a valid output for a code with nested submission and queue misuse:
+
+{
+  "schemaVersion": "1.0",
+  "auditType": "concurrency",
+  "status": "complete",
+  "language": "java",
+  "summary": "The code has critical concurrency defects including nested submission deadlock and queue/execute mismatch.",
+  "executionOverview": {
+    "entryPoints": ["build()"],
+    "taskSubmissionPoints": ["executor.submit()"],
+    "blockingWaitPoints": ["future.get()"],
+    "sharedResources": ["poolMap"],
+    "resourceLifecycle": ["no shutdown"]
+  },
+  "findings": [
+    {
+      "id": "FIND-001",
+      "title": "Thread-starvation deadlock due to nested submission",
+      "category": "thread-starvation",
+      "severity": "critical",
+      "confidence": "definite",
+      "evidence": [
+        {
+          "startLine": 120,
+          "endLine": 120,
+          "code": "executor.submit(block::body);",
+          "explanation": "Inner task submitted to same executor."
+        },
+        {
+          "startLine": 122,
+          "endLine": 122,
+          "code": "future.get();",
+          "explanation": "Outer task blocks on inner task."
+        }
+      ],
+      "executionPath": [
+        "build() → submitWithBulkhead() → createTask() → executor.submit() → future.get()"
+      ],
+      "triggerConditions": [
+        "Pool size = N",
+        "N outer tasks submitted",
+        "Each outer task blocks on inner task"
+      ],
+      "consequence": "All workers blocked, system deadlocked.",
+      "technicalExplanation": "Nested submission to the same executor causes deadlock if all workers are occupied.",
+      "remediation": "Use separate executor for inner tasks.",
+      "relatedSymbols": ["executor", "future"],
+      "testToReproduce": {
+        "title": "Deadlock test",
+        "setup": ["FixedThreadPool(2)"],
+        "steps": ["Submit 2 outer tasks that block on inner tasks."],
+        "expectedResult": "Deadlock after 2 tasks."
+      }
+    }
+  ],
+  "architecturalObservations": [],
+  "recommendedActions": [],
+  "suggestedTests": [],
+  "complexity": {
+    "time": "O(1)",
+    "space": "O(1)",
+    "resourceGrowth": "Linear",
+    "assumptions": ["Bounded pool"]
+  },
+  "scorecard": {
+    "correctness": 4,
+    "concurrencySafety": 2,
+    "liveness": 2,
+    "errorHandling": 4,
+    "resourceManagement": 3,
+    "maintainability": 5,
+    "productionReadiness": 3
+  },
+  "verdict": {
+    "status": "requires-major-changes",
+    "explanation": "Critical concurrency defects must be fixed."
+  },
+  "limitations": []
+}
+
 ==================== OUTPUT SCHEMA ====================
 
 Return a JSON object matching the AdvancedAuditResult schema.
