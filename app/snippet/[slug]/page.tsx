@@ -56,8 +56,8 @@ export default async function SnippetPage({ params }: PageProps) {
     notFound();
   }
 
-  // ✅ اصلاح: داده‌ها قبلاً توسط Supabase به‌صورت JSON parse شده‌اند
-  // بنابراین مستقیماً از فیلدها استفاده می‌کنیم و نیازی به JSON.parse نیست
+  // ✅ داده‌ها قبلاً توسط Supabase به‌صورت JSON آماده شده‌اند
+  // بنابراین نیازی به JSON.parse نیست
   const codeWalkthrough = snippet.code_walkthrough as CodeWalkthroughItem[] | null;
   const whatWorksWell = snippet.what_works_well as string[] | null;
   const bugsAndRiskyCases = snippet.bugs_and_risky_cases as BugAndRiskyCase[] | null;
@@ -69,6 +69,10 @@ export default async function SnippetPage({ params }: PageProps) {
   const suggestedTests = snippet.suggested_tests as SuggestedTest[] | null;
   const scorecard = snippet.scorecard as ScorecardLegacy | null;
   const lineExplanations = snippet.line_explanations as LineExplanation[] | null;
+
+  // لینک اشتراک برای هدر
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? '';
+  const shareUrl = `${appUrl}/snippet/${snippet.slug}`;
 
   // Build fullAnalysis object
   const fullAnalysis: GenerateResponse = {
@@ -111,7 +115,7 @@ export default async function SnippetPage({ params }: PageProps) {
     <main className="min-h-screen bg-[#f8f9fa]">
       <div className="max-w-5xl mx-auto px-4 py-6 md:py-8">
         {/* Header */}
-        <SnippetHeader snippet={snippet} />
+        <SnippetHeader shareUrl={shareUrl} />
 
         {/* User Info */}
         <SnippetUserInfo snippet={snippet} />
@@ -122,8 +126,8 @@ export default async function SnippetPage({ params }: PageProps) {
         {/* Tab Links */}
         <SnippetTabLinks
           hasCode={!!snippet.raw_code}
-          hasAnalysis={hasFullAnalysis}
-          hasDebug={hasDebugAnalysis}
+          hasAnalysis={!!hasFullAnalysis}
+          hasDebug={!!hasDebugAnalysis}
           hasLinkedIn={!!snippet.linkedin_post}
         />
 
