@@ -1,3 +1,7 @@
+// ============================================================
+// 📁 فایل: components/OutputPanel/OutputPanel.tsx (اصلاح‌شده - کامل)
+// ============================================================
+
 'use client';
 import { forwardRef, useImperativeHandle, useState, useEffect, useRef, useCallback } from 'react';
 import { Snippet, GenerateResponse, LineExplanation } from '@/types';
@@ -85,12 +89,10 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
     const isUpdatingCard = useRef(false);
     const isDownloading = useRef(false);
 
-    // ===== STATEهای جدید برای آپلود تصویر =====
     const [savedImageUrl, setSavedImageUrl] = useState<string | null>(null);
     const [isUploading, setIsUploading] = useState(false);
     const [hasUploaded, setHasUploaded] = useState(false);
 
-    // ===== NEW STATE for avatar upload =====
     const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
     const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
@@ -108,7 +110,6 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
       },
     }));
 
-    // ===== تابع آپلود تصویر کارت =====
     const handleUploadImage = useCallback(async () => {
       if (!snippet?.slug || !cardImageDataUrl) {
         showToast('❌ No image to upload');
@@ -142,7 +143,6 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
       }
     }, [snippet, cardImageDataUrl]);
 
-    // ===== NEW: Avatar upload handler =====
     const handleUploadAvatar = useCallback(async (file: File) => {
       if (!snippet?.slug) {
         showToast('❌ No snippet available');
@@ -321,9 +321,6 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
       }
     }, [snippet, activeTab, generateCardImage, tempUsername, tempGithubUsername, onUsernameChange, onGithubChange, updateSnippetInDatabase]);
 
-    // ============================================================
-    // 🔥 Load avatar from snippet when snippet changes
-    // ============================================================
     useEffect(() => {
       if (snippet && activeTab === 'preview' && isFirstRender.current) {
         isFirstRender.current = false;
@@ -419,7 +416,6 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
           content += `\n`;
         }
 
-        // ===== Performance Analysis (legacy) =====
         if (fullAnalysis.performanceAnalysis) {
           content += `⚡ Performance Analysis:\n`;
           const pa = fullAnalysis.performanceAnalysis;
@@ -444,7 +440,6 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
           content += `\n`;
         }
 
-        // ===== New Advanced structure: complexity =====
         if (fullAnalysis.complexity) {
           content += `⚡ Complexity Analysis:\n`;
           content += `  Time Complexity: ${safeString(fullAnalysis.complexity.time)}\n`;
@@ -455,7 +450,6 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
           content += `\n`;
         }
 
-        // ===== New Advanced structure: findings =====
         if (fullAnalysis.findings && fullAnalysis.findings.length > 0) {
           content += `🔍 Findings:\n`;
           fullAnalysis.findings.forEach((f: any) => {
@@ -477,7 +471,6 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
           });
         }
 
-        // ===== Legacy security analysis =====
         if (fullAnalysis.securityAnalysis) {
           content += `🔒 Security Analysis:\n`;
           content += `  Severity: ${safeString(fullAnalysis.securityAnalysis.severity)}\n`;
@@ -496,7 +489,6 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
           content += `\n`;
         }
 
-        // ===== Production readiness =====
         if (fullAnalysis.productionReadiness) {
           content += `🛡️ Production Readiness:\n`;
           content += `  Ready: ${fullAnalysis.productionReadiness.isProductionReady ? 'Yes' : 'No'}\n`;
@@ -514,7 +506,6 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
           content += `\n`;
         }
 
-        // ===== New Advanced: architectural observations =====
         if (fullAnalysis.architecturalObservations && fullAnalysis.architecturalObservations.length > 0) {
           content += `🏗️ Architectural Observations:\n`;
           fullAnalysis.architecturalObservations.forEach((obs: any) => {
@@ -523,7 +514,6 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
           content += `\n`;
         }
 
-        // ===== New Advanced: recommended actions =====
         if (fullAnalysis.recommendedActions && fullAnalysis.recommendedActions.length > 0) {
           content += `🔧 Recommended Actions:\n`;
           fullAnalysis.recommendedActions
@@ -535,11 +525,9 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
           content += `\n`;
         }
 
-        // ===== Suggested Tests (supports both legacy and new structure) =====
         if (fullAnalysis.suggestedTests && fullAnalysis.suggestedTests.length > 0) {
           content += `🧪 Suggested Tests:\n`;
           fullAnalysis.suggestedTests.forEach((test: any) => {
-            // Support both legacy and new structure
             const testName = test.name || test.title || 'Test';
             const testInput = test.input || test.setup?.join(', ') || '';
             const testExpected = test.expectedOutput || test.expectedResult || '';
@@ -552,20 +540,17 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
           content += `\n`;
         }
 
-        // ===== Legacy improved code =====
         if (fullAnalysis.improvedCode && fullAnalysis.improvedCode.available) {
           content += `✨ Improved Code:\n`;
           content += `Notes: ${safeString(fullAnalysis.improvedCode.notes)}\n`;
           content += `${safeString(fullAnalysis.improvedCode.code)}\n\n`;
         }
 
-        // ===== New Advanced: improved code (if present) =====
         if (fullAnalysis.improvedCode?.code) {
           content += `✨ Improved Code:\n`;
           content += `${safeString(fullAnalysis.improvedCode.code)}\n\n`;
         }
 
-        // ===== Legacy scorecard =====
         if (fullAnalysis.scorecardLegacy) {
           content += `📊 Scorecard:\n`;
           const scores = fullAnalysis.scorecardLegacy;
@@ -579,7 +564,6 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
           content += `\n`;
         }
 
-        // ===== New Advanced: scorecard =====
         if (fullAnalysis.scorecard) {
           content += `📊 Scorecard:\n`;
           const scores = fullAnalysis.scorecard;
@@ -593,14 +577,12 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
           content += `\n`;
         }
 
-        // ===== New Advanced: verdict =====
         if (fullAnalysis.verdict) {
           content += `🏁 Final Verdict:\n`;
           content += `  Status: ${safeString(fullAnalysis.verdict.status)}\n`;
           content += `  Explanation: ${safeString(fullAnalysis.verdict.explanation)}\n\n`;
         }
 
-        // ===== Legacy final verdict =====
         if (fullAnalysis.finalVerdict) {
           content += `🏁 Final Verdict:\n`;
           content += `  Summary: ${safeString(fullAnalysis.finalVerdict.summary)}\n`;
@@ -610,7 +592,6 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
           }
         }
 
-        // ===== New Advanced: limitations =====
         if (fullAnalysis.limitations && fullAnalysis.limitations.length > 0) {
           content += `⚠️ Limitations:\n`;
           fullAnalysis.limitations.forEach((lim: string) => {
@@ -619,7 +600,6 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
           content += `\n`;
         }
 
-        // ===== Metadata =====
         if (fullAnalysis.auditType) {
           content += `Audit Type: ${safeString(fullAnalysis.auditType)}\n`;
         }
@@ -690,7 +670,6 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
           content += `\n`;
         }
 
-        // ===== Performance Analysis (legacy) =====
         if (fullAnalysis.performanceAnalysis) {
           content += `⚡ Performance Analysis:\n`;
           const pa = fullAnalysis.performanceAnalysis;
@@ -715,7 +694,6 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
           content += `\n`;
         }
 
-        // ===== New Advanced: complexity =====
         if (fullAnalysis.complexity) {
           content += `⚡ Complexity Analysis:\n`;
           content += `  Time Complexity: ${safeString(fullAnalysis.complexity.time)}\n`;
@@ -726,7 +704,6 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
           content += `\n`;
         }
 
-        // ===== New Advanced: findings =====
         if (fullAnalysis.findings && fullAnalysis.findings.length > 0) {
           content += `🔍 Findings:\n`;
           fullAnalysis.findings.forEach((f: any) => {
@@ -748,7 +725,6 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
           });
         }
 
-        // ===== Legacy security =====
         if (fullAnalysis.securityAnalysis) {
           content += `🔒 Security Analysis:\n`;
           content += `  Severity: ${safeString(fullAnalysis.securityAnalysis.severity)}\n`;
@@ -767,7 +743,6 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
           content += `\n`;
         }
 
-        // ===== Production readiness =====
         if (fullAnalysis.productionReadiness) {
           content += `🛡️ Production Readiness:\n`;
           content += `  Ready: ${fullAnalysis.productionReadiness.isProductionReady ? 'Yes' : 'No'}\n`;
@@ -785,7 +760,6 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
           content += `\n`;
         }
 
-        // ===== New Advanced: architectural observations =====
         if (fullAnalysis.architecturalObservations && fullAnalysis.architecturalObservations.length > 0) {
           content += `🏗️ Architectural Observations:\n`;
           fullAnalysis.architecturalObservations.forEach((obs: any) => {
@@ -794,7 +768,6 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
           content += `\n`;
         }
 
-        // ===== New Advanced: recommended actions =====
         if (fullAnalysis.recommendedActions && fullAnalysis.recommendedActions.length > 0) {
           content += `🔧 Recommended Actions:\n`;
           fullAnalysis.recommendedActions
@@ -806,7 +779,6 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
           content += `\n`;
         }
 
-        // ===== Suggested Tests (supports both legacy and new) =====
         if (fullAnalysis.suggestedTests && fullAnalysis.suggestedTests.length > 0) {
           content += `🧪 Suggested Tests:\n`;
           fullAnalysis.suggestedTests.forEach((test: any) => {
@@ -822,18 +794,17 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
           content += `\n`;
         }
 
-        // ===== Improved code =====
         if (fullAnalysis.improvedCode && fullAnalysis.improvedCode.available) {
           content += `✨ Improved Code:\n`;
           content += `Notes: ${safeString(fullAnalysis.improvedCode.notes)}\n`;
           content += `${safeString(fullAnalysis.improvedCode.code)}\n\n`;
         }
+
         if (fullAnalysis.improvedCode?.code) {
           content += `✨ Improved Code:\n`;
           content += `${safeString(fullAnalysis.improvedCode.code)}\n\n`;
         }
 
-        // ===== Scorecard =====
         if (fullAnalysis.scorecardLegacy) {
           content += `📊 Scorecard:\n`;
           const scores = fullAnalysis.scorecardLegacy;
@@ -846,6 +817,7 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
           if (scores.overall) content += `  Overall: ${safeString(scores.overall)}/10\n`;
           content += `\n`;
         }
+
         if (fullAnalysis.scorecard) {
           content += `📊 Scorecard:\n`;
           const scores = fullAnalysis.scorecard;
@@ -859,12 +831,12 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
           content += `\n`;
         }
 
-        // ===== Verdict =====
         if (fullAnalysis.verdict) {
           content += `🏁 Final Verdict:\n`;
           content += `  Status: ${safeString(fullAnalysis.verdict.status)}\n`;
           content += `  Explanation: ${safeString(fullAnalysis.verdict.explanation)}\n\n`;
         }
+
         if (fullAnalysis.finalVerdict) {
           content += `🏁 Final Verdict:\n`;
           content += `  Summary: ${safeString(fullAnalysis.finalVerdict.summary)}\n`;
@@ -874,7 +846,6 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
           }
         }
 
-        // ===== Limitations =====
         if (fullAnalysis.limitations && fullAnalysis.limitations.length > 0) {
           content += `⚠️ Limitations:\n`;
           fullAnalysis.limitations.forEach((lim: string) => {
@@ -883,7 +854,6 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
           content += `\n`;
         }
 
-        // ===== Metadata =====
         if (fullAnalysis.auditType) {
           content += `Audit Type: ${safeString(fullAnalysis.auditType)}\n`;
         }
