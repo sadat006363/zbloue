@@ -113,17 +113,16 @@ export default async function SnippetPage({ params }: PageProps) {
   return (
     <main className="min-h-screen bg-[#f8f9fa]">
       <div className="max-w-5xl mx-auto px-4 py-6 md:py-8">
-        {/* Header - اصلاح: ارسال shareUrl */}
+        {/* Header - فقط shareUrl */}
         <SnippetHeader shareUrl={shareUrl} />
 
-        {/* User Info */}
+        {/* User Info - فقط username و githubUsername (بدون avatarUrl) */}
         <SnippetUserInfo
-          username={snippet.username || undefined}
+          username={snippet.username || 'Anonymous'}
           githubUsername={snippet.github_username || undefined}
-          avatarUrl={snippet.avatar_url || undefined}
         />
 
-        {/* Share Buttons */}
+        {/* Share Buttons - با slug و title */}
         <SnippetShareButtons slug={snippet.slug} title={snippet.card_title} />
 
         {/* Tab Links */}

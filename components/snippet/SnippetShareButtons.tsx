@@ -1,7 +1,6 @@
 // ============================================================
 // 📁 فایل: components/snippet/SnippetShareButtons.tsx
 // ============================================================
-
 'use client';
 
 import { useState } from 'react';

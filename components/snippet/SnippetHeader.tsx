@@ -1,3 +1,6 @@
+// ============================================================
+// 📁 فایل: components/snippet/SnippetHeader.tsx
+// ============================================================
 'use client';
 import Link from 'next/link';
 import CopyButton from '../common/CopyButton';
