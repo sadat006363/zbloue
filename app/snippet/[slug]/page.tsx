@@ -13,6 +13,7 @@ import {
   SuggestedTest,
   Scorecard,
   LineExplanation,
+  GenerateResponse, // <-- اضافه شد
 } from '@/types';
 import AnalysisTab from '@/components/OutputPanel/tabs/AnalysisTab';
 
@@ -142,8 +143,8 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
     const hasLineExplanations = snippet.line_explanations && snippet.line_explanations.length > 0;
     const hasGeneratedPrompt = snippet.generated_prompt;
 
-    // ===== Build fullAnalysis from both legacy and new fields =====
-    let fullAnalysis = null;
+    // ===== Build fullAnalysis with correct typing =====
+    let fullAnalysis: GenerateResponse | null = null;
     if (isAdvanced) {
       fullAnalysis = {
         title: snippet.card_title || 'Code Analysis',
@@ -180,7 +181,7 @@ export default async function SnippetPage({ params, searchParams }: PageProps) {
         auditType: 'concurrency',
         status: 'complete',
         language: snippet.language,
-        schemaVersion: '1.0',
+        schemaVersion: '1.0' as const, // <-- رفع خطای TypeScript
       };
     }
 
