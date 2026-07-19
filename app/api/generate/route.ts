@@ -113,22 +113,25 @@ export async function POST(req: NextRequest) {
     }
 
     // ===== 6. Execute AI =====
-    let result;
+    let result: any;
 
     if (mode === 'advanced') {
-      // Use the new pipeline for Advanced mode
-      const pipelineResult = await runAdvancedPipeline(code, language);
-      if (pipelineResult.result) {
-        result = pipelineResult.result;
-        // Add status to result for UI
-        result.status = pipelineResult.status;
-      } else {
-        // Fallback to legacy if pipeline fails
-        console.warn('Pipeline failed, falling back to legacy:', pipelineResult.error);
+      try {
+        const pipelineResult = await runAdvancedPipeline(code, language);
+        if (pipelineResult.result) {
+          result = {
+            ...pipelineResult.result,
+            status: pipelineResult.status,
+          };
+        } else {
+          console.warn('Advanced pipeline failed, falling back to legacy:', pipelineResult.error);
+          result = await generateEducationalContent(code, language, mode);
+        }
+      } catch (pipelineError) {
+        console.error('Pipeline error, falling back to legacy:', pipelineError);
         result = await generateEducationalContent(code, language, mode);
       }
     } else {
-      // Simple and Medium modes use legacy
       result = await generateEducationalContent(code, language, mode);
     }
 

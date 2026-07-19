@@ -1,3 +1,4 @@
+// components/OutputPanel/tabs/AnalysisTab.tsx
 'use client';
 import { GenerateResponse, AuditFinding, EvidenceItem } from '@/types';
 import { safeString } from '@/lib/utils';
@@ -121,6 +122,22 @@ const FindingCard = ({ finding }: { finding: AuditFinding }) => {
           <p className="text-xs text-[#4a4a6a]">{safeString(finding.technicalExplanation)}</p>
         </div>
       )}
+
+      {finding.testToReproduce && (
+        <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-200">
+          <span className="text-xs font-medium text-[#4a86f7]">🧪 Test to Reproduce:</span>
+          <div className="text-xs text-[#4a4a6a] mt-1 space-y-1">
+            <p><span className="font-medium">Title:</span> {safeString(finding.testToReproduce.title)}</p>
+            {safeArray(finding.testToReproduce.setup).length > 0 && (
+              <p><span className="font-medium">Setup:</span> {safeArray(finding.testToReproduce.setup).join(', ')}</p>
+            )}
+            {safeArray(finding.testToReproduce.steps).length > 0 && (
+              <p><span className="font-medium">Steps:</span> {safeArray(finding.testToReproduce.steps).join(' → ')}</p>
+            )}
+            <p><span className="font-medium">Expected:</span> {safeString(finding.testToReproduce.expectedResult)}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -154,6 +171,12 @@ export default function AnalysisTab({
         if (safeArray(f.evidence).length > 0) {
           const lines = safeArray(f.evidence).map((e: EvidenceItem) => `${e.startLine}-${e.endLine}`).join(', ');
           text += `    Lines: ${lines}\n`;
+        }
+        if (safeArray(f.executionPath).length > 0) {
+          text += `    Path: ${safeArray(f.executionPath).join(' → ')}\n`;
+        }
+        if (safeArray(f.triggerConditions).length > 0) {
+          text += `    Triggers: ${safeArray(f.triggerConditions).join('; ')}\n`;
         }
         text += `    Consequence: ${safeString(f.consequence)}\n`;
         if (f.remediation) text += `    Fix: ${safeString(f.remediation)}\n\n`;

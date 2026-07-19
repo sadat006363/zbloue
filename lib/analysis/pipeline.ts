@@ -1,5 +1,4 @@
 // lib/analysis/pipeline.ts
-
 import { addLineNumbers, getLineCount } from './numberedCode';
 import { detectConcurrencySignals } from './detector';
 import { buildGenericAdvancedPrompt } from './prompts/generic';

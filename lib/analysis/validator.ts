@@ -1,5 +1,4 @@
 // lib/analysis/validator.ts
-
 import { z } from 'zod';
 import { AdvancedAuditResultSchema } from './schema';
 import {
@@ -57,18 +56,18 @@ function validateCriticalFindings(result: AdvancedAuditResult): ValidationIssue[
           expectedCoverage: 'Critical/high findings must have at least one evidence item',
         });
       }
-      if (finding.executionPath.length === 0) {
+      if (!finding.executionPath || finding.executionPath.length === 0) {
         issues.push({
-          code: 'CRITICAL_NO_PATH',
+          code: 'MISSING_EXECUTION_PATH',
           severity: 'error',
           message: `Critical/high finding "${finding.title}" has no execution path`,
           relatedLines: [],
           expectedCoverage: 'Critical/high findings must include executionPath',
         });
       }
-      if (finding.triggerConditions.length === 0) {
+      if (!finding.triggerConditions || finding.triggerConditions.length === 0) {
         issues.push({
-          code: 'CRITICAL_NO_TRIGGERS',
+          code: 'MISSING_TRIGGER_CONDITIONS',
           severity: 'error',
           message: `Critical/high finding "${finding.title}" has no trigger conditions`,
           relatedLines: [],
@@ -91,6 +90,15 @@ function validateCriticalFindings(result: AdvancedAuditResult): ValidationIssue[
           message: `Critical/high finding "${finding.title}" has no remediation`,
           relatedLines: [],
           expectedCoverage: 'Critical/high findings must include remediation',
+        });
+      }
+      if (!finding.testToReproduce) {
+        issues.push({
+          code: 'CRITICAL_NO_TEST_TO_REPRODUCE',
+          severity: 'error',
+          message: `Critical/high finding "${finding.title}" has no test to reproduce`,
+          relatedLines: [],
+          expectedCoverage: 'Critical/high findings must include testToReproduce',
         });
       }
     }
@@ -246,6 +254,19 @@ export function validateSemanticCompleteness(
       message: 'Future.get detected but no blocking wait analysis found',
       relatedLines: detectorResult.signals.filter((s) => s.type === 'FUTURE_GET').map((s) => s.line),
       expectedCoverage: 'Should analyze blocking waits and nested submission risks',
+    });
+  }
+
+  // Check for queue manipulation signals
+  const hasQueueOffer = detectorResult.signals.some((s) => s.type === 'QUEUE_OFFER' || s.value.includes('offer'));
+  const hasQueueAnalysis = result.findings.some((f) => f.category === 'queue-misuse');
+  if (hasQueueOffer && !hasQueueAnalysis) {
+    semanticIssues.push({
+      code: 'MISSING_QUEUE_ANALYSIS',
+      severity: 'warning',
+      message: 'Queue offer detected but no queue-misuse analysis found',
+      relatedLines: detectorResult.signals.filter((s) => s.value.includes('offer')).map((s) => s.line),
+      expectedCoverage: 'Should analyze queue manipulation and execute mismatch',
     });
   }
 
