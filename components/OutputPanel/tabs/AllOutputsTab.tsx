@@ -1,5 +1,5 @@
+// components/OutputPanel/tabs/AllOutputsTab.tsx
 'use client';
-import { CopyButton } from '@/components/common';
 
 interface AllOutputsTabProps {
   snippet: any;
@@ -12,17 +12,20 @@ export default function AllOutputsTab({
   showToast,
   appUrl,
 }: AllOutputsTabProps) {
-  // ===== ساخت لینک صفحه اسنیپت =====
-  const shareUrl = `${appUrl}/snippet/${snippet?.slug || ''}`;
+  // ===== ساخت لینک صفحه اسنیپت با پاکسازی URL =====
+  const baseUrl = appUrl?.replace(/\/+$/, '') || '';
+  const slug = snippet?.slug || '';
+  const shareUrl = slug ? `${baseUrl}/snippet/${slug}` : '';
 
-  // ===== تابع کپی برای اطمینان =====
+  // ===== تابع کپی لینک =====
   const handleCopyLink = () => {
-    if (shareUrl) {
-      navigator.clipboard.writeText(shareUrl);
-      showToast('✅ Link copied!');
-    } else {
+    if (!shareUrl) {
       showToast('❌ No link available');
+      return;
     }
+    navigator.clipboard.writeText(shareUrl)
+      .then(() => showToast('✅ Link copied!'))
+      .catch(() => showToast('❌ Failed to copy link'));
   };
 
   return (
@@ -45,22 +48,39 @@ export default function AllOutputsTab({
               </span>
             </p>
             <div className="flex flex-wrap items-center gap-3 mt-4">
-              {/* ===== دکمه کپی لینک (اصلاح‌شده) ===== */}
+              {/* ===== دکمه کپی لینک ===== */}
               <button
                 onClick={handleCopyLink}
-                className="flex items-center gap-2 text-sm px-4 py-1.5 rounded-md transition border border-[#d0d0d8] text-[#4a4a6a] hover:text-[#4a86f7] hover:bg-[#f1f3f5]"
+                disabled={!shareUrl}
+                className={`flex items-center gap-2 text-sm px-4 py-1.5 rounded-md transition border ${
+                  !shareUrl
+                    ? 'border-[#d0d0d8] text-[#a0a0b0] cursor-not-allowed bg-[#f8f9fa]'
+                    : 'border-[#d0d0d8] text-[#4a4a6a] hover:text-[#4a86f7] hover:bg-[#f1f3f5]'
+                }`}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                 </svg>
                 🔗 Copy Link
               </button>
+
               {/* ===== دکمه باز کردن صفحه اسنیپت ===== */}
               <a
-                href={shareUrl}
+                href={shareUrl || '#'}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 bg-[#4a86f7] hover:bg-[#3b6fd4] text-white px-4 py-1.5 rounded-md text-sm font-medium transition"
+                className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition ${
+                  !shareUrl
+                    ? 'bg-[#d0d0d8] text-[#a0a0b0] cursor-not-allowed'
+                    : 'bg-[#4a86f7] hover:bg-[#3b6fd4] text-white'
+                }`}
+                aria-disabled={!shareUrl}
+                onClick={(e) => {
+                  if (!shareUrl) {
+                    e.preventDefault();
+                    showToast('❌ No snippet available');
+                  }
+                }}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
