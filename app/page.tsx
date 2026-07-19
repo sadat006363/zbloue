@@ -1,5 +1,5 @@
 // ============================================================
-// 📁 فایل: app/page.tsx (اصلاح شده - رفع مشکل پاک شدن کد)
+// 📁 فایل: app/page.tsx (اصلاح‌شده - حذف setActiveTab از توابع)
 // ============================================================
 
 'use client';
@@ -80,7 +80,7 @@ type Action =
   | { type: 'SET_HOVERED_LINE'; payload: number | null }
   | { type: 'SET_TOAST'; payload: string | null }
   | { type: 'CLEAR_ALL' }
-  | { type: 'CLEAR_OUTPUTS' }; // ✅ Action جدید برای پاک کردن فقط خروجی‌ها
+  | { type: 'CLEAR_OUTPUTS' };
 
 const initialState: AppState = {
   code: '',
@@ -155,7 +155,7 @@ function appReducer(state: AppState, action: Action): AppState {
         isExplaining: false,
         isGeneratingPrompt: false,
       };
-    case 'CLEAR_OUTPUTS': // ✅ فقط خروجی‌ها را پاک کن، کد را دست نخورده نگه دار
+    case 'CLEAR_OUTPUTS':
       return {
         ...state,
         errorMessage: null,
@@ -176,34 +176,6 @@ function appReducer(state: AppState, action: Action): AppState {
       };
     default: return state;
   }
-}
-
-function useAsyncAction() {
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const execute = useCallback(<T,>(
-    action: () => Promise<T>,
-    onSuccess?: (data: T) => void,
-    onError?: (error: string) => void
-  ) => {
-    setIsLoading(true);
-    setError(null);
-    (async () => {
-      try {
-        const result = await action();
-        onSuccess?.(result);
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : 'Operation failed';
-        setError(message);
-        onError?.(message);
-      } finally {
-        setIsLoading(false);
-      }
-    })();
-  }, []);
-
-  return { isLoading, error, execute };
 }
 
 export default function Home() {
@@ -248,7 +220,6 @@ export default function Home() {
     dispatch({ type: 'SET_AVATAR', payload: newAvatar });
   }, []);
 
-  // ✅ اصلاح: تشخیص خودکار زبان بدون پاک کردن خروجی‌ها
   useEffect(() => {
     if (code.trim().length > 0) {
       const detected = detectLanguage(code);
@@ -258,7 +229,6 @@ export default function Home() {
     }
   }, [code, language]);
 
-  // ✅ اصلاح: فقط خروجی‌ها را پاک کن، کد را نه!
   useEffect(() => {
     if (code.trim().length > 0 || language) {
       dispatch({ type: 'CLEAR_OUTPUTS' });
@@ -493,14 +463,14 @@ export default function Home() {
     }
   }, [code, language, mode, outputs, processCode, validateCode, callGenerateAPI, prepareSaveData, saveSnippet, buildSnippet, showToast]);
 
-  const { execute: executeExplanation } = useAsyncAction();
-  const { execute: executePrompt } = useAsyncAction();
-
+  // ============================================================
+  // 🔥 اصلاح: حذف setActiveTab از توابع (مدیریت تب در OutputPanel)
+  // ============================================================
   const handleGenerateExplanation = useCallback(async () => {
     const trimmedCode = removeEmptyLines(code);
     if (!trimmedCode.trim()) { showToast('❌ Please enter some code first.'); return; }
     if (trimmedCode !== code) dispatch({ type: 'SET_CODE', payload: trimmedCode });
-    if (outputPanelRef.current) outputPanelRef.current.setActiveTab('line-by-line');
+
     const lines = trimmedCode.split('\n').filter((line: string) => line.trim().length > 0);
     if (lines.length > MAX_LINES_EXPLAIN) {
       const msg = `Code exceeds ${MAX_LINES_EXPLAIN} lines. Please shorten your code.`;
@@ -508,38 +478,45 @@ export default function Home() {
       showToast(`❌ ${msg}`);
       return;
     }
+
     dispatch({ type: 'SET_EXPLAIN_ERROR', payload: null });
+    dispatch({ type: 'SET_EXPLAINING', payload: true }); // ⏳ نمایش حالت انتظار
+
     try {
-      await executeExplanation(
-        async () => {
-          const res = await fetch('/api/explain-line-by-line', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code: trimmedCode, language }),
-          });
-          const result = await res.json();
-          if (!res.ok) throw new Error(result.error || 'Failed to generate explanations');
-          return result;
-        },
-        (data) => {
-          const explanations = data.explanations || [];
-          dispatch({ type: 'SET_OUTPUTS', payload: { [mode]: { lineExplanations: explanations } } });
-          if (displaySnippet?.slug) updateSnippet(displaySnippet.slug, { line_explanations: explanations });
-          showToast(`✅ ${explanations.length || 0} line explanations generated!`);
-        },
-        (error) => {
-          dispatch({ type: 'SET_EXPLAIN_ERROR', payload: error });
-          showToast(`❌ ${error}`);
+      const res = await fetch('/api/explain-line-by-line', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: trimmedCode, language }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to generate explanations');
+
+      const explanations = data.explanations || [];
+      dispatch({
+        type: 'SET_OUTPUTS',
+        payload: {
+          [mode]: { lineExplanations: explanations }
         }
-      );
-    } catch { /* handled by useAsyncAction */ }
-  }, [code, language, mode, displaySnippet, executeExplanation, updateSnippet, showToast]);
+      });
+      if (displaySnippet?.slug) {
+        await updateSnippet(displaySnippet.slug, { line_explanations: explanations });
+      }
+      showToast(`✅ ${explanations.length || 0} line explanations generated!`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to generate explanations';
+      if (process.env.NODE_ENV === 'development') console.error('Explanation error:', error);
+      dispatch({ type: 'SET_EXPLAIN_ERROR', payload: message });
+      showToast(`❌ ${message}`);
+    } finally {
+      dispatch({ type: 'SET_EXPLAINING', payload: false }); // ✅ پایان حالت انتظار
+    }
+  }, [code, language, mode, displaySnippet, updateSnippet, showToast]);
 
   const handleGeneratePrompt = useCallback(async () => {
     const trimmedCode = removeEmptyLines(code);
     if (!trimmedCode.trim()) { showToast('❌ Please enter some code first.'); return; }
     if (trimmedCode !== code) dispatch({ type: 'SET_CODE', payload: trimmedCode });
-    if (outputPanelRef.current) outputPanelRef.current.setActiveTab('prompt');
+
     const lines = trimmedCode.split('\n').filter((line: string) => line.trim().length > 0);
     if (lines.length > MAX_LINES_PROMPT) {
       const msg = `Code exceeds ${MAX_LINES_PROMPT} lines. Please shorten your code.`;
@@ -547,32 +524,39 @@ export default function Home() {
       showToast(`❌ ${msg}`);
       return;
     }
+
     dispatch({ type: 'SET_PROMPT_ERROR', payload: null });
+    dispatch({ type: 'SET_GENERATING_PROMPT', payload: true }); // ⏳ نمایش حالت انتظار
+
     try {
-      await executePrompt(
-        async () => {
-          const res = await fetch('/api/generate-prompt', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code: trimmedCode, language, mode }),
-          });
-          const result = await res.json();
-          if (!res.ok) throw new Error(result.error || 'Failed to generate prompt');
-          return result;
-        },
-        (data) => {
-          const prompt = data.prompt || '';
-          dispatch({ type: 'SET_OUTPUTS', payload: { [mode]: { generatedPrompt: prompt } } });
-          if (displaySnippet?.slug) updateSnippet(displaySnippet.slug, { generated_prompt: prompt });
-          showToast('✅ Prompt generated! Check the Prompt tab.');
-        },
-        (error) => {
-          dispatch({ type: 'SET_PROMPT_ERROR', payload: error });
-          showToast(`❌ ${error}`);
+      const res = await fetch('/api/generate-prompt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: trimmedCode, language, mode }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to generate prompt');
+
+      const prompt = data.prompt || '';
+      dispatch({
+        type: 'SET_OUTPUTS',
+        payload: {
+          [mode]: { generatedPrompt: prompt }
         }
-      );
-    } catch { /* handled by useAsyncAction */ }
-  }, [code, language, mode, displaySnippet, executePrompt, updateSnippet, showToast]);
+      });
+      if (displaySnippet?.slug) {
+        await updateSnippet(displaySnippet.slug, { generated_prompt: prompt });
+      }
+      showToast('✅ Prompt generated! Check the Prompt tab.');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to generate prompt';
+      if (process.env.NODE_ENV === 'development') console.error('Prompt generation error:', error);
+      dispatch({ type: 'SET_PROMPT_ERROR', payload: message });
+      showToast(`❌ ${message}`);
+    } finally {
+      dispatch({ type: 'SET_GENERATING_PROMPT', payload: false }); // ✅ پایان حالت انتظار
+    }
+  }, [code, language, mode, displaySnippet, updateSnippet, showToast]);
 
   const handleStop = useCallback(() => {
     if (abortControllerRef.current) {
