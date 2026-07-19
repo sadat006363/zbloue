@@ -157,29 +157,33 @@ function appReducer(state: AppState, action: Action): AppState {
   }
 }
 
+// ============================================================
+// 🔥 Hook سفارشی برای عملیات ناهمگام (اصلاح‌شده)
+// ============================================================
 function useAsyncAction() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const execute = useCallback(async <T>(
+  // 🔥 اصلاح: اضافه کردن کاما بعد از T
+  const execute = useCallback(<T,>(
     action: () => Promise<T>,
     onSuccess?: (data: T) => void,
     onError?: (error: string) => void
   ) => {
     setIsLoading(true);
     setError(null);
-    try {
-      const result = await action();
-      onSuccess?.(result);
-      return result;
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Operation failed';
-      setError(message);
-      onError?.(message);
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
+    (async () => {
+      try {
+        const result = await action();
+        onSuccess?.(result);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Operation failed';
+        setError(message);
+        onError?.(message);
+      } finally {
+        setIsLoading(false);
+      }
+    })();
   }, []);
 
   return { isLoading, error, execute };
