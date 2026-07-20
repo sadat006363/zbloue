@@ -282,13 +282,8 @@ export default function Home() {
     });
   }, [mode, displaySnippet]);
 
-  // ============================================================
-  // 🔥 اصلاح: پردازش کد در یک مرحله (ابتدا کامنت‌ها، سپس خطوط خالی)
-  // ============================================================
   const processCode = useCallback((rawCode: string, lang: string): string => {
-    // 1. حذف کامنت‌ها
     let processed = removeComments(rawCode, lang);
-    // 2. حذف خطوط خالی
     processed = removeEmptyLines(processed);
     return processed;
   }, []);
@@ -437,19 +432,12 @@ export default function Home() {
     }
   }, [mode, username, githubUsername, avatarUrl]);
 
-  // ============================================================
-  // 🔥 اصلاح: پردازش و تحلیل در یک مرحله
-  // ============================================================
   const handleGenerate = useCallback(async () => {
-    // 1. پردازش کد (کامنت‌ها + خطوط خالی) در یک مرحله
     const processedCode = processCode(code, language);
-
-    // 2. اگر کد تغییر کرده، ادیتور را به‌روزرسانی کن
     if (processedCode !== code) {
       dispatch({ type: 'SET_CODE', payload: processedCode });
     }
 
-    // 3. اعتبارسنجی
     const validationError = validateCode(processedCode);
     if (validationError) {
       dispatch({ type: 'SET_ERROR', payload: validationError });
@@ -460,12 +448,9 @@ export default function Home() {
     dispatch({ type: 'SET_LOADING', payload: true });
 
     try {
-      // 4. فراخوانی API با کد پردازش‌شده
       const genData = await callGenerateAPI(processedCode, language, mode);
       const saveDataPayload = prepareSaveData(processedCode, language, genData);
       const saveResult = await saveSnippet(saveDataPayload);
-
-      // 5. ساخت snippet
       const newSnippet = buildSnippetFromPayload(saveResult, processedCode, language, saveDataPayload);
       const fullAnalysisData = mode === 'advanced' ? genData : { analysis: genData.analysis, linkedin_post: genData.linkedin_post };
 
