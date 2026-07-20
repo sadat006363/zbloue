@@ -14,17 +14,14 @@ import { z } from 'zod';
 import { AdvancedAuditResultSchema } from '@/lib/analysis/schema';
 
 // ============================================================
-// 1. Schemas
+// 1. Schemas (اصلاح شده)
 // ============================================================
 
 const ModeValues = ['simple', 'medium', 'advanced'] as const;
 type Mode = typeof ModeValues[number];
 
-const ModeSchema = z.enum(ModeValues, {
-  errorMap: (issue, ctx) => {
-    return { message: `Mode must be one of: ${ModeValues.join(', ')}` };
-  },
-});
+// ✅ استفاده از z.enum بدون errorMap
+const ModeSchema = z.enum(ModeValues);
 
 const GenerateRequestSchema = z.object({
   code: z.string().min(1, 'Code is required').max(MAX_CODE_LENGTH, `Code exceeds maximum length of ${MAX_CODE_LENGTH} characters`),
@@ -34,7 +31,6 @@ const GenerateRequestSchema = z.object({
 
 type GenerateRequestValidated = z.infer<typeof GenerateRequestSchema>;
 
-// Response validation: only ensures linkedin_post exists, passes through other fields
 const GenerateResponseSchema = z.object({
   linkedin_post: z.string().min(1).max(300),
 }).passthrough();
