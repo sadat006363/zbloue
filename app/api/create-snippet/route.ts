@@ -274,12 +274,26 @@ export async function POST(req: NextRequest) {
     const row = mapToDatabaseRow(body, slug);
 
     // --- Insert into Supabase ---
-    // 🔥 FIX: TypeScript error - use type assertion because Supabase client lacks table types
-    const { data, error } = await supabase
+    // 🔥 Fix TypeScript error: use type assertion for the entire query result
+    type InsertResult = {
+      data: {
+        id: string;
+        slug: string;
+        card_title: string;
+        username: string | null;
+        github_username: string | null;
+        avatar_url: string | null;
+      } | null;
+      error: any;
+    };
+
+    const result = (await supabase
       .from('snippets')
-      .insert(row as any) // ✅ Fixed: cast to any to bypass type inference
+      .insert(row as any)
       .select('id, slug, card_title, username, github_username, avatar_url')
-      .single();
+      .single()) as InsertResult;
+
+    const { data, error } = result;
 
     if (error) {
       logger.error('[create-snippet] Supabase insert error:', error);
@@ -293,15 +307,15 @@ export async function POST(req: NextRequest) {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || '';
     const response = {
       success: true,
-      id: data.id,
-      slug: data.slug,
-      url: `${baseUrl}/snippet/${data.slug}`,
-      username: data.username,
-      github_username: data.github_username,
-      avatar_url: data.avatar_url,
+      id: data!.id,
+      slug: data!.slug,
+      url: `${baseUrl}/snippet/${data!.slug}`,
+      username: data!.username,
+      github_username: data!.github_username,
+      avatar_url: data!.avatar_url,
     };
 
-    logger.info(`[create-snippet] Snippet created: ${data.slug}`);
+    logger.info(`[create-snippet] Snippet created: ${data!.slug}`);
     return NextResponse.json(response, { status: 201 });
   } catch (error) {
     logger.error('[create-snippet] Unhandled error:', error);
