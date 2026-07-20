@@ -1,4 +1,5 @@
 // app/page.tsx
+
 'use client';
 
 import { useState, useEffect, useCallback, useRef, useMemo, useReducer } from 'react';
@@ -77,7 +78,7 @@ type Action =
   | { type: 'SET_HOVERED_LINE'; payload: number | null }
   | { type: 'SET_TOAST'; payload: string | null }
   | { type: 'CLEAR_ALL' }
-  | { type: 'CLEAR_OUTPUTS' };
+  | { type: 'CLEAR_CURRENT_OUTPUT' };
 
 const initialState: AppState = {
   code: '',
@@ -152,7 +153,8 @@ function appReducer(state: AppState, action: Action): AppState {
         isExplaining: false,
         isGeneratingPrompt: false,
       };
-    case 'CLEAR_OUTPUTS':
+    case 'CLEAR_CURRENT_OUTPUT': {
+      const mode = state.mode;
       return {
         ...state,
         errorMessage: null,
@@ -160,9 +162,13 @@ function appReducer(state: AppState, action: Action): AppState {
         explainError: null,
         promptError: null,
         outputs: {
-          simple: { snippet: null, fullAnalysis: null, lineExplanations: [], generatedPrompt: '' },
-          medium: { snippet: null, fullAnalysis: null, lineExplanations: [], generatedPrompt: '' },
-          advanced: { snippet: null, fullAnalysis: null, lineExplanations: [], generatedPrompt: '' },
+          ...state.outputs,
+          [mode]: {
+            snippet: null,
+            fullAnalysis: null,
+            lineExplanations: [],
+            generatedPrompt: '',
+          }
         },
         convertLanguage: '',
         hoveredLine: null,
@@ -171,6 +177,7 @@ function appReducer(state: AppState, action: Action): AppState {
         isExplaining: false,
         isGeneratingPrompt: false,
       };
+    }
     default: return state;
   }
 }
@@ -226,9 +233,10 @@ export default function Home() {
     }
   }, [code, language]);
 
+  // 🔥 اصلاح: فقط خروجی حالت فعلی را پاک کن، نه همه حالت‌ها
   useEffect(() => {
     if (code.trim().length > 0 || language) {
-      dispatch({ type: 'CLEAR_OUTPUTS' });
+      dispatch({ type: 'CLEAR_CURRENT_OUTPUT' });
     }
   }, [code, language]);
 
