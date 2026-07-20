@@ -233,7 +233,7 @@ export default function Home() {
     }
   }, [code, language]);
 
-  // 🔥 اصلاح: فقط خروجی حالت فعلی را پاک کن، نه همه حالت‌ها
+  // فقط خروجی حالت فعلی را پاک کن، نه همه حالت‌ها
   useEffect(() => {
     if (code.trim().length > 0 || language) {
       dispatch({ type: 'CLEAR_CURRENT_OUTPUT' });
@@ -312,46 +312,59 @@ export default function Home() {
     return data;
   }, []);
 
-  const buildSnippet = useCallback((saveData: any, processedCode: string, lang: string, genData: GenerateResponse): Snippet => {
+  // ============================================================
+  // 🔥 اصلاح: ساخت snippet از داده‌های واقعی (نه از پاسخ API که فقط id و slug دارد)
+  // ============================================================
+  const buildSnippetFromPayload = useCallback((
+    saveResult: any,
+    processedCode: string,
+    lang: string,
+    payload: any
+  ): Snippet => {
     return {
-      id: saveData.id,
-      slug: saveData.slug,
+      id: saveResult.id,
+      slug: saveResult.slug,
       raw_code: processedCode,
       language: lang,
-      card_title: saveData.card_title || 'Code Analysis',
-      key_concept: saveData.key_concept || '',
-      what_this_code_does: saveData.what_this_code_does || '',
-      debug_analysis: saveData.debug_analysis || '-',
-      optimization: saveData.optimization || '-',
-      linkedin_post: saveData.linkedin_post || '',
+      card_title: payload.card_title || 'Code Analysis',
+      key_concept: payload.key_concept || '',
+      what_this_code_does: payload.what_this_code_does || '',
+      debug_analysis: payload.debug_analysis || '-',
+      optimization: payload.optimization || '-',
+      linkedin_post: payload.linkedin_post || '',
       is_public: true,
       created_at: new Date().toISOString(),
       username: username || 'Developer',
       github_username: githubUsername || null,
-      avatar_url: saveData.avatar_url || null,
-      code_walkthrough: saveData.code_walkthrough || null,
-      what_works_well: saveData.what_works_well || null,
-      bugs_and_risky_cases: saveData.bugs_and_risky_cases || null,
-      edge_cases: saveData.edge_cases || null,
-      performance_analysis: saveData.performance_analysis || null,
-      security_analysis: saveData.security_analysis || null,
-      production_readiness: saveData.production_readiness || null,
-      recommended_improvements: saveData.recommended_improvements || null,
-      improved_code: saveData.improved_code || null,
-      suggested_tests: saveData.suggested_tests || null,
-      scorecard: saveData.scorecard || null,
-      final_verdict_summary: saveData.final_verdict_summary || null,
-      final_verdict_approved: saveData.final_verdict_approved || null,
-      final_verdict_next_steps: saveData.final_verdict_next_steps || null,
-      findings: saveData.findings || null,
-      execution_overview: saveData.execution_overview || null,
-      architectural_observations: saveData.architectural_observations || null,
-      recommended_actions: saveData.recommended_actions || null,
-      suggested_tests_new: saveData.suggested_tests_new || null,
-      complexity: saveData.complexity || null,
-      scorecard_new: saveData.scorecard_new || null,
-      verdict: saveData.verdict || null,
-      limitations: saveData.limitations || null,
+      avatar_url: saveResult.avatar_url || null,
+      card_image_url: null,
+      // Legacy fields
+      code_walkthrough: payload.code_walkthrough || null,
+      what_works_well: payload.what_works_well || null,
+      bugs_and_risky_cases: payload.bugs_and_risky_cases || null,
+      edge_cases: payload.edge_cases || null,
+      performance_analysis: payload.performance_analysis || null,
+      security_analysis: payload.security_analysis || null,
+      production_readiness: payload.production_readiness || null,
+      recommended_improvements: payload.recommended_improvements || null,
+      improved_code: payload.improved_code || null,
+      suggested_tests: payload.suggested_tests || null,
+      scorecard: payload.scorecard || null,
+      final_verdict_summary: payload.final_verdict_summary || null,
+      final_verdict_approved: payload.final_verdict_approved || null,
+      final_verdict_next_steps: payload.final_verdict_next_steps || null,
+      line_explanations: null,
+      generated_prompt: null,
+      // New fields
+      findings: payload.findings || null,
+      execution_overview: payload.execution_overview || null,
+      architectural_observations: payload.architectural_observations || null,
+      recommended_actions: payload.recommended_actions || null,
+      suggested_tests_new: payload.suggested_tests_new || null,
+      complexity: payload.complexity || null,
+      scorecard_new: payload.scorecard_new || null,
+      verdict: payload.verdict || null,
+      limitations: payload.limitations || null,
     };
   }, [username, githubUsername]);
 
@@ -439,8 +452,12 @@ export default function Home() {
       const genData = await callGenerateAPI(processedCode, language, mode);
       const saveDataPayload = prepareSaveData(processedCode, language, genData);
       const saveResult = await saveSnippet(saveDataPayload);
+
+      // 🔥 ساخت snippet از payload واقعی (نه از saveResult که فقط id و slug دارد)
+      const newSnippet = buildSnippetFromPayload(saveResult, processedCode, language, saveDataPayload);
+
       const fullAnalysisData = mode === 'advanced' ? genData : { analysis: genData.analysis, linkedin_post: genData.linkedin_post };
-      const newSnippet = buildSnippet(saveResult, processedCode, language, genData);
+
       dispatch({
         type: 'SET_OUTPUTS',
         payload: {
@@ -466,10 +483,10 @@ export default function Home() {
       dispatch({ type: 'SET_LOADING', payload: false });
       abortControllerRef.current = null;
     }
-  }, [code, language, mode, outputs, processCode, validateCode, callGenerateAPI, prepareSaveData, saveSnippet, buildSnippet, showToast]);
+  }, [code, language, mode, outputs, processCode, validateCode, callGenerateAPI, prepareSaveData, saveSnippet, buildSnippetFromPayload, showToast]);
 
   // ============================================================
-  // 🔥 اصلاح: حذف setActiveTab از توابع
+  // 🔥 توابع Explanation و Prompt (بدون تغییر)
   // ============================================================
   const handleGenerateExplanation = useCallback(async () => {
     const trimmedCode = removeEmptyLines(code);
