@@ -192,6 +192,9 @@ export default function Home() {
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const outputPanelRef = useRef<any>(null);
+  // 🔥 Ref to track loading start time for minimum display duration
+  const loadingStartTimeRef = useRef<number | null>(null);
+  const MIN_LOADING_MS = 400; // minimum time to show loading state (ms)
 
   const showToast = useCallback((message: string) => {
     dispatch({ type: 'SET_TOAST', payload: message });
@@ -433,10 +436,13 @@ export default function Home() {
   }, [mode, username, githubUsername, avatarUrl]);
 
   const handleGenerate = useCallback(async () => {
-    // 🔥 STEP 1: Set loading state IMMEDIATELY
+    // 🔥 Record start time for minimum loading display
+    loadingStartTimeRef.current = Date.now();
+
+    // STEP 1: Set loading state immediately
     dispatch({ type: 'SET_LOADING', payload: true });
 
-    // STEP 2: Process code (remove comments and empty lines)
+    // STEP 2: Process code
     const processedCode = processCode(code, language);
     if (processedCode !== code) {
       dispatch({ type: 'SET_CODE', payload: processedCode });
@@ -447,6 +453,7 @@ export default function Home() {
     if (validationError) {
       dispatch({ type: 'SET_ERROR', payload: validationError });
       dispatch({ type: 'SET_LOADING', payload: false });
+      loadingStartTimeRef.current = null;
       return;
     }
 
@@ -484,8 +491,14 @@ export default function Home() {
       if (process.env.NODE_ENV === 'development') console.error('Error:', error);
       dispatch({ type: 'SET_ERROR', payload: message });
     } finally {
-      // STEP 6: Turn off loading state
+      // 🔥 Ensure loading is shown for minimum duration (400ms)
+      const elapsed = Date.now() - (loadingStartTimeRef.current || Date.now());
+      const remaining = Math.max(0, MIN_LOADING_MS - elapsed);
+      if (remaining > 0) {
+        await new Promise(resolve => setTimeout(resolve, remaining));
+      }
       dispatch({ type: 'SET_LOADING', payload: false });
+      loadingStartTimeRef.current = null;
       abortControllerRef.current = null;
     }
   }, [code, language, mode, outputs, processCode, validateCode, callGenerateAPI, prepareSaveData, saveSnippet, buildSnippetFromPayload, showToast]);
