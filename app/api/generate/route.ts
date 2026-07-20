@@ -1,4 +1,5 @@
 // app/api/generate/route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
 import { generateEducationalContent } from '@/lib/ai';
 import { runAdvancedPipeline } from '@/lib/analysis/pipeline';
@@ -12,9 +13,10 @@ import { MOCK_RESPONSE } from '@/lib/mockData';
 import logger from '@/lib/logger';
 import { z } from 'zod';
 import { AdvancedAuditResultSchema } from '@/lib/analysis/schema';
+import { normalizeAnalysisOutput } from '@/lib/analysis/normalizer';
 
 // ============================================================
-// 1. Schemas (اصلاح شده)
+// 1. Schemas
 // ============================================================
 
 const ModeValues = ['simple', 'medium', 'advanced'] as const;
@@ -30,6 +32,7 @@ const GenerateRequestSchema = z.object({
 
 type GenerateRequestValidated = z.infer<typeof GenerateRequestSchema>;
 
+// Response validation: only ensures linkedin_post exists, passes through other fields
 const GenerateResponseSchema = z.object({
   linkedin_post: z.string().min(1).max(300),
 }).passthrough();
@@ -37,10 +40,10 @@ const GenerateResponseSchema = z.object({
 type GenerateResponseValidated = z.infer<typeof GenerateResponseSchema>;
 
 // ============================================================
-// 2. Language helpers (با اصلاح Set<string>)
+// 2. Language helpers
 // ============================================================
 
-const supportedLanguagesSet = new Set<string>(SUPPORTED_LANGUAGES); // 🔥 اصلاح
+const supportedLanguagesSet = new Set<string>(SUPPORTED_LANGUAGES);
 
 const languageAliases: Record<string, string> = {
   js: 'javascript',
@@ -82,8 +85,17 @@ function isSupportedLanguage(lang: string): boolean {
 // 3. Helpers
 // ============================================================
 
+/**
+ * Validate and normalize response to ensure linkedin_post exists
+ */
 function validateResponse(result: unknown): GenerateResponseValidated {
-  return GenerateResponseSchema.parse(result);
+  // If linkedin_post is missing or empty, set a default
+  const withDefault = {
+    ...(result as Record<string, unknown>),
+    linkedin_post: (result as Record<string, unknown>)?.linkedin_post || 'Check out this code analysis! #Zbloue',
+  };
+
+  return GenerateResponseSchema.parse(withDefault);
 }
 
 function getSafeErrorMessage(error: unknown): string {
@@ -182,7 +194,9 @@ export async function POST(req: NextRequest) {
         const pipelineResult = await runAdvancedPipeline(code, language);
         if (pipelineResult.result) {
           try {
-            const validated = AdvancedAuditResultSchema.parse(pipelineResult.result);
+            // Normalize pipeline output to ensure all required fields exist
+            const normalized = normalizeAnalysisOutput(pipelineResult.result);
+            const validated = AdvancedAuditResultSchema.parse(normalized);
             result = {
               ...validated,
               linkedin_post: validated.linkedin_post || 'Check out this code analysis! #Zbloue',
