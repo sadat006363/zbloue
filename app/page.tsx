@@ -154,7 +154,7 @@ function appReducer(state: AppState, action: Action): AppState {
         isGeneratingPrompt: false,
       };
     case 'CLEAR_CURRENT_OUTPUT': {
-      const mode = state.mode;
+      const currentMode = state.mode;
       return {
         ...state,
         errorMessage: null,
@@ -163,7 +163,7 @@ function appReducer(state: AppState, action: Action): AppState {
         promptError: null,
         outputs: {
           ...state.outputs,
-          [mode]: {
+          [currentMode]: {
             snippet: null,
             fullAnalysis: null,
             lineExplanations: [],
@@ -172,10 +172,7 @@ function appReducer(state: AppState, action: Action): AppState {
         },
         convertLanguage: '',
         hoveredLine: null,
-        loading: false,
-        isConverting: false,
-        isExplaining: false,
-        isGeneratingPrompt: false,
+        // 🔥 پرچم‌های بارگذاری دست‌نخورده می‌مانند تا با تغییر کد ریست نشوند
       };
     }
     default: return state;
@@ -701,8 +698,7 @@ export default function Home() {
             onStop={handleStop}
           />
           <OutputPanel
-            ref={outputPanelRef}
-            snippet={displaySnippet}
+            ref={outputPanelRef}snippet={displaySnippet}
             loading={loading}
             fullAnalysis={displayFullAnalysis}
             analysisMode={mode}
