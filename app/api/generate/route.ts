@@ -15,35 +15,39 @@ import { z } from 'zod';
 import { AdvancedAuditResultSchema } from '@/lib/analysis/schema';
 
 // ============================================================
-// 1. Request validation schema
+// 1. Schemas
 // ============================================================
+
+// Use as const to get literal types
+const ModeValues = ['simple', 'medium', 'advanced'] as const;
+type Mode = typeof ModeValues[number];
+
+const ModeSchema = z.enum(ModeValues, {
+  errorMap: (issue, ctx) => {
+    // Custom error message for enum mismatch
+    return { message: `Mode must be one of: ${ModeValues.join(', ')}` };
+  },
+});
 
 const GenerateRequestSchema = z.object({
   code: z.string().min(1, 'Code is required').max(MAX_CODE_LENGTH, `Code exceeds maximum length of ${MAX_CODE_LENGTH} characters`),
   language: z.string().min(1, 'Language is required').max(50, 'Language name too long'),
-  mode: z.enum(['simple', 'medium', 'advanced'], {
-    errorMap: () => ({ message: 'Mode must be simple, medium, or advanced' }),
-  }),
+  mode: ModeSchema,
 });
 
-// ============================================================
-// 2. Response validation (minimal shared contract)
-// ============================================================
+type GenerateRequestValidated = z.infer<typeof GenerateRequestSchema>;
 
-// We only guarantee linkedin_post exists, other fields are passed through.
+// Response validation: only ensures linkedin_post exists, passes through other fields
 const GenerateResponseSchema = z.object({
   linkedin_post: z.string().min(1).max(300),
-}).passthrough(); // allow any other fields
+}).passthrough();
 
 type GenerateResponseValidated = z.infer<typeof GenerateResponseSchema>;
 
 // ============================================================
-// 3. Language normalization and validation
+// 2. Language helpers
 // ============================================================
 
-// Ensure SUPPORTED_LANGUAGES is a readonly array with literal types
-// (this should be defined in lib/constants.ts as 'as const')
-// For safety, we cast it here:
 const supportedLanguagesSet = new Set(SUPPORTED_LANGUAGES);
 
 const languageAliases: Record<string, string> = {
@@ -83,17 +87,15 @@ function isSupportedLanguage(lang: string): boolean {
 }
 
 // ============================================================
-// 4. Helpers
+// 3. Helpers
 // ============================================================
 
 function validateResponse(result: unknown): GenerateResponseValidated {
-  // This ensures linkedin_post exists, but passes through all other fields
   return GenerateResponseSchema.parse(result);
 }
 
 function getSafeErrorMessage(error: unknown): string {
   if (error instanceof Error) {
-    // Only expose specific non-sensitive error types
     if (error.message.includes('rate limit') || error.message.includes('validation')) {
       return error.message;
     }
@@ -103,7 +105,7 @@ function getSafeErrorMessage(error: unknown): string {
 }
 
 // ============================================================
-// 5. Main handler
+// 4. Main handler
 // ============================================================
 
 export async function POST(req: NextRequest) {
@@ -111,7 +113,6 @@ export async function POST(req: NextRequest) {
   const ip = getClientIP(req);
 
   try {
-    // --- Rate limiting ---
     const rateLimitResult = rateLimiter(ip);
     if (!rateLimitResult.allowed) {
       logger.warn(`[generate] Rate limit exceeded for IP ${ip}`);
@@ -121,7 +122,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // --- Parse and validate request body ---
     let rawBody: unknown;
     try {
       rawBody = await req.json();
@@ -144,13 +144,9 @@ export async function POST(req: NextRequest) {
     }
 
     const { code, language: rawLanguage, mode } = validation.data;
-
-    // --- Normalize language ---
     const language = normalizeLanguage(rawLanguage);
 
-    // --- Validate language (use normalized) ---
     if (!isSupportedLanguage(language)) {
-      // Show the raw language in the error message, but mention the normalized form
       return NextResponse.json(
         {
           error: `Unsupported language: "${rawLanguage}" (normalized: "${language}"). Supported: ${Array.from(supportedLanguagesSet).join(', ')}`,
@@ -159,7 +155,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // --- Code limits ---
     const lines = code.split(/\r?\n/).length;
     if (lines > MAX_LINES_GENERATE) {
       return NextResponse.json(
@@ -168,7 +163,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // --- Payload size limit (using actual byte length) ---
     const rawBodyString = JSON.stringify(rawBody);
     const byteLength = Buffer.byteLength(rawBodyString, 'utf8');
     if (byteLength > 100000) {
@@ -178,7 +172,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // --- Mock response for debugging ---
     if (process.env.USE_MOCK_RESPONSE === 'true' && mode === 'advanced') {
       logger.info(`[generate] Using mock response for advanced mode (IP ${ip})`);
       try {
@@ -186,11 +179,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(validatedMock);
       } catch (mockError) {
         logger.error('[generate] Mock response validation failed:', mockError);
-        // Fall through to real generation
       }
     }
 
-    // --- Execute AI ---
     let result: GenerateResponseValidated;
 
     if (mode === 'advanced') {
@@ -198,10 +189,8 @@ export async function POST(req: NextRequest) {
       try {
         const pipelineResult = await runAdvancedPipeline(code, language);
         if (pipelineResult.result) {
-          // Ensure the pipeline output conforms to the canonical schema
           try {
             const validated = AdvancedAuditResultSchema.parse(pipelineResult.result);
-            // Merge with guaranteed linkedin_post
             result = {
               ...validated,
               linkedin_post: validated.linkedin_post || 'Check out this code analysis! #Zbloue',
@@ -231,7 +220,6 @@ export async function POST(req: NextRequest) {
       result = validateResponse(legacyResult);
     }
 
-    // --- Response ---
     const duration = Date.now() - startTime;
     logger.info(`[generate] Request completed in ${duration}ms for mode ${mode} (IP ${ip})`);
 

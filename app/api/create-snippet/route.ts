@@ -4,7 +4,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { randomBytes } from 'crypto';
-import { type AdvancedAuditResult } from '@/lib/analysis/schema';
 import logger from '@/lib/logger';
 
 // ============================================================
@@ -28,16 +27,13 @@ function getSupabaseAdmin() {
 }
 
 // ============================================================
-// 2. Zod validation schema (runtime enforcement)
+// 2. Zod schemas
 // ============================================================
 
 const CreateSnippetRequestSchema = z
   .object({
-    // Core required fields
     code: z.string().min(1, 'Code is required').max(100_000, 'Code is too large (max 100KB)'),
     language: z.string().min(1, 'Language is required').max(50, 'Language name too long'),
-
-    // Basic metadata (optional)
     card_title: z.string().min(1).max(200).optional(),
     key_concept: z.string().max(2000).optional(),
     what_this_code_does: z.string().max(10000).optional(),
@@ -47,8 +43,6 @@ const CreateSnippetRequestSchema = z
     username: z.string().min(1).max(100).nullable().optional(),
     github_username: z.string().min(1).max(100).nullable().optional(),
     avatar_url: z.string().url().nullable().optional(),
-
-    // Legacy advanced fields (optional, any JSON)
     code_walkthrough: z.any().optional().nullable(),
     what_works_well: z.any().optional().nullable(),
     bugs_and_risky_cases: z.any().optional().nullable(),
@@ -63,8 +57,6 @@ const CreateSnippetRequestSchema = z
     final_verdict_summary: z.string().optional().nullable(),
     final_verdict_approved: z.boolean().optional().nullable(),
     final_verdict_next_steps: z.string().optional().nullable(),
-
-    // NEW canonical advanced fields (from AdvancedAuditResult)
     findings: z.any().optional().nullable(),
     execution_overview: z.any().optional().nullable(),
     architectural_observations: z.any().optional().nullable(),
@@ -75,12 +67,23 @@ const CreateSnippetRequestSchema = z
     verdict: z.any().optional().nullable(),
     limitations: z.array(z.string().max(300)).max(20).optional().nullable(),
   })
-  .strict(); // Reject unknown fields
+  .strict();
 
 export type CreateSnippetRequest = z.infer<typeof CreateSnippetRequestSchema>;
 
+const CreatedSnippetSchema = z.object({
+  id: z.string(),
+  slug: z.string(),
+  card_title: z.string(),
+  username: z.string().nullable().optional(),
+  github_username: z.string().nullable().optional(),
+  avatar_url: z.string().nullable().optional(),
+});
+
+export type CreatedSnippet = z.infer<typeof CreatedSnippetSchema>;
+
 // ============================================================
-// 3. Slug generator (collision-safe with retry)
+// 3. Slug generator
 // ============================================================
 
 const SLUG_LENGTH = 10;
@@ -98,7 +101,6 @@ async function generateUniqueSlug(
 ): Promise<string> {
   for (let attempt = 0; attempt < retries; attempt++) {
     const slug = generateSlug();
-    // Check if slug already exists
     const { data, error } = await supabase
       .from('snippets')
       .select('slug')
@@ -106,15 +108,13 @@ async function generateUniqueSlug(
       .maybeSingle();
 
     if (error) {
-      // If error is not "not found", propagate it
       logger.error('[create-snippet] Slug uniqueness check error:', error);
       throw new Error('Failed to check slug uniqueness');
     }
 
     if (!data) {
-      return slug; // Slug is free
+      return slug;
     }
-    // Otherwise, loop and generate a new one
     logger.warn(`[create-snippet] Slug collision: ${slug}, retrying...`);
   }
 
@@ -122,7 +122,7 @@ async function generateUniqueSlug(
 }
 
 // ============================================================
-// 4. Database mapper (explicit, type-safe)
+// 4. Database mapper
 // ============================================================
 
 interface DatabaseRow {
@@ -140,8 +140,6 @@ interface DatabaseRow {
   avatar_url: string | null;
   is_public: boolean;
   created_at?: string;
-
-  // Legacy
   code_walkthrough?: any | null;
   what_works_well?: any | null;
   bugs_and_risky_cases?: any | null;
@@ -156,8 +154,6 @@ interface DatabaseRow {
   final_verdict_summary?: string | null;
   final_verdict_approved?: boolean | null;
   final_verdict_next_steps?: string | null;
-
-  // NEW
   findings?: any | null;
   execution_overview?: any | null;
   architectural_observations?: any | null;
@@ -169,16 +165,8 @@ interface DatabaseRow {
   limitations?: string[] | null;
 }
 
-function mapToDatabaseRow(
-  body: CreateSnippetRequest,
-  slug: string
-): DatabaseRow {
+function mapToDatabaseRow(body: CreateSnippetRequest, slug: string): DatabaseRow {
   const now = new Date().toISOString();
-
-  // Normalize optional user fields
-  const username = body.username || null;
-  const githubUsername = body.github_username || null;
-  const avatarUrl = body.avatar_url || null;
 
   const row: DatabaseRow = {
     slug,
@@ -190,11 +178,11 @@ function mapToDatabaseRow(
     debug_analysis: body.debug_analysis || '-',
     optimization: body.optimization || '-',
     linkedin_post: body.linkedin_post || '',
-    username,
-    github_username: githubUsername,
-    avatar_url: avatarUrl,
+    username: body.username || null,
+    github_username: body.github_username || null,
+    avatar_url: body.avatar_url || null,
     is_public: true,
-    created_at: now, // Explicitly set for consistency; DB could default, but we set it to be explicit
+    created_at: now,
   };
 
   // Legacy optional fields
@@ -213,7 +201,7 @@ function mapToDatabaseRow(
   if (body.final_verdict_approved !== undefined) row.final_verdict_approved = body.final_verdict_approved;
   if (body.final_verdict_next_steps !== undefined) row.final_verdict_next_steps = body.final_verdict_next_steps;
 
-  // NEW canonical advanced fields
+  // New canonical advanced fields
   if (body.findings !== undefined) row.findings = body.findings;
   if (body.execution_overview !== undefined) row.execution_overview = body.execution_overview;
   if (body.architectural_observations !== undefined) row.architectural_observations = body.architectural_observations;
@@ -233,7 +221,6 @@ function mapToDatabaseRow(
 
 export async function POST(req: NextRequest) {
   try {
-    // --- Parse raw body ---
     let rawBody: unknown;
     try {
       rawBody = await req.json();
@@ -241,11 +228,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
     }
 
-    // --- Validate with Zod ---
     const validation = CreateSnippetRequestSchema.safeParse(rawBody);
     if (!validation.success) {
       logger.warn('[create-snippet] Validation failed:', validation.error.issues);
-      // Return first error message for simplicity
       const firstError = validation.error.issues[0];
       return NextResponse.json(
         { error: `Validation error: ${firstError.path.join('.')} - ${firstError.message}` },
@@ -254,11 +239,8 @@ export async function POST(req: NextRequest) {
     }
 
     const body = validation.data;
-
-    // --- Get Supabase client ---
     const supabase = getSupabaseAdmin();
 
-    // --- Generate unique slug ---
     let slug: string;
     try {
       slug = await generateUniqueSlug(supabase);
@@ -270,30 +252,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // --- Map to database row ---
     const row = mapToDatabaseRow(body, slug);
 
-    // --- Insert into Supabase ---
-    // 🔥 Fix TypeScript error: use type assertion for the entire query result
-    type InsertResult = {
-      data: {
-        id: string;
-        slug: string;
-        card_title: string;
-        username: string | null;
-        github_username: string | null;
-        avatar_url: string | null;
-      } | null;
-      error: any;
-    };
-
-    const result = (await supabase
+    // Insert and select the created row
+    const { data, error } = await supabase
       .from('snippets')
-      .insert(row as any)
+      .insert(row)
       .select('id, slug, card_title, username, github_username, avatar_url')
-      .single()) as InsertResult;
-
-    const { data, error } = result;
+      .single();
 
     if (error) {
       logger.error('[create-snippet] Supabase insert error:', error);
@@ -303,19 +269,30 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // --- Build response (minimal) ---
+    // Validate the returned data with Zod
+    const createdValidation = CreatedSnippetSchema.safeParse(data);
+    if (!createdValidation.success) {
+      logger.error('[create-snippet] Created snippet validation failed:', createdValidation.error);
+      return NextResponse.json(
+        { error: 'Internal data inconsistency' },
+        { status: 500 }
+      );
+    }
+
+    const created = createdValidation.data;
+
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || '';
     const response = {
       success: true,
-      id: data!.id,
-      slug: data!.slug,
-      url: `${baseUrl}/snippet/${data!.slug}`,
-      username: data!.username,
-      github_username: data!.github_username,
-      avatar_url: data!.avatar_url,
+      id: created.id,
+      slug: created.slug,
+      url: `${baseUrl}/snippet/${created.slug}`,
+      username: created.username,
+      github_username: created.github_username,
+      avatar_url: created.avatar_url,
     };
 
-    logger.info(`[create-snippet] Snippet created: ${data!.slug}`);
+    logger.info(`[create-snippet] Snippet created: ${created.slug}`);
     return NextResponse.json(response, { status: 201 });
   } catch (error) {
     logger.error('[create-snippet] Unhandled error:', error);
