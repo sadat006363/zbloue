@@ -7,7 +7,7 @@ import { type Database } from '@/types/supabase';
 import logger from '@/lib/logger';
 
 // ============================================================
-// 1. ENV validation
+// 1. ENV
 // ============================================================
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -27,13 +27,13 @@ function getSupabaseAdmin() {
 }
 
 // ============================================================
-// 2. Zod schemas (تمام فیلدهای مورد استفاده در mapping)
+// 2. Zod Schemas
 // ============================================================
 
 const CreateSnippetRequestSchema = z
   .object({
-    code: z.string().min(1, 'Code is required').max(100_000, 'Code is too large'),
-    language: z.string().min(1, 'Language is required').max(50, 'Language name too long'),
+    code: z.string().min(1).max(100000),
+    language: z.string().min(1).max(50),
     card_title: z.string().min(1).max(200).optional(),
     key_concept: z.string().max(2000).optional(),
     what_this_code_does: z.string().max(10000).optional(),
@@ -69,7 +69,7 @@ const CreateSnippetRequestSchema = z
   })
   .strict();
 
-export type CreateSnippetRequest = z.infer<typeof CreateSnippetRequestSchema>;
+type CreateSnippetRequest = z.infer<typeof CreateSnippetRequestSchema>;
 
 const CreatedSnippetSchema = z.object({
   id: z.string(),
@@ -80,8 +80,6 @@ const CreatedSnippetSchema = z.object({
   avatar_url: z.string().nullable().optional(),
 });
 
-export type CreatedSnippet = z.infer<typeof CreatedSnippetSchema>;
-
 // ============================================================
 // 3. Slug generator
 // ============================================================
@@ -90,9 +88,7 @@ const SLUG_LENGTH = 10;
 const MAX_SLUG_RETRIES = 3;
 
 function generateSlug(): string {
-  return randomBytes(SLUG_LENGTH)
-    .toString('base64url')
-    .slice(0, SLUG_LENGTH);
+  return randomBytes(SLUG_LENGTH).toString('base64url').slice(0, SLUG_LENGTH);
 }
 
 async function generateUniqueSlug(
@@ -111,18 +107,14 @@ async function generateUniqueSlug(
       logger.error('[create-snippet] Slug uniqueness check error:', error);
       throw new Error('Failed to check slug uniqueness');
     }
-
-    if (!data) {
-      return slug;
-    }
+    if (!data) return slug;
     logger.warn(`[create-snippet] Slug collision: ${slug}, retrying...`);
   }
-
   throw new Error('Failed to generate unique slug after multiple retries');
 }
 
 // ============================================================
-// 4. Database mapper با استفاده از تایپ SnippetInsert
+// 4. Mapper
 // ============================================================
 
 type SnippetInsert = Database['public']['Tables']['snippets']['Insert'];
@@ -130,7 +122,6 @@ type SnippetInsert = Database['public']['Tables']['snippets']['Insert'];
 function mapToDatabaseRow(body: CreateSnippetRequest, slug: string): SnippetInsert {
   const now = new Date().toISOString();
 
-  // فیلدهای اصلی و ضروری
   const row: SnippetInsert = {
     slug,
     raw_code: body.code,
@@ -148,7 +139,7 @@ function mapToDatabaseRow(body: CreateSnippetRequest, slug: string): SnippetInse
     created_at: now,
   };
 
-  // Legacy فیلدها
+  // Legacy fields
   if (body.code_walkthrough !== undefined) row.code_walkthrough = body.code_walkthrough;
   if (body.what_works_well !== undefined) row.what_works_well = body.what_works_well;
   if (body.bugs_and_risky_cases !== undefined) row.bugs_and_risky_cases = body.bugs_and_risky_cases;
@@ -164,7 +155,7 @@ function mapToDatabaseRow(body: CreateSnippetRequest, slug: string): SnippetInse
   if (body.final_verdict_approved !== undefined) row.final_verdict_approved = body.final_verdict_approved;
   if (body.final_verdict_next_steps !== undefined) row.final_verdict_next_steps = body.final_verdict_next_steps;
 
-  // NEW Advanced فیلدها
+  // New fields
   if (body.findings !== undefined) row.findings = body.findings;
   if (body.execution_overview !== undefined) row.execution_overview = body.execution_overview;
   if (body.architectural_observations !== undefined) row.architectural_observations = body.architectural_observations;
@@ -179,7 +170,7 @@ function mapToDatabaseRow(body: CreateSnippetRequest, slug: string): SnippetInse
 }
 
 // ============================================================
-// 5. Main handler
+// 5. POST Handler
 // ============================================================
 
 export async function POST(req: NextRequest) {
@@ -209,15 +200,12 @@ export async function POST(req: NextRequest) {
       slug = await generateUniqueSlug(supabase);
     } catch (error) {
       logger.error('[create-snippet] Slug generation failed:', error);
-      return NextResponse.json(
-        { error: 'Failed to generate unique identifier' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Failed to generate unique identifier' }, { status: 500 });
     }
 
     const row = mapToDatabaseRow(body, slug);
 
-    // اجرای insert با تایپ درست (SnippetInsert)
+    // ✅ اینجا row از نوع SnippetInsert است و با تایپ Database هماهنگ
     const { data, error } = await supabase
       .from('snippets')
       .insert(row)
@@ -226,49 +214,37 @@ export async function POST(req: NextRequest) {
 
     if (error) {
       logger.error('[create-snippet] Supabase insert error:', error);
-      return NextResponse.json(
-        { error: 'Failed to save snippet' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Failed to save snippet' }, { status: 500 });
     }
 
     if (!data) {
       logger.error('[create-snippet] Insert succeeded but returned no data');
-      return NextResponse.json(
-        { error: 'Snippet was not returned after creation' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Snippet was not returned after creation' }, { status: 500 });
     }
 
     const parsed = CreatedSnippetSchema.safeParse(data);
     if (!parsed.success) {
       logger.error('[create-snippet] Invalid inserted row:', parsed.error.flatten());
-      return NextResponse.json(
-        { error: 'Invalid database response' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Invalid database response' }, { status: 500 });
     }
 
     const created = parsed.data;
-
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || '';
-    const response = {
-      success: true,
-      id: created.id,
-      slug: created.slug,
-      url: `${baseUrl}/snippet/${created.slug}`,
-      username: created.username ?? null,
-      github_username: created.github_username ?? null,
-      avatar_url: created.avatar_url ?? null,
-    };
 
-    logger.info(`[create-snippet] Snippet created: ${created.slug}`);
-    return NextResponse.json(response, { status: 201 });
+    return NextResponse.json(
+      {
+        success: true,
+        id: created.id,
+        slug: created.slug,
+        url: `${baseUrl}/snippet/${created.slug}`,
+        username: created.username ?? null,
+        github_username: created.github_username ?? null,
+        avatar_url: created.avatar_url ?? null,
+      },
+      { status: 201 }
+    );
   } catch (error) {
     logger.error('[create-snippet] Unhandled error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
