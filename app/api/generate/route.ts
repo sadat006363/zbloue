@@ -20,7 +20,6 @@ import { AdvancedAuditResultSchema } from '@/lib/analysis/schema';
 const ModeValues = ['simple', 'medium', 'advanced'] as const;
 type Mode = typeof ModeValues[number];
 
-// ✅ استفاده از z.enum بدون errorMap
 const ModeSchema = z.enum(ModeValues);
 
 const GenerateRequestSchema = z.object({
@@ -38,10 +37,10 @@ const GenerateResponseSchema = z.object({
 type GenerateResponseValidated = z.infer<typeof GenerateResponseSchema>;
 
 // ============================================================
-// 2. Language helpers
+// 2. Language helpers (با اصلاح Set<string>)
 // ============================================================
 
-const supportedLanguagesSet = new Set(SUPPORTED_LANGUAGES);
+const supportedLanguagesSet = new Set<string>(SUPPORTED_LANGUAGES); // 🔥 اصلاح
 
 const languageAliases: Record<string, string> = {
   js: 'javascript',
