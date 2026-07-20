@@ -94,7 +94,6 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
         const ev = getSafeObject(e);
         let startLine = typeof ev.startLine === 'number' ? ev.startLine : (typeof ev.line === 'number' ? ev.line : 1);
         let endLine = typeof ev.endLine === 'number' ? ev.endLine : startLine;
-        // Ensure endLine >= startLine
         if (endLine < startLine) {
           endLine = startLine;
         }
@@ -127,7 +126,6 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
       if (!/^F-\d{3,}$/.test(id)) {
         id = `F-${String(index + 1).padStart(3, '0')}`;
       }
-      // Ensure uniqueness
       let counter = 1;
       let finalId = id;
       while (usedIds.has(finalId)) {
@@ -227,7 +225,6 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
       const o = getSafeObject(obs);
       const title = getSafeString(o.title, '');
       const explanation = getSafeString(o.explanation, '');
-      // Filter related IDs to only those that exist in findings
       const allFindingIds = new Set(normalizedFindings.map((f) => f.id));
       const relatedFindingIds = getStringArray(o.relatedFindingIds).filter((id) => allFindingIds.has(id));
       return { title, explanation, relatedFindingIds };
@@ -238,7 +235,6 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
     .map((act: unknown) => {
       const a = getSafeObject(act);
       let priority = typeof a.priority === 'number' && a.priority > 0 ? Math.round(a.priority) : 1;
-      // Sort will be applied later
       const severity = sanitizeEnum(a.severity, SeveritySchema.options, 'medium');
       const title = getSafeString(a.title, '');
       const action = getSafeString(a.action, '');
@@ -274,7 +270,8 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
   const auditType = sanitizeEnum(input.auditType, AuditTypeSchema.options, 'generic');
   const language = getSafeString(input.language, 'unknown');
   const summary = getSafeString(input.summary, getSafeString(input.highLevelSummary, ''));
-  const schemaVersion = getSafeString(input.schemaVersion, '1.0');
+  // 🔥 Fix: schemaVersion must be the literal "1.0" as per the contract
+  const schemaVersion: '1.0' = '1.0';
 
   return {
     schemaVersion,
