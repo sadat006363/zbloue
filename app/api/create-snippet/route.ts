@@ -1,9 +1,9 @@
 // app/api/create-snippet/route.ts
-
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { randomBytes } from 'crypto';
+import { type Database } from '@/types/supabase';
 import logger from '@/lib/logger';
 
 // ============================================================
@@ -17,11 +17,11 @@ if (!supabaseUrl || !supabaseServiceKey) {
   throw new Error('Missing Supabase environment variables: NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
 }
 
-let supabaseAdmin: ReturnType<typeof createClient> | null = null;
+let supabaseAdmin: ReturnType<typeof createClient<Database>> | null = null;
 
 function getSupabaseAdmin() {
   if (!supabaseAdmin) {
-    supabaseAdmin = createClient(supabaseUrl!, supabaseServiceKey!);
+    supabaseAdmin = createClient<Database>(supabaseUrl!, supabaseServiceKey!);
   }
   return supabaseAdmin;
 }
@@ -96,7 +96,7 @@ function generateSlug(): string {
 }
 
 async function generateUniqueSlug(
-  supabase: ReturnType<typeof createClient>,
+  supabase: ReturnType<typeof createClient<Database>>,
   retries = MAX_SLUG_RETRIES
 ): Promise<string> {
   for (let attempt = 0; attempt < retries; attempt++) {
@@ -125,62 +125,24 @@ async function generateUniqueSlug(
 // 4. Database mapper
 // ============================================================
 
-interface DatabaseRow {
-  slug: string;
-  raw_code: string;
-  language: string;
-  card_title: string;
-  key_concept: string;
-  what_this_code_does: string;
-  debug_analysis: string;
-  optimization: string;
-  linkedin_post: string;
-  username: string | null;
-  github_username: string | null;
-  avatar_url: string | null;
-  is_public: boolean;
-  created_at?: string;
-  code_walkthrough?: any | null;
-  what_works_well?: any | null;
-  bugs_and_risky_cases?: any | null;
-  edge_cases?: any | null;
-  performance_analysis?: any | null;
-  security_analysis?: any | null;
-  production_readiness?: any | null;
-  recommended_improvements?: any | null;
-  improved_code?: string | null;
-  suggested_tests?: any | null;
-  scorecard?: any | null;
-  final_verdict_summary?: string | null;
-  final_verdict_approved?: boolean | null;
-  final_verdict_next_steps?: string | null;
-  findings?: any | null;
-  execution_overview?: any | null;
-  architectural_observations?: any | null;
-  recommended_actions?: any | null;
-  suggested_tests_new?: any | null;
-  complexity?: any | null;
-  scorecard_new?: any | null;
-  verdict?: any | null;
-  limitations?: string[] | null;
-}
+type SnippetInsert = Database['public']['Tables']['snippets']['Insert'];
 
-function mapToDatabaseRow(body: CreateSnippetRequest, slug: string): DatabaseRow {
+function mapToDatabaseRow(body: CreateSnippetRequest, slug: string): SnippetInsert {
   const now = new Date().toISOString();
 
-  const row: DatabaseRow = {
+  const row: SnippetInsert = {
     slug,
     raw_code: body.code,
     language: body.language,
-    card_title: body.card_title || 'Code Analysis',
-    key_concept: body.key_concept || '',
-    what_this_code_does: body.what_this_code_does || '',
-    debug_analysis: body.debug_analysis || '-',
-    optimization: body.optimization || '-',
-    linkedin_post: body.linkedin_post || '',
-    username: body.username || null,
-    github_username: body.github_username || null,
-    avatar_url: body.avatar_url || null,
+    card_title: body.card_title ?? 'Code Analysis',
+    key_concept: body.key_concept ?? '',
+    what_this_code_does: body.what_this_code_does ?? '',
+    debug_analysis: body.debug_analysis ?? '-',
+    optimization: body.optimization ?? '-',
+    linkedin_post: body.linkedin_post ?? '',
+    username: body.username ?? null,
+    github_username: body.github_username ?? null,
+    avatar_url: body.avatar_url ?? null,
     is_public: true,
     created_at: now,
   };
@@ -254,7 +216,6 @@ export async function POST(req: NextRequest) {
 
     const row = mapToDatabaseRow(body, slug);
 
-    // Insert and select the created row
     const { data, error } = await supabase
       .from('snippets')
       .insert(row)
@@ -269,17 +230,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Validate the returned data with Zod
-    const createdValidation = CreatedSnippetSchema.safeParse(data);
-    if (!createdValidation.success) {
-      logger.error('[create-snippet] Created snippet validation failed:', createdValidation.error);
+    if (!data) {
+      logger.error('[create-snippet] Insert succeeded but returned no data');
       return NextResponse.json(
-        { error: 'Internal data inconsistency' },
+        { error: 'Snippet was not returned after creation' },
         { status: 500 }
       );
     }
 
-    const created = createdValidation.data;
+    const parsed = CreatedSnippetSchema.safeParse(data);
+    if (!parsed.success) {
+      logger.error('[create-snippet] Invalid inserted row:', parsed.error.flatten());
+      return NextResponse.json(
+        { error: 'Invalid database response' },
+        { status: 500 }
+      );
+    }
+
+    const created = parsed.data;
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || '';
     const response = {
@@ -287,9 +255,9 @@ export async function POST(req: NextRequest) {
       id: created.id,
       slug: created.slug,
       url: `${baseUrl}/snippet/${created.slug}`,
-      username: created.username,
-      github_username: created.github_username,
-      avatar_url: created.avatar_url,
+      username: created.username ?? null,
+      github_username: created.github_username ?? null,
+      avatar_url: created.avatar_url ?? null,
     };
 
     logger.info(`[create-snippet] Snippet created: ${created.slug}`);

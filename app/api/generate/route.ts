@@ -1,5 +1,4 @@
 // app/api/generate/route.ts
-
 import { NextRequest, NextResponse } from 'next/server';
 import { generateEducationalContent } from '@/lib/ai';
 import { runAdvancedPipeline } from '@/lib/analysis/pipeline';
@@ -18,13 +17,11 @@ import { AdvancedAuditResultSchema } from '@/lib/analysis/schema';
 // 1. Schemas
 // ============================================================
 
-// Use as const to get literal types
 const ModeValues = ['simple', 'medium', 'advanced'] as const;
 type Mode = typeof ModeValues[number];
 
 const ModeSchema = z.enum(ModeValues, {
   errorMap: (issue, ctx) => {
-    // Custom error message for enum mismatch
     return { message: `Mode must be one of: ${ModeValues.join(', ')}` };
   },
 });
