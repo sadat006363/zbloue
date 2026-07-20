@@ -233,7 +233,6 @@ export default function Home() {
     }
   }, [code, language]);
 
-  // فقط خروجی حالت فعلی را پاک کن، نه همه حالت‌ها
   useEffect(() => {
     if (code.trim().length > 0 || language) {
       dispatch({ type: 'CLEAR_CURRENT_OUTPUT' });
@@ -283,9 +282,14 @@ export default function Home() {
     });
   }, [mode, displaySnippet]);
 
+  // ============================================================
+  // 🔥 اصلاح: پردازش کد در یک مرحله (ابتدا کامنت‌ها، سپس خطوط خالی)
+  // ============================================================
   const processCode = useCallback((rawCode: string, lang: string): string => {
-    let processed = removeEmptyLines(rawCode);
-    processed = removeComments(processed, lang);
+    // 1. حذف کامنت‌ها
+    let processed = removeComments(rawCode, lang);
+    // 2. حذف خطوط خالی
+    processed = removeEmptyLines(processed);
     return processed;
   }, []);
 
@@ -312,9 +316,6 @@ export default function Home() {
     return data;
   }, []);
 
-  // ============================================================
-  // 🔥 اصلاح: ساخت snippet از داده‌های واقعی (نه از پاسخ API که فقط id و slug دارد)
-  // ============================================================
   const buildSnippetFromPayload = useCallback((
     saveResult: any,
     processedCode: string,
@@ -338,7 +339,6 @@ export default function Home() {
       github_username: githubUsername || null,
       avatar_url: saveResult.avatar_url || null,
       card_image_url: null,
-      // Legacy fields
       code_walkthrough: payload.code_walkthrough || null,
       what_works_well: payload.what_works_well || null,
       bugs_and_risky_cases: payload.bugs_and_risky_cases || null,
@@ -355,7 +355,6 @@ export default function Home() {
       final_verdict_next_steps: payload.final_verdict_next_steps || null,
       line_explanations: null,
       generated_prompt: null,
-      // New fields
       findings: payload.findings || null,
       execution_overview: payload.execution_overview || null,
       architectural_observations: payload.architectural_observations || null,
@@ -438,24 +437,36 @@ export default function Home() {
     }
   }, [mode, username, githubUsername, avatarUrl]);
 
+  // ============================================================
+  // 🔥 اصلاح: پردازش و تحلیل در یک مرحله
+  // ============================================================
   const handleGenerate = useCallback(async () => {
+    // 1. پردازش کد (کامنت‌ها + خطوط خالی) در یک مرحله
     const processedCode = processCode(code, language);
-    if (processedCode !== code) dispatch({ type: 'SET_CODE', payload: processedCode });
+
+    // 2. اگر کد تغییر کرده، ادیتور را به‌روزرسانی کن
+    if (processedCode !== code) {
+      dispatch({ type: 'SET_CODE', payload: processedCode });
+    }
+
+    // 3. اعتبارسنجی
     const validationError = validateCode(processedCode);
     if (validationError) {
       dispatch({ type: 'SET_ERROR', payload: validationError });
       return;
     }
+
     dispatch({ type: 'SET_ERROR', payload: null });
     dispatch({ type: 'SET_LOADING', payload: true });
+
     try {
+      // 4. فراخوانی API با کد پردازش‌شده
       const genData = await callGenerateAPI(processedCode, language, mode);
       const saveDataPayload = prepareSaveData(processedCode, language, genData);
       const saveResult = await saveSnippet(saveDataPayload);
 
-      // 🔥 ساخت snippet از payload واقعی (نه از saveResult که فقط id و slug دارد)
+      // 5. ساخت snippet
       const newSnippet = buildSnippetFromPayload(saveResult, processedCode, language, saveDataPayload);
-
       const fullAnalysisData = mode === 'advanced' ? genData : { analysis: genData.analysis, linkedin_post: genData.linkedin_post };
 
       dispatch({
@@ -469,6 +480,7 @@ export default function Home() {
           }
         }
       });
+
       if (outputPanelRef.current) outputPanelRef.current.setActiveTab('explanation');
       showToast('✅ Code analyzed successfully!');
     } catch (error: unknown) {
@@ -485,9 +497,6 @@ export default function Home() {
     }
   }, [code, language, mode, outputs, processCode, validateCode, callGenerateAPI, prepareSaveData, saveSnippet, buildSnippetFromPayload, showToast]);
 
-  // ============================================================
-  // 🔥 توابع Explanation و Prompt (بدون تغییر)
-  // ============================================================
   const handleGenerateExplanation = useCallback(async () => {
     const trimmedCode = removeEmptyLines(code);
     if (!trimmedCode.trim()) { showToast('❌ Please enter some code first.'); return; }
