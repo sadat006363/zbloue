@@ -274,9 +274,10 @@ export async function POST(req: NextRequest) {
     const row = mapToDatabaseRow(body, slug);
 
     // --- Insert into Supabase ---
+    // 🔥 FIX: TypeScript error - use type assertion because Supabase client lacks table types
     const { data, error } = await supabase
       .from('snippets')
-      .insert(row)
+      .insert(row as any) // ✅ Fixed: cast to any to bypass type inference
       .select('id, slug, card_title, username, github_username, avatar_url')
       .single();
 
