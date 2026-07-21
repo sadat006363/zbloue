@@ -1,41 +1,54 @@
-﻿import satori from 'satori';
+﻿// lib/imageRenderer.tsx
+
+import satori from 'satori';
 import { Resvg } from '@resvg/resvg-wasm';
 import { highlightCode } from './shiki';
 import fs from 'fs';
 import path from 'path';
+import logger from './logger';
 
 async function loadFont(): Promise<ArrayBuffer> {
   try {
     const fontPath = path.join(process.cwd(), 'public', 'fonts', 'Inter_18pt-Regular.ttf');
-    console.log('🔍 Loading font from:', fontPath);
-    
+    if (process.env.NODE_ENV === 'development') {
+      logger.debug('[imageRenderer] Loading font from:', fontPath);
+    }
+
     if (!fs.existsSync(fontPath)) {
-      console.error('❌ Font file not found at:', fontPath);
+      logger.error('[imageRenderer] Font file not found at:', fontPath);
       throw new Error(`Font file not found at: ${fontPath}`);
     }
-    
+
     const fontBuffer = fs.readFileSync(fontPath);
-    console.log('✅ Font loaded successfully, size:', fontBuffer.length);
-    
+    if (process.env.NODE_ENV === 'development') {
+      logger.debug('[imageRenderer] Font loaded successfully, size:', fontBuffer.length);
+    }
+
     return fontBuffer.buffer.slice(
       fontBuffer.byteOffset,
       fontBuffer.byteOffset + fontBuffer.byteLength
     );
   } catch (error) {
-    console.error('❌ Font loading error:', error);
+    logger.error('[imageRenderer] Font loading error:', error);
     throw new Error(`Font loading failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
 export async function generateCardImage(code: string, language: string, title: string) {
   try {
-    console.log('🖼️ Generating card image for:', { language, title, codeLength: code.length });
-    
+    if (process.env.NODE_ENV === 'development') {
+      logger.debug('[imageRenderer] Generating card image for:', { language, title, codeLength: code.length });
+    }
+
     const highlightedHtml = await highlightCode(code, language);
-    console.log('✅ Code highlighted successfully');
-    
+    if (process.env.NODE_ENV === 'development') {
+      logger.debug('[imageRenderer] Code highlighted successfully');
+    }
+
     const fontData = await loadFont();
-    console.log('✅ Font loaded successfully');
+    if (process.env.NODE_ENV === 'development') {
+      logger.debug('[imageRenderer] Font loaded successfully');
+    }
 
     const svg = await satori(
       <div
@@ -93,18 +106,22 @@ export async function generateCardImage(code: string, language: string, title: s
       }
     );
 
-    console.log('✅ Satori SVG generated successfully, length:', svg.length);
+    if (process.env.NODE_ENV === 'development') {
+      logger.debug('[imageRenderer] Satori SVG generated successfully, length:', svg.length);
+    }
 
     const resvg = new Resvg(svg, {
       fitTo: { mode: 'width', value: 800 },
     });
-    
+
     const pngBuffer = resvg.render().asPng();
-    console.log('✅ PNG generated successfully, size:', pngBuffer.length);
-    
+    if (process.env.NODE_ENV === 'development') {
+      logger.debug('[imageRenderer] PNG generated successfully, size:', pngBuffer.length);
+    }
+
     return pngBuffer;
   } catch (error) {
-    console.error('❌ Error generating card image:', error);
+    logger.error('[imageRenderer] Error generating card image:', error);
     throw new Error(`Image generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }

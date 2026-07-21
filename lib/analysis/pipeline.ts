@@ -9,12 +9,21 @@ import { repairAudit } from './repair';
 import { normalizeAnalysisOutput } from './normalizer';
 import { AdvancedAuditResultSchema, type AdvancedAuditResult } from './schema';
 import type { AuditStatus, DetectorResult, AuditValidationResult } from './types';
-import { ANALYSIS_CONFIG } from './config';
-import { callOpenAI } from '@/lib/openaiClient';
-import logger from '@/lib/logger';
+import { ANALYSIS_CONFIG } from './analysis.config';
+import { defaultDependencies, type AnalysisDependencies } from './dependencies';
 
-// Maximum repair attempts (strictly limited to 1 for MVP)
-const MAX_REPAIR_ATTEMPTS = 1;
+// ============================================================
+// 🔥 گزینه‌های Pipeline
+// ============================================================
+
+export interface PipelineOptions {
+  dependencies?: AnalysisDependencies;
+  maxRepairAttempts?: number;
+}
+
+// ============================================================
+// 🔥 نتیجه‌ی Pipeline
+// ============================================================
 
 export interface PipelineResult {
   result: AdvancedAuditResult | null;
@@ -22,30 +31,41 @@ export interface PipelineResult {
   error?: string;
 }
 
-// ===== Extract JSON from raw response (robust against extra text and control chars) =====
+// ============================================================
+// 🔥 تابع کمکی استخراج JSON
+// ============================================================
+
 function extractJSON(text: string): string {
   const start = text.indexOf('{');
   const end = text.lastIndexOf('}');
   if (start === -1 || end === -1) return text;
-  // Extract content and remove invalid control characters (except newlines within strings)
   return text.substring(start, end + 1).replace(/[\u0000-\u001F\u007F-\u009F]/g, '');
 }
 
+// ============================================================
+// 🔥 تابع اصلی Pipeline با تزریق وابستگی‌ها
+// ============================================================
+
 export async function runAdvancedPipeline(
   code: string,
-  language: string
+  language: string,
+  options: PipelineOptions = {}
 ): Promise<PipelineResult> {
   const startTime = Date.now();
+  const deps = options.dependencies ?? defaultDependencies;
+  const MAX_REPAIR_ATTEMPTS = options.maxRepairAttempts ?? 1;
+
+  const { callAI, logger, config } = deps;
 
   try {
     // ===== 1. Input validation =====
     const lineCount = getLineCount(code);
-    if (lineCount > ANALYSIS_CONFIG.maxLinesForAnalysis) {
-      logger.warn(`[Pipeline] Code exceeds max lines: ${lineCount} > ${ANALYSIS_CONFIG.maxLinesForAnalysis}`);
+    if (lineCount > config.maxLinesForAnalysis) {
+      logger.warn(`[Pipeline] Code exceeds max lines: ${lineCount} > ${config.maxLinesForAnalysis}`);
       return {
         result: null,
         status: 'failed_validation',
-        error: `Code exceeds maximum ${ANALYSIS_CONFIG.maxLinesForAnalysis} lines (${lineCount} lines).`,
+        error: `Code exceeds maximum ${config.maxLinesForAnalysis} lines (${lineCount} lines).`,
       };
     }
 
@@ -75,9 +95,9 @@ export async function runAdvancedPipeline(
 
     let rawContent: string;
     try {
-      rawContent = await callOpenAI(systemPrompt, prompt, {
+      rawContent = await callAI(systemPrompt, prompt, {
         mode: 'advanced',
-        responseFormat: 'text', // we want raw text to handle fences manually
+        responseFormat: 'text',
       });
     } catch (aiError) {
       logger.error('[Pipeline] AI call failed:', aiError);
@@ -101,10 +121,11 @@ export async function runAdvancedPipeline(
     } catch (e) {
       parseError = e instanceof Error ? e : new Error(String(e));
       logger.warn('[Pipeline] JSON parse failed:', parseError.message);
-      // Attempt repair with minimal context
+      
+      // Attempt repair
       const repairResult = await attemptRepair(
         numberedCode,
-        null, // no previous audit
+        null,
         {
           structurallyValid: false,
           semanticallyComplete: false,
@@ -121,7 +142,8 @@ export async function runAdvancedPipeline(
         } as AuditValidationResult,
         language,
         auditType,
-        0 // attempt number
+        0,
+        deps
       );
 
       if (repairResult) {
@@ -141,7 +163,7 @@ export async function runAdvancedPipeline(
     // ===== 7. First validation =====
     let validationResult = validateSemanticCompleteness(parsed, detectorResult, code);
 
-    // ===== 8. Repair if needed (max 1 attempt) =====
+    // ===== 8. Repair if needed =====
     let repairAttempts = 0;
     let finalResult = parsed;
     let finalValidation = validationResult;
@@ -157,25 +179,21 @@ export async function runAdvancedPipeline(
         finalValidation,
         language,
         auditType,
-        repairAttempts
+        repairAttempts,
+        deps
       );
 
       if (repaired) {
-        // Re-validate the repaired result
         const revalidation = validateSemanticCompleteness(repaired, detectorResult, code);
         if (revalidation.structurallyValid && !revalidation.repairRequired) {
-          // Repair succeeded
           finalResult = { ...repaired, status: 'repaired' };
           finalValidation = revalidation;
           break;
         } else {
-          // Repair partially succeeded but still has issues
           finalResult = { ...repaired, status: 'partially_complete' };
           finalValidation = revalidation;
-          // We might still have repairRequired, but we'll exit loop if attempts exhausted
         }
       } else {
-        // Repair failed completely
         logger.error('[Pipeline] Repair attempt failed');
         break;
       }
@@ -184,7 +202,6 @@ export async function runAdvancedPipeline(
 
     // ===== 9. Determine final outcome =====
     if (finalValidation.structurallyValid && !finalValidation.repairRequired) {
-      // Full success
       const status: AuditStatus = repairAttempts > 0 ? 'repaired' : 'complete';
       try {
         const result = AdvancedAuditResultSchema.parse({
@@ -197,7 +214,6 @@ export async function runAdvancedPipeline(
         logger.info(`[Pipeline] Complete in ${duration}ms, status: ${status}`);
         return { result, status };
       } catch (schemaError) {
-        // If final schema validation fails, treat as failed validation
         logger.error('[Pipeline] Final schema validation failed:', schemaError);
         return {
           result: null,
@@ -206,7 +222,6 @@ export async function runAdvancedPipeline(
         };
       }
     } else if (finalValidation.structurallyValid && finalValidation.repairRequired) {
-      // Partial success: repair did not fix all issues, but structure is valid
       const status: AuditStatus = 'partially_complete';
       try {
         const result = AdvancedAuditResultSchema.parse({
@@ -226,7 +241,6 @@ export async function runAdvancedPipeline(
         };
       }
     } else {
-      // Failed validation even after repair
       logger.error('[Pipeline] Final validation failed');
       return {
         result: null,
@@ -245,7 +259,7 @@ export async function runAdvancedPipeline(
 }
 
 // ============================================================
-// Helper: attempt repair (with attempt tracking)
+// 🔥 Helper: attempt repair with dependencies
 // ============================================================
 
 async function attemptRepair(
@@ -254,7 +268,8 @@ async function attemptRepair(
   validationResult: AuditValidationResult,
   language: string,
   auditType: 'generic' | 'concurrency',
-  attempt: number
+  attempt: number,
+  deps: AnalysisDependencies = defaultDependencies
 ): Promise<AdvancedAuditResult | null> {
   try {
     const previousAuditJson = previousAudit ? JSON.stringify(previousAudit, null, 2) : '{}';
@@ -263,11 +278,10 @@ async function attemptRepair(
       previousAuditJson,
       validationResult,
       language,
-      auditType
+      auditType,
+      deps
     );
     if (repaired) {
-      // Ensure schemaVersion and status are set correctly
-      // Cast to any to avoid TypeScript literal type conflicts
       return {
         ...repaired,
         schemaVersion: '1.0',
@@ -276,7 +290,7 @@ async function attemptRepair(
     }
     return null;
   } catch (err) {
-    logger.error(`[Pipeline] Repair attempt ${attempt + 1} failed with error:`, err);
+    deps.logger.error(`[Pipeline] Repair attempt ${attempt + 1} failed with error:`, err);
     return null;
   }
 }

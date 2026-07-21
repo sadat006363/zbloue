@@ -1,16 +1,15 @@
+// app/api/generate-prompt/route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { MAX_LINES_PROMPT, MAX_CODE_LENGTH } from '@/lib/constants';
+import { rateLimiter, getClientIP } from '@/lib/rateLimiter';
+import logger from '@/lib/logger';
+import { withErrorHandlerAndLog } from '@/lib/errorHandler';
 
-// ============================================================
-// 🔥 OpenAI Client با fallback
-// ============================================================
 const openaiApiKey = process.env.OPENAI_API_KEY || 'placeholder-key';
 const openai = new OpenAI({ apiKey: openaiApiKey });
 
-// ============================================================
-// 🔥 پرامپت‌های مختلف بر اساس mode
-// ============================================================
 const getSystemPrompt = (mode: string) => {
   if (mode === 'simple') {
     return `
@@ -48,7 +47,6 @@ You are a skilled programming mentor. Your task is to generate a detailed and th
 `;
   }
 
-  // Advanced (پیش‌فرض)
   return `
 You are a Senior Software Engineer and Code Reviewer. Your task is to generate a comprehensive, professional prompt that helps an experienced developer perform a production-grade analysis of the provided code.
 
@@ -66,39 +64,46 @@ You are a Senior Software Engineer and Code Reviewer. Your task is to generate a
 `;
 };
 
-export async function POST(req: NextRequest) {
-  try {
-    const { code, language, mode = 'simple' } = await req.json();
+export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
+  const ip = getClientIP(req);
 
-    if (!code || !language) {
-      return NextResponse.json(
-        { error: 'Code and language are required' },
-        { status: 400 }
-      );
-    }
+  // ===== Rate Limiter =====
+  const rateLimitResult = await rateLimiter(ip);
+  if (!rateLimitResult.allowed) {
+    logger.warn(`[generate-prompt] Rate limit exceeded for IP ${ip}`);
+    return NextResponse.json(
+      { error: rateLimitResult.message },
+      { status: 429 }
+    );
+  }
 
-    // ===== محدودیت خطوط =====
-    const lines = code.split('\n').filter((line: string) => line.trim().length > 0);
-    if (lines.length > MAX_LINES_PROMPT) {
-      return NextResponse.json(
-        { error: `Code exceeds ${MAX_LINES_PROMPT} lines (${lines.length} lines). Please shorten your code.` },
-        { status: 400 }
-      );
-    }
+  const { code, language, mode = 'simple' } = await req.json();
 
-    if (code.length > MAX_CODE_LENGTH) {
-      return NextResponse.json(
-        { error: `Code is too long (${code.length} characters).` },
-        { status: 400 }
-      );
-    }
+  if (!code || !language) {
+    return NextResponse.json(
+      { error: 'Code and language are required' },
+      { status: 400 }
+    );
+  }
 
-    // ============================================================
-    // 🔥 انتخاب پرامپت بر اساس mode
-    // ============================================================
-    const systemPrompt = getSystemPrompt(mode);
+  const lines = code.split('\n').filter((line: string) => line.trim().length > 0);
+  if (lines.length > MAX_LINES_PROMPT) {
+    return NextResponse.json(
+      { error: `Code exceeds ${MAX_LINES_PROMPT} lines (${lines.length} lines). Please shorten your code.` },
+      { status: 400 }
+    );
+  }
 
-    const userPrompt = `
+  if (code.length > MAX_CODE_LENGTH) {
+    return NextResponse.json(
+      { error: `Code is too long (${code.length} characters).` },
+      { status: 400 }
+    );
+  }
+
+  const systemPrompt = getSystemPrompt(mode);
+
+  const userPrompt = `
 Generate a detailed analysis prompt for the following ${language} code:
 
 \`\`\`${language}
@@ -108,46 +113,30 @@ ${code}
 Create a prompt that would help someone understand this code deeply.
 `;
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-    const response = await openai.chat.completions.create(
-      {
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        temperature: 0.5,
-        response_format: { type: 'json_object' },
-        max_tokens: 4000,
-      },
-      { signal: controller.signal }
-    );
+  const response = await openai.chat.completions.create(
+    {
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      temperature: 0.5,
+      response_format: { type: 'json_object' },
+      max_tokens: 4000,
+    },
+    { signal: controller.signal }
+  );
 
-    clearTimeout(timeoutId);
+  clearTimeout(timeoutId);
 
-    const content = response.choices[0].message.content || '{}';
-    const data = JSON.parse(content);
+  const content = response.choices[0].message.content || '{}';
+  const data = JSON.parse(content);
 
-    return NextResponse.json({
-      prompt: data.prompt || '',
-    });
-  } catch (error: any) {
-    if (process.env.NODE_ENV === 'development') {
-      console.error('Prompt generation error:', error);
-    }
-
-    if (error.name === 'AbortError') {
-      return NextResponse.json(
-        { error: 'Prompt generation timed out after 30 seconds' },
-        { status: 504 }
-      );
-    }
-
-    return NextResponse.json(
-      { error: error.message || 'Failed to generate prompt' },
-      { status: 500 }
-    );
-  }
-}
+  logger.info(`[generate-prompt] Success for IP ${ip}, mode: ${mode}`);
+  return NextResponse.json({
+    prompt: data.prompt || '',
+  });
+});

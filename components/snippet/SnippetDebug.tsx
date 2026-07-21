@@ -1,4 +1,8 @@
+// components/snippet/SnippetDebug.tsx
+
 'use client';
+
+import logger from '@/lib/logger';
 
 interface SnippetDebugProps {
   debugAnalysis: string;
@@ -6,18 +10,15 @@ interface SnippetDebugProps {
 }
 
 export default function SnippetDebug({ debugAnalysis, optimization }: SnippetDebugProps) {
-  // ===== DEBUG LOGS =====
-  console.log('🔍 [SnippetDebug] ===== START =====');
-  console.log('🔍 [SnippetDebug] debugAnalysis:', debugAnalysis);
-  console.log('🔍 [SnippetDebug] optimization:', optimization);
-
-  if ((!debugAnalysis || debugAnalysis === '-') && (!optimization || optimization === '-')) {
-    console.log('🔍 [SnippetDebug] ❌ Both are empty or "-", returning null');
-    return null;
+  // فقط در محیط توسعه لاگ بزن
+  if (process.env.NODE_ENV === 'development') {
+    logger.debug('[SnippetDebug] debugAnalysis:', debugAnalysis);
+    logger.debug('[SnippetDebug] optimization:', optimization);
   }
 
-  console.log('🔍 [SnippetDebug] ✅ Rendering SnippetDebug...');
-  console.log('🔍 [SnippetDebug] ===== END =====');
+  if ((!debugAnalysis || debugAnalysis === '-') && (!optimization || optimization === '-')) {
+    return null;
+  }
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-[#313244]">

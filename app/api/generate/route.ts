@@ -14,6 +14,7 @@ import logger from '@/lib/logger';
 import { z } from 'zod';
 import { AdvancedAuditResultSchema } from '@/lib/analysis/schema';
 import { normalizeAnalysisOutput } from '@/lib/analysis/normalizer';
+import { withErrorHandlerAndLog } from '@/lib/errorHandler';
 
 // ============================================================
 // 1. Schemas
@@ -32,7 +33,6 @@ const GenerateRequestSchema = z.object({
 
 type GenerateRequestValidated = z.infer<typeof GenerateRequestSchema>;
 
-// Response validation: only ensures linkedin_post exists, passes through other fields
 const GenerateResponseSchema = z.object({
   linkedin_post: z.string().min(1).max(300),
 }).passthrough();
@@ -85,16 +85,11 @@ function isSupportedLanguage(lang: string): boolean {
 // 3. Helpers
 // ============================================================
 
-/**
- * Validate and normalize response to ensure linkedin_post exists
- */
 function validateResponse(result: unknown): GenerateResponseValidated {
-  // If linkedin_post is missing or empty, set a default
   const withDefault = {
     ...(result as Record<string, unknown>),
     linkedin_post: (result as Record<string, unknown>)?.linkedin_post || 'Check out this code analysis! #Zbloue',
   };
-
   return GenerateResponseSchema.parse(withDefault);
 }
 
@@ -109,134 +104,128 @@ function getSafeErrorMessage(error: unknown): string {
 }
 
 // ============================================================
-// 4. Main handler
+// 4. Main handler (wrapped with error handler)
 // ============================================================
 
-export async function POST(req: NextRequest) {
+export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
   const startTime = Date.now();
   const ip = getClientIP(req);
 
-  try {
-    const rateLimitResult = rateLimiter(ip);
-    if (!rateLimitResult.allowed) {
-      logger.warn(`[generate] Rate limit exceeded for IP ${ip}`);
-      return NextResponse.json(
-        { error: rateLimitResult.message },
-        { status: 429 }
-      );
-    }
-
-    let rawBody: unknown;
-    try {
-      rawBody = await req.json();
-    } catch {
-      logger.warn(`[generate] Invalid JSON from IP ${ip}`);
-      return NextResponse.json(
-        { error: 'Invalid JSON payload' },
-        { status: 400 }
-      );
-    }
-
-    const validation = GenerateRequestSchema.safeParse(rawBody);
-    if (!validation.success) {
-      const firstError = validation.error.issues[0];
-      logger.warn(`[generate] Validation failed for IP ${ip}: ${firstError.path.join('.')} - ${firstError.message}`);
-      return NextResponse.json(
-        { error: `Validation error: ${firstError.path.join('.')} - ${firstError.message}` },
-        { status: 400 }
-      );
-    }
-
-    const { code, language: rawLanguage, mode } = validation.data;
-    const language = normalizeLanguage(rawLanguage);
-
-    if (!isSupportedLanguage(language)) {
-      return NextResponse.json(
-        {
-          error: `Unsupported language: "${rawLanguage}" (normalized: "${language}"). Supported: ${Array.from(supportedLanguagesSet).join(', ')}`,
-        },
-        { status: 400 }
-      );
-    }
-
-    const lines = code.split(/\r?\n/).length;
-    if (lines > MAX_LINES_GENERATE) {
-      return NextResponse.json(
-        { error: `Code exceeds ${MAX_LINES_GENERATE} lines (${lines} lines). Please shorten your code.` },
-        { status: 400 }
-      );
-    }
-
-    const rawBodyString = JSON.stringify(rawBody);
-    const byteLength = Buffer.byteLength(rawBodyString, 'utf8');
-    if (byteLength > 100000) {
-      return NextResponse.json(
-        { error: 'Payload too large (max 100KB)' },
-        { status: 413 }
-      );
-    }
-
-    if (process.env.USE_MOCK_RESPONSE === 'true' && mode === 'advanced') {
-      logger.info(`[generate] Using mock response for advanced mode (IP ${ip})`);
-      try {
-        const validatedMock = validateResponse(MOCK_RESPONSE);
-        return NextResponse.json(validatedMock);
-      } catch (mockError) {
-        logger.error('[generate] Mock response validation failed:', mockError);
-      }
-    }
-
-    let result: GenerateResponseValidated;
-
-    if (mode === 'advanced') {
-      logger.info(`[generate] Running advanced pipeline for IP ${ip}`);
-      try {
-        const pipelineResult = await runAdvancedPipeline(code, language);
-        if (pipelineResult.result) {
-          try {
-            // Normalize pipeline output to ensure all required fields exist
-            const normalized = normalizeAnalysisOutput(pipelineResult.result);
-            const validated = AdvancedAuditResultSchema.parse(normalized);
-            result = {
-              ...validated,
-              linkedin_post: validated.linkedin_post || 'Check out this code analysis! #Zbloue',
-            } as GenerateResponseValidated;
-            logger.info(`[generate] Advanced pipeline succeeded with status: ${pipelineResult.status}`);
-          } catch (schemaError) {
-            logger.error('[generate] Pipeline output failed schema validation, falling back to legacy:', schemaError);
-            const legacyResult = await generateEducationalContent(code, language, mode);
-            result = validateResponse(legacyResult);
-            logger.info(`[generate] Fallback to legacy advanced completed after schema validation failure`);
-          }
-        } else {
-          logger.warn(`[generate] Advanced pipeline failed: ${pipelineResult.error}`);
-          const legacyResult = await generateEducationalContent(code, language, mode);
-          result = validateResponse(legacyResult);
-          logger.info(`[generate] Fallback to legacy advanced completed after pipeline failure`);
-        }
-      } catch (pipelineError) {
-        logger.error(`[generate] Pipeline error, falling back to legacy:`, pipelineError);
-        const legacyResult = await generateEducationalContent(code, language, mode);
-        result = validateResponse(legacyResult);
-        logger.info(`[generate] Fallback to legacy advanced completed after pipeline error`);
-      }
-    } else {
-      logger.info(`[generate] Running legacy generation for mode ${mode} (IP ${ip})`);
-      const legacyResult = await generateEducationalContent(code, language, mode);
-      result = validateResponse(legacyResult);
-    }
-
-    const duration = Date.now() - startTime;
-    logger.info(`[generate] Request completed in ${duration}ms for mode ${mode} (IP ${ip})`);
-
-    return NextResponse.json(result);
-  } catch (error: unknown) {
-    const duration = Date.now() - startTime;
-    const safeMessage = getSafeErrorMessage(error);
-    logger.error(`[generate] Unhandled error after ${duration}ms for IP ${ip}:`, error);
+  // ===== Rate Limiter =====
+  const rateLimitResult = await rateLimiter(ip);
+  if (!rateLimitResult.allowed) {
+    logger.warn(`[generate] Rate limit exceeded for IP ${ip}`);
     return NextResponse.json(
-      { error: safeMessage },
-      { status: 500 }
+      { error: rateLimitResult.message },
+      { status: 429 }
     );
   }
-}
+
+  // ===== Parse JSON =====
+  let rawBody: unknown;
+  try {
+    rawBody = await req.json();
+  } catch {
+    logger.warn(`[generate] Invalid JSON from IP ${ip}`);
+    return NextResponse.json(
+      { error: 'Invalid JSON payload' },
+      { status: 400 }
+    );
+  }
+
+  // ===== Validation =====
+  const validation = GenerateRequestSchema.safeParse(rawBody);
+  if (!validation.success) {
+    const firstError = validation.error.issues[0];
+    logger.warn(`[generate] Validation failed for IP ${ip}: ${firstError.path.join('.')} - ${firstError.message}`);
+    return NextResponse.json(
+      { error: `Validation error: ${firstError.path.join('.')} - ${firstError.message}` },
+      { status: 400 }
+    );
+  }
+
+  const { code, language: rawLanguage, mode } = validation.data;
+  const language = normalizeLanguage(rawLanguage);
+
+  if (!isSupportedLanguage(language)) {
+    return NextResponse.json(
+      {
+        error: `Unsupported language: "${rawLanguage}" (normalized: "${language}"). Supported: ${Array.from(supportedLanguagesSet).join(', ')}`,
+      },
+      { status: 400 }
+    );
+  }
+
+  const lines = code.split(/\r?\n/).length;
+  if (lines > MAX_LINES_GENERATE) {
+    return NextResponse.json(
+      { error: `Code exceeds ${MAX_LINES_GENERATE} lines (${lines} lines). Please shorten your code.` },
+      { status: 400 }
+    );
+  }
+
+  const rawBodyString = JSON.stringify(rawBody);
+  const byteLength = Buffer.byteLength(rawBodyString, 'utf8');
+  if (byteLength > 100000) {
+    return NextResponse.json(
+      { error: 'Payload too large (max 100KB)' },
+      { status: 413 }
+    );
+  }
+
+  // ===== Mock mode =====
+  if (process.env.USE_MOCK_RESPONSE === 'true' && mode === 'advanced') {
+    logger.info(`[generate] Using mock response for advanced mode (IP ${ip})`);
+    try {
+      const validatedMock = validateResponse(MOCK_RESPONSE);
+      return NextResponse.json(validatedMock);
+    } catch (mockError) {
+      logger.error('[generate] Mock response validation failed:', mockError);
+    }
+  }
+
+  // ===== AI generation =====
+  let result: GenerateResponseValidated;
+
+  if (mode === 'advanced') {
+    logger.info(`[generate] Running advanced pipeline for IP ${ip}`);
+    try {
+      const pipelineResult = await runAdvancedPipeline(code, language);
+      if (pipelineResult.result) {
+        try {
+          const normalized = normalizeAnalysisOutput(pipelineResult.result);
+          const validated = AdvancedAuditResultSchema.parse(normalized);
+          result = {
+            ...validated,
+            linkedin_post: validated.linkedin_post || 'Check out this code analysis! #Zbloue',
+          } as GenerateResponseValidated;
+          logger.info(`[generate] Advanced pipeline succeeded with status: ${pipelineResult.status}`);
+        } catch (schemaError) {
+          logger.error('[generate] Pipeline output failed schema validation, falling back to legacy:', schemaError);
+          const legacyResult = await generateEducationalContent(code, language, mode);
+          result = validateResponse(legacyResult);
+          logger.info(`[generate] Fallback to legacy advanced completed after schema validation failure`);
+        }
+      } else {
+        logger.warn(`[generate] Advanced pipeline failed: ${pipelineResult.error}`);
+        const legacyResult = await generateEducationalContent(code, language, mode);
+        result = validateResponse(legacyResult);
+        logger.info(`[generate] Fallback to legacy advanced completed after pipeline failure`);
+      }
+    } catch (pipelineError) {
+      logger.error(`[generate] Pipeline error, falling back to legacy:`, pipelineError);
+      const legacyResult = await generateEducationalContent(code, language, mode);
+      result = validateResponse(legacyResult);
+      logger.info(`[generate] Fallback to legacy advanced completed after pipeline error`);
+    }
+  } else {
+    logger.info(`[generate] Running legacy generation for mode ${mode} (IP ${ip})`);
+    const legacyResult = await generateEducationalContent(code, language, mode);
+    result = validateResponse(legacyResult);
+  }
+
+  const duration = Date.now() - startTime;
+  logger.info(`[generate] Request completed in ${duration}ms for mode ${mode} (IP ${ip})`);
+
+  return NextResponse.json(result);
+});

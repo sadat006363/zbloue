@@ -160,7 +160,7 @@ export interface GenerateResponse extends Partial<AdvancedAuditResult> {
 }
 
 // ============================================================
-// 🔥 تایپ‌های قدیمی (Snippet - برای سازگاری با عقب)
+// 🔥 تایپ‌های قدیمی (SnippetLegacy - برای سازگاری با عقب)
 // ============================================================
 
 export interface SnippetLegacy {
@@ -180,30 +180,30 @@ export interface SnippetLegacy {
   github_username?: string | null;
   avatar_url?: string | null;
   card_image_url?: string | null;
-  code_walkthrough?: any[] | null;
+  code_walkthrough?: CodeWalkthroughItem[] | null;
   what_works_well?: string[] | null;
-  bugs_and_risky_cases?: any[] | null;
-  edge_cases?: any[] | null;
-  performance_analysis?: any | null;
-  security_analysis?: any | null;
-  production_readiness?: any | null;
-  recommended_improvements?: any[] | null;
+  bugs_and_risky_cases?: BugAndRiskyCase[] | null;
+  edge_cases?: EdgeCase[] | null;
+  performance_analysis?: PerformanceAnalysis | null;
+  security_analysis?: SecurityAnalysis | null;
+  production_readiness?: ProductionReadiness | null;
+  recommended_improvements?: RecommendedImprovement[] | null;
   improved_code?: string | null;
-  suggested_tests?: any[] | null;
-  scorecard?: any | null;
+  suggested_tests?: SuggestedTest[] | null;
+  scorecard?: ScorecardLegacy | null;
   final_verdict_summary?: string | null;
   final_verdict_approved?: boolean | null;
   final_verdict_next_steps?: string | null;
-  line_explanations?: any[] | null;
+  line_explanations?: LineExplanation[] | null;
   generated_prompt?: string | null;
-  findings?: any[] | null;
-  execution_overview?: any | null;
-  architectural_observations?: any[] | null;
-  recommended_actions?: any[] | null;
-  suggested_tests_new?: any[] | null;
-  complexity?: any | null;
-  scorecard_new?: any | null;
-  verdict?: any | null;
+  findings?: AuditFinding[] | null;
+  execution_overview?: AdvancedAuditResult['executionOverview'] | null;
+  architectural_observations?: AdvancedAuditResult['architecturalObservations'] | null;
+  recommended_actions?: AdvancedAuditResult['recommendedActions'] | null;
+  suggested_tests_new?: AdvancedAuditResult['suggestedTests'] | null;
+  complexity?: AdvancedAuditResult['complexity'] | null;
+  scorecard_new?: AuditScorecard | null;
+  verdict?: AdvancedAuditResult['verdict'] | null;
   limitations?: string[] | null;
 }
 
@@ -428,7 +428,7 @@ export const SnippetDataSchema = z.object({
   final_verdict_summary: z.string().optional(),
   final_verdict_approved: z.boolean().optional(),
   final_verdict_next_steps: z.string().optional(),
-  line_explanations: z.array(z.any()).nullable().optional(),
+  line_explanations: z.array(LineExplanationSchema).nullable().optional(),
   generated_prompt: z.string().nullable().optional(),
 
   // ===== NEW Advanced فیلدها =====
@@ -568,6 +568,10 @@ export interface FinalVerdict {
   nextSteps: string;
 }
 
+// ============================================================
+// 🔥 تایپ LineExplanation (برای توضیحات خط به خط)
+// ============================================================
+
 export interface LineExplanation {
   lineNumber: number;
   code: string;
@@ -575,7 +579,7 @@ export interface LineExplanation {
 }
 
 // ============================================================
-// 🔥 تایپ‌های کمکی برای Validator
+// 🔥 تایپ‌های کمکی برای Validator (هماهنگ با lib/analysis/types.ts)
 // ============================================================
 
 export interface ValidationIssue {
@@ -594,18 +598,69 @@ export interface ValidationResult {
 }
 
 // ============================================================
-// 🔥 تایپ‌های Detector
+// 🔥 تایپ‌های Detector (هماهنگ با lib/analysis/detector.ts)
 // ============================================================
 
-export interface ConcurrencySignal {
+export interface DetectorSignal {
   type: string;
+  value: string;
   line: number;
-  confidence: 'high' | 'medium' | 'low';
+  weight: number;
 }
 
 export interface DetectorResult {
   requiresConcurrencyAudit: boolean;
-  signals: ConcurrencySignal[];
-  confidence: 'high' | 'medium' | 'low';
+  score: number;
+  signals: DetectorSignal[];
+}
+
+// ============================================================
+// 🔥 تایپ PromptInfo (برای نمایش وضعیت پرامپت در صفحه اصلی)
+// ============================================================
+
+export interface PromptInfo {
+  auditType: 'simple' | 'medium' | 'advanced' | 'concurrency' | 'generic' | null;
+  status: 'complete' | 'repaired' | 'partially_complete' | 'failed_validation' | 'fallback' | null;
+  isPipeline: boolean;
+}
+
+// ============================================================
+// 🔥 تایپ‌های OutputsByMode (برای مدیریت خروجی‌های هر mode)
+// ============================================================
+
+export interface ModeOutput {
+  snippet: Snippet | null;
+  fullAnalysis: GenerateResponse | null;
+  lineExplanations: LineExplanation[];
+  generatedPrompt: string;
+}
+
+export type OutputsByMode = {
+  [K in 'simple' | 'medium' | 'advanced']: ModeOutput;
+};
+
+// ============================================================
+// 🔥 تایپ AppState (برای State Management در صفحه اصلی)
+// ============================================================
+
+export interface AppState {
+  code: string;
   language: string;
+  mode: 'simple' | 'medium' | 'advanced';
+  loading: boolean;
+  isConverting: boolean;
+  isExplaining: boolean;
+  isGeneratingPrompt: boolean;
+  errorMessage: string | null;
+  convertError: string | null;
+  explainError: string | null;
+  promptError: string | null;
+  outputs: OutputsByMode;
+  username: string;
+  githubUsername: string;
+  avatarUrl: string | null;
+  convertLanguage: string;
+  hoveredLine: number | null;
+  toastMessage: string | null;
+  promptInfo: PromptInfo | null;
 }

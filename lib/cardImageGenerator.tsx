@@ -1,4 +1,5 @@
 // lib/cardImageGenerator.ts
+
 import { ImageResponse } from '@vercel/og';
 import React from 'react';
 
@@ -17,7 +18,6 @@ export async function generateCardImageBuffer({
   theme,
   appUrl,
 }: CardImageOptions): Promise<Buffer> {
-  // ===== انتخاب رنگ تم =====
   const themeColors: Record<string, { bg: string; gradient: string; accent: string }> = {
     blue: { bg: '#0f0f1a', gradient: '135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%', accent: '#4a86f7' },
     purple: { bg: '#0f0f1a', gradient: '135deg, #0f0f1a 0%, #1a1a2e 50%, #2d1b4e 100%', accent: '#a855f7' },
@@ -28,7 +28,6 @@ export async function generateCardImageBuffer({
 
   const colors = themeColors[theme] || themeColors.blue;
 
-  // ===== ساخت JSX کارت =====
   const cardElement = (
     <div
       style={{
@@ -45,7 +44,6 @@ export async function generateCardImageBuffer({
         position: 'relative',
       }}
     >
-      {/* ===== Background Pattern ===== */}
       <div
         style={{
           position: 'absolute',
@@ -56,7 +54,6 @@ export async function generateCardImageBuffer({
         }}
       />
 
-      {/* ===== Glow Effects ===== */}
       <div
         style={{
           position: 'absolute',
@@ -82,7 +79,6 @@ export async function generateCardImageBuffer({
         }}
       />
 
-      {/* ===== Logo ===== */}
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20, zIndex: 1 }}>
         <div
           style={{
@@ -107,7 +103,6 @@ export async function generateCardImageBuffer({
         </div>
       </div>
 
-      {/* ===== Title ===== */}
       <h1
         style={{
           fontSize: 48,
@@ -123,7 +118,6 @@ export async function generateCardImageBuffer({
         {title}
       </h1>
 
-      {/* ===== Username ===== */}
       <div
         style={{
           display: 'flex',
@@ -156,7 +150,6 @@ export async function generateCardImageBuffer({
         <span style={{ color: 'white', fontSize: 18 }}>{username}</span>
       </div>
 
-      {/* ===== Footer ===== */}
       <div
         style={{
           position: 'absolute',
@@ -173,7 +166,6 @@ export async function generateCardImageBuffer({
         </span>
       </div>
 
-      {/* ===== Watermark ===== */}
       <div
         style={{
           position: 'absolute',
@@ -189,13 +181,11 @@ export async function generateCardImageBuffer({
     </div>
   );
 
-  // ===== تولید تصویر با @vercel/og =====
   const response = new ImageResponse(cardElement, {
     width: 1200,
     height: 630,
   });
 
-  // ===== تبدیل به Buffer =====
   const arrayBuffer = await response.arrayBuffer();
   return Buffer.from(arrayBuffer);
 }

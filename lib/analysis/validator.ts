@@ -14,12 +14,8 @@ import type {
 import { getLineCount, isValidLineRange, getLineContent } from './numberedCode';
 import logger from '@/lib/logger';
 
-// ============================================================
-// VALIDATION: Evidence lines
-// ============================================================
-
 function validateEvidenceLines(
-  result: any, // 🔥 Changed from AdvancedAuditResult to any
+  result: any,
   code: string
 ): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
@@ -76,12 +72,8 @@ function validateEvidenceLines(
   return issues;
 }
 
-// ============================================================
-// VALIDATION: Finding IDs and uniqueness
-// ============================================================
-
 function validateFindingIds(
-  result: any // 🔥 Changed from AdvancedAuditResult to any
+  result: any
 ): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   const ids = new Set<string>();
@@ -118,12 +110,8 @@ function validateFindingIds(
   return issues;
 }
 
-// ============================================================
-// VALIDATION: Related IDs (references)
-// ============================================================
-
 function validateRelatedIds(
-  result: any // 🔥 Changed from AdvancedAuditResult to any
+  result: any
 ): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   const allIds = new Set((result?.findings ?? []).map((f: any) => f?.id ?? ''));
@@ -163,12 +151,8 @@ function validateRelatedIds(
   return issues;
 }
 
-// ============================================================
-// VALIDATION: Scorecard ranges
-// ============================================================
-
 function validateScorecard(
-  result: any // 🔥 Changed from AdvancedAuditResult to any
+  result: any
 ): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   const scores = result?.scorecard ?? {};
@@ -188,12 +172,8 @@ function validateScorecard(
   return issues;
 }
 
-// ============================================================
-// VALIDATION: Verdict consistency
-// ============================================================
-
 function validateVerdictConsistency(
-  result: any // 🔥 Changed from AdvancedAuditResult to any
+  result: any
 ): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
 
@@ -225,12 +205,8 @@ function validateVerdictConsistency(
   return issues;
 }
 
-// ============================================================
-// VALIDATION: Ensure linkedin_post is present and valid
-// ============================================================
-
 function validateLinkedInPost(
-  result: any // 🔥 Changed from AdvancedAuditResult to any
+  result: any
 ): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   const post = result?.linkedin_post ?? '';
@@ -256,12 +232,8 @@ function validateLinkedInPost(
   return issues;
 }
 
-// ============================================================
-// SEMANTIC VALIDATION: Concurrency-specific coverage
-// ============================================================
-
 function validateConcurrencyCoverage(
-  result: any, // 🔥 Changed from AdvancedAuditResult to any
+  result: any,
   detectorResult: DetectorResult
 ): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
@@ -313,18 +285,13 @@ function validateConcurrencyCoverage(
   return issues;
 }
 
-// ============================================================
-// MAIN VALIDATION FUNCTION
-// ============================================================
-
 export function validateSemanticCompleteness(
-  result: any, // 🔥 Changed from AdvancedAuditResult to any
+  result: any,
   detectorResult: DetectorResult,
   code: string
 ): AuditValidationResult {
   const allIssues: ValidationIssue[] = [];
 
-  // --- STRUCTURAL VALIDATION (Zod) ---
   let structurallyValid = true;
   try {
     AdvancedAuditResultSchema.parse(result);
@@ -351,7 +318,6 @@ export function validateSemanticCompleteness(
     }
   }
 
-  // --- SEMANTIC VALIDATIONS (only if structurally valid to avoid noise) ---
   if (structurallyValid) {
     try {
       const evidenceIssues = validateEvidenceLines(result, code);
@@ -452,14 +418,12 @@ export function validateSemanticCompleteness(
     }
   }
 
-  // 🔥 FIX: repairRequired remains the same
   const repairRequired =
     !structurallyValid ||
     allIssues.some(
       (i) => i.severity === 'error' && i.code !== 'EVIDENCE_LINE_OUT_OF_RANGE'
     );
 
-  // 🔥 FIX: semanticallyComplete MUST include structurallyValid
   const semanticallyComplete =
     structurallyValid &&
     !allIssues.some(

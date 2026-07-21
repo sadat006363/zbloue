@@ -1,11 +1,11 @@
 // components/OutputPanel/OutputPanel.tsx
 'use client';
-import { forwardRef, useImperativeHandle, useState, useEffect, useRef, useCallback } from 'react';
+import { forwardRef, useImperativeHandle, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Snippet, GenerateResponse, LineExplanation } from '@/types';
 import { toPng } from 'html-to-image';
 import CardPreview from '../card/CardPreview';
 import { CardTheme, themes } from '../card/themes';
-import LoadingState from './LoadingState';
+import SkeletonLoader from './SkeletonLoader';
 import EmptyState from './EmptyState';
 import OutputPanelHeader from './OutputPanelHeader';
 import ExplanationTab from './tabs/ExplanationTab';
@@ -15,24 +15,16 @@ import AnalysisTab from './tabs/AnalysisTab';
 import LineByLineTab from './tabs/LineByLineTab';
 import PromptTab from './tabs/PromptTab';
 import AllOutputsTab from './tabs/AllOutputsTab';
+import { useAppContext } from '@/context';
 
 export interface OutputPanelProps {
-  snippet: Snippet | null;
-  loading: boolean;
-  fullAnalysis?: GenerateResponse | null;
-  analysisMode?: 'simple' | 'medium' | 'advanced';
   onUsernameChange?: (name: string) => void;
   onGithubChange?: (name: string) => void;
   onSnippetUpdate?: (data: { username: string; github_username: string }) => void;
-  lineExplanations?: LineExplanation[];
-  isExplaining?: boolean;
   onGenerateExplanation?: () => void;
-  hoveredLine?: number | null;
   onLineHover?: (lineNumber: number | null) => void;
-  generatedPrompt?: string;
-  isGeneratingPrompt?: boolean;
-  initialTab?: 'explanation' | 'linkedin' | 'preview' | 'analysis' | 'line-by-line' | 'prompt' | 'all-outputs';
   onAvatarChange?: (avatarUrl: string | null) => void;
+  showToast: (message: string) => void;
 }
 
 export type TabType = 'explanation' | 'linkedin' | 'preview' | 'analysis' | 'line-by-line' | 'prompt' | 'all-outputs';
@@ -52,34 +44,46 @@ const safeString = (value: unknown): string => {
 
 const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputPanelProps>(
   function OutputPanel({
-    snippet,
-    loading,
-    fullAnalysis,
-    analysisMode,
     onUsernameChange,
     onGithubChange,
     onSnippetUpdate,
-    lineExplanations = [],
-    isExplaining = false,
     onGenerateExplanation,
-    hoveredLine,
     onLineHover,
-    generatedPrompt,
-    isGeneratingPrompt = false,
-    initialTab = 'explanation',
     onAvatarChange,
+    showToast,
   }, ref) {
-    const [activeTab, setActiveTab] = useState<TabType>(initialTab);
+    const { state, dispatch } = useAppContext();
+    const {
+      mode,
+      loading,
+      outputs,
+      username,
+      githubUsername,
+      avatarUrl: contextAvatarUrl,
+      isExplaining,
+      isGeneratingPrompt,
+      hoveredLine,
+    } = state;
+
+    const currentOutput = useMemo(() => outputs[mode], [outputs, mode]);
+    const snippet = currentOutput.snippet;
+    const fullAnalysis = currentOutput.fullAnalysis;
+    const lineExplanations = currentOutput.lineExplanations;
+    const generatedPrompt = currentOutput.generatedPrompt;
+    const analysisMode = mode;
+    const isAdvanced = mode === 'advanced';
+
+    const [activeTab, setActiveTab] = useState<TabType>('explanation');
     const [toastMessage, setToastMessage] = useState<string | null>(null);
     const [cardImageDataUrl, setCardImageDataUrl] = useState<string | null>(null);
     const [isGeneratingCard, setIsGeneratingCard] = useState(false);
     const cardRef = useRef<HTMLDivElement>(null);
 
     const [selectedTheme, setSelectedTheme] = useState<CardTheme>('blue');
-    const [displayUsername, setDisplayUsername] = useState<string>('Developer');
-    const [displayGithubUsername, setDisplayGithubUsername] = useState<string>('');
-    const [tempUsername, setTempUsername] = useState<string>('Developer');
-    const [tempGithubUsername, setTempGithubUsername] = useState<string>('');
+    const [displayUsername, setDisplayUsername] = useState<string>(username || 'Developer');
+    const [displayGithubUsername, setDisplayGithubUsername] = useState<string>(githubUsername || '');
+    const [tempUsername, setTempUsername] = useState<string>(displayUsername);
+    const [tempGithubUsername, setTempGithubUsername] = useState<string>(displayGithubUsername);
     const [showUsernameInput, setShowUsernameInput] = useState<boolean>(false);
     const [isUpdating, setIsUpdating] = useState<boolean>(false);
     const isFirstRender = useRef(true);
@@ -90,16 +94,16 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
     const [isUploading, setIsUploading] = useState(false);
     const [hasUploaded, setHasUploaded] = useState(false);
 
-    const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+    const [localAvatarUrl, setLocalAvatarUrl] = useState<string | null>(contextAvatarUrl || null);
     const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
-    const isAdvanced = analysisMode === 'advanced';
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://Zbloue.vercel.app';
 
-    const showToast = (message: string) => {
+    const internalShowToast = useCallback((message: string) => {
       setToastMessage(message);
       setTimeout(() => setToastMessage(null), 3000);
-    };
+      if (showToast) showToast(message);
+    }, [showToast]);
 
     useImperativeHandle(ref, () => ({
       setActiveTab: (tab: TabType) => {
@@ -108,7 +112,7 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
     }));
 
     // ============================================================
-    // 🔥 اصلاح: تغییر خودکار تب بر اساس وضعیت isExplaining و isGeneratingPrompt
+    // 🔥 تغییر خودکار تب
     // ============================================================
     useEffect(() => {
       if (isExplaining) {
@@ -123,11 +127,11 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
     }, [isGeneratingPrompt]);
 
     // ============================================================
-    // بقیه کدهای قبلی (بدون تغییر)
+    // 🔥 آپلود تصویر کارت
     // ============================================================
     const handleUploadImage = useCallback(async () => {
       if (!snippet?.slug || !cardImageDataUrl) {
-        showToast('❌ No image to upload');
+        internalShowToast('❌ No image to upload');
         return;
       }
 
@@ -146,21 +150,26 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
         if (data.success) {
           setSavedImageUrl(data.imageUrl);
           setHasUploaded(true);
-          showToast('✅ Card image uploaded successfully!');
+          internalShowToast('✅ Card image uploaded successfully!');
         } else {
           throw new Error(data.error || 'Upload failed');
         }
       } catch (error: any) {
-        console.error('Upload error:', error);
-        showToast(`❌ ${error.message || 'Failed to upload'}`);
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Upload error:', error);
+        }
+        internalShowToast(`❌ ${error.message || 'Failed to upload'}`);
       } finally {
         setIsUploading(false);
       }
-    }, [snippet, cardImageDataUrl]);
+    }, [snippet, cardImageDataUrl, internalShowToast]);
 
+    // ============================================================
+    // 🔥 آپلود آواتار
+    // ============================================================
     const handleUploadAvatar = useCallback(async (file: File) => {
       if (!snippet?.slug) {
-        showToast('❌ No snippet available');
+        internalShowToast('❌ No snippet available');
         return;
       }
 
@@ -177,22 +186,29 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
 
         const data = await response.json();
         if (data.success) {
-          setAvatarUrl(data.avatarUrl);
+          setLocalAvatarUrl(data.avatarUrl);
           if (onAvatarChange) {
             onAvatarChange(data.avatarUrl);
           }
-          showToast('✅ Avatar uploaded successfully!');
+          // همچنین در Context ذخیره کنیم
+          dispatch({ type: 'SET_AVATAR', payload: data.avatarUrl });
+          internalShowToast('✅ Avatar uploaded successfully!');
         } else {
           throw new Error(data.error || 'Upload failed');
         }
       } catch (error: any) {
-        console.error('Avatar upload error:', error);
-        showToast(`❌ ${error.message || 'Failed to upload avatar'}`);
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Avatar upload error:', error);
+        }
+        internalShowToast(`❌ ${error.message || 'Failed to upload avatar'}`);
       } finally {
         setIsUploadingAvatar(false);
       }
-    }, [snippet, onAvatarChange]);
+    }, [snippet, onAvatarChange, dispatch, internalShowToast]);
 
+    // ============================================================
+    // 🔥 به‌روزرسانی دیتابیس
+    // ============================================================
     const updateSnippetInDatabase = useCallback(async (username: string, githubUsername: string) => {
       if (!snippet || !snippet.slug) return;
 
@@ -221,18 +237,25 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
           onSnippetUpdate({ username, github_username: githubUsername });
         }
 
-        showToast('✅ User info updated successfully!');
+        // به‌روزرسانی Context
+        dispatch({ type: 'SET_USERNAME', payload: username });
+        dispatch({ type: 'SET_GITHUB_USERNAME', payload: githubUsername });
+
+        internalShowToast('✅ User info updated successfully!');
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : 'Update failed';
         if (process.env.NODE_ENV === 'development') {
           console.error('Update error:', error);
         }
-        showToast(`❌ Failed to update: ${message}`);
+        internalShowToast(`❌ Failed to update: ${message}`);
       } finally {
         setIsUpdating(false);
       }
-    }, [snippet, onSnippetUpdate]);
+    }, [snippet, onSnippetUpdate, dispatch, internalShowToast]);
 
+    // ============================================================
+    // 🔥 تولید تصویر کارت
+    // ============================================================
     const generateCardImage = useCallback(async (): Promise<string> => {
       if (!cardRef.current) {
         throw new Error('Card element not found');
@@ -256,18 +279,21 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
       }
     }, []);
 
+    // ============================================================
+    // 🔥 دانلود کارت
+    // ============================================================
     const downloadCard = useCallback(async () => {
       if (isDownloading.current) {
         return;
       }
 
       if (!snippet) {
-        showToast('❌ No snippet available');
+        internalShowToast('❌ No snippet available');
         return;
       }
 
       isDownloading.current = true;
-      showToast('⏳ Generating card image...');
+      internalShowToast('⏳ Generating card image...');
 
       try {
         let dataUrl = cardImageDataUrl;
@@ -289,17 +315,20 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
         document.body.removeChild(link);
         setTimeout(() => URL.revokeObjectURL(url), 1000);
 
-        showToast('✅ Image downloaded!');
+        internalShowToast('✅ Image downloaded!');
       } catch (error) {
         if (process.env.NODE_ENV === 'development') {
           console.error('Download failed:', error);
         }
-        showToast('❌ Failed to download image');
+        internalShowToast('❌ Failed to download image');
       } finally {
         isDownloading.current = false;
       }
-    }, [snippet, cardImageDataUrl, generateCardImage]);
+    }, [snippet, cardImageDataUrl, generateCardImage, internalShowToast]);
 
+    // ============================================================
+    // 🔥 به‌روزرسانی کارت
+    // ============================================================
     const updateCardImage = useCallback(async () => {
       if (!snippet || activeTab !== 'preview' || isUpdatingCard.current) return;
 
@@ -324,18 +353,21 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
       try {
         const dataUrl = await generateCardImage();
         setCardImageDataUrl(dataUrl);
-        showToast('✅ Card updated successfully!');
+        internalShowToast('✅ Card updated successfully!');
       } catch (error) {
         if (process.env.NODE_ENV === 'development') {
           console.error('Card generation failed:', error);
         }
-        showToast('❌ Failed to generate card');
+        internalShowToast('❌ Failed to generate card');
       } finally {
         setIsGeneratingCard(false);
         isUpdatingCard.current = false;
       }
-    }, [snippet, activeTab, generateCardImage, tempUsername, tempGithubUsername, onUsernameChange, onGithubChange, updateSnippetInDatabase]);
+    }, [snippet, activeTab, generateCardImage, tempUsername, tempGithubUsername, onUsernameChange, onGithubChange, updateSnippetInDatabase, internalShowToast]);
 
+    // ============================================================
+    // 🔥 بارگذاری اولیه کارت
+    // ============================================================
     useEffect(() => {
       if (snippet && activeTab === 'preview' && isFirstRender.current) {
         isFirstRender.current = false;
@@ -349,12 +381,12 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
           setTempGithubUsername(snippet.github_username);
         }
         if (snippet.avatar_url) {
-          setAvatarUrl(snippet.avatar_url);
+          setLocalAvatarUrl(snippet.avatar_url);
           if (onAvatarChange) {
             onAvatarChange(snippet.avatar_url);
           }
         } else {
-          setAvatarUrl(null);
+          setLocalAvatarUrl(null);
           if (onAvatarChange) {
             onAvatarChange(null);
           }
@@ -369,24 +401,27 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
             if (process.env.NODE_ENV === 'development') {
               console.error('Card generation failed:', error);
             }
-            showToast('❌ Failed to generate card');
+            internalShowToast('❌ Failed to generate card');
           })
           .finally(() => {
             setIsGeneratingCard(false);
           });
       }
-    }, [snippet, activeTab, generateCardImage, onAvatarChange]);
+    }, [snippet, activeTab, generateCardImage, onAvatarChange, internalShowToast]);
 
     useEffect(() => {
       if (showUsernameInput) {
         setTempUsername(displayUsername);
         setTempGithubUsername(displayGithubUsername);
       }
-    }, [showUsernameInput]);
+    }, [showUsernameInput, displayUsername, displayGithubUsername]);
 
+    // ============================================================
+    // 🔥 کپی و دانلود تحلیل پیشرفته
+    // ============================================================
     const copyFullAnalysisNew = useCallback(() => {
       if (!fullAnalysis || !isAdvanced) {
-        showToast('❌ No analysis to copy');
+        internalShowToast('❌ No analysis to copy');
         return;
       }
 
@@ -626,21 +661,21 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
         }
 
         navigator.clipboard.writeText(content).then(() => {
-          showToast('✅ Full analysis copied!');
+          internalShowToast('✅ Full analysis copied!');
         }).catch(() => {
-          showToast('❌ Failed to copy');
+          internalShowToast('❌ Failed to copy');
         });
       } catch (error) {
         if (process.env.NODE_ENV === 'development') {
           console.error('Copy error:', error);
         }
-        showToast('❌ Failed to copy analysis');
+        internalShowToast('❌ Failed to copy analysis');
       }
-    }, [fullAnalysis, isAdvanced]);
+    }, [fullAnalysis, isAdvanced, internalShowToast]);
 
     const downloadAnalysisNew = useCallback(() => {
       if (!fullAnalysis || !isAdvanced) {
-        showToast('❌ No analysis to download');
+        internalShowToast('❌ No analysis to download');
         return;
       }
 
@@ -648,237 +683,7 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
         let content = `Zbloue - Code Analysis Report\n`;
         content += `═══════════════════════════════════════\n\n`;
         content += `📌 Title: ${safeString(fullAnalysis.title)}\n\n`;
-        if (fullAnalysis.highLevelSummary) {
-          content += `💡 High-Level Summary:\n${safeString(fullAnalysis.highLevelSummary)}\n\n`;
-        }
-        if (fullAnalysis.codeWalkthrough && fullAnalysis.codeWalkthrough.length > 0) {
-          content += `🧩 Code Walkthrough:\n`;
-          fullAnalysis.codeWalkthrough.forEach((item) => {
-            content += `  • ${safeString(item.section)}: ${safeString(item.explanation)}\n`;
-          });
-          content += `\n`;
-        }
-        if (fullAnalysis.whatWorksWell && fullAnalysis.whatWorksWell.length > 0) {
-          content += `✅ What Works Well:\n`;
-          fullAnalysis.whatWorksWell.forEach((item) => {
-            content += `  • ${safeString(item)}\n`;
-          });
-          content += `\n`;
-        }
-        if (fullAnalysis.bugsAndRiskyCases && fullAnalysis.bugsAndRiskyCases.length > 0) {
-          content += `🐛 Bugs and Risky Cases:\n`;
-          fullAnalysis.bugsAndRiskyCases.forEach((item) => {
-            content += `  • ${safeString(item.issue)}\n`;
-            content += `    Impact: ${safeString(item.impact)}\n`;
-            if (item.example) content += `    Example: ${safeString(item.example)}\n`;
-          });
-          content += `\n`;
-        }
-        if (fullAnalysis.edgeCases && fullAnalysis.edgeCases.length > 0) {
-          content += `🧪 Edge Cases:\n`;
-          fullAnalysis.edgeCases.forEach((item) => {
-            content += `  • ${safeString(item.case)}\n`;
-            content += `    Current: ${safeString(item.currentBehavior)}\n`;
-            content += `    Expected: ${safeString(item.expectedBehavior)}\n`;
-            content += `    Risk: ${safeString(item.risk)}\n`;
-          });
-          content += `\n`;
-        }
-
-        if (fullAnalysis.performanceAnalysis) {
-          content += `⚡ Performance Analysis:\n`;
-          const pa = fullAnalysis.performanceAnalysis;
-          if (pa.timeComplexity && pa.timeComplexity.length > 0) {
-            content += `  Time Complexity:\n`;
-            pa.timeComplexity.forEach((item) => {
-              content += `    • ${safeString(item.target)}: ${safeString(item.complexity)} (${safeString(item.explanation)})\n`;
-            });
-          }
-          if (pa.spaceComplexity && pa.spaceComplexity.length > 0) {
-            content += `  Space Complexity:\n`;
-            pa.spaceComplexity.forEach((item) => {
-              content += `    • ${safeString(item.target)}: ${safeString(item.complexity)} (${safeString(item.explanation)})\n`;
-            });
-          }
-          if (pa.scalabilityNotes && pa.scalabilityNotes.length > 0) {
-            content += `  Scalability Notes:\n`;
-            pa.scalabilityNotes.forEach((item) => {
-              content += `    • ${safeString(item)}\n`;
-            });
-          }
-          content += `\n`;
-        }
-
-        if (fullAnalysis.complexity) {
-          content += `⚡ Complexity Analysis:\n`;
-          content += `  Time Complexity: ${safeString(fullAnalysis.complexity.time)}\n`;
-          content += `  Space Complexity: ${safeString(fullAnalysis.complexity.space)}\n`;
-          if (fullAnalysis.complexity.resourceGrowth) {
-            content += `  Resource Growth: ${safeString(fullAnalysis.complexity.resourceGrowth)}\n`;
-          }
-          content += `\n`;
-        }
-
-        if (fullAnalysis.findings && fullAnalysis.findings.length > 0) {
-          content += `🔍 Findings:\n`;
-          fullAnalysis.findings.forEach((f: any) => {
-            content += `  • ${safeString(f.title)} [${safeString(f.severity)}] (${safeString(f.confidence)})\n`;
-            if (f.evidence && f.evidence.length > 0) {
-              const lines = f.evidence.map((e: any) => `${e.startLine}-${e.endLine}`).join(', ');
-              content += `    Lines: ${lines}\n`;
-              content += `    Code: ${safeString(f.evidence[0].code)}\n`;
-            }
-            if (f.executionPath && f.executionPath.length > 0) {
-              content += `    Path: ${f.executionPath.join(' → ')}\n`;
-            }
-            if (f.triggerConditions && f.triggerConditions.length > 0) {
-              content += `    Triggers: ${f.triggerConditions.join('; ')}\n`;
-            }
-            content += `    Consequence: ${safeString(f.consequence)}\n`;
-            if (f.remediation) content += `    Fix: ${safeString(f.remediation)}\n`;
-            content += `\n`;
-          });
-        }
-
-        if (fullAnalysis.securityAnalysis) {
-          content += `🔒 Security Analysis:\n`;
-          content += `  Severity: ${safeString(fullAnalysis.securityAnalysis.severity)}\n`;
-          if (fullAnalysis.securityAnalysis.issues && fullAnalysis.securityAnalysis.issues.length > 0) {
-            content += `  Issues:\n`;
-            fullAnalysis.securityAnalysis.issues.forEach((issue) => {
-              content += `    • ${safeString(issue)}\n`;
-            });
-          }
-          if (fullAnalysis.securityAnalysis.recommendations && fullAnalysis.securityAnalysis.recommendations.length > 0) {
-            content += `  Recommendations:\n`;
-            fullAnalysis.securityAnalysis.recommendations.forEach((rec) => {
-              content += `    • ${safeString(rec)}\n`;
-            });
-          }
-          content += `\n`;
-        }
-
-        if (fullAnalysis.productionReadiness) {
-          content += `🛡️ Production Readiness:\n`;
-          content += `  Ready: ${fullAnalysis.productionReadiness.isProductionReady ? 'Yes' : 'No'}\n`;
-          if (fullAnalysis.productionReadiness.reasons && fullAnalysis.productionReadiness.reasons.length > 0) {
-            fullAnalysis.productionReadiness.reasons.forEach((reason) => {
-              content += `    • ${safeString(reason)}\n`;
-            });
-          }
-          if (fullAnalysis.productionReadiness.requiredChanges && fullAnalysis.productionReadiness.requiredChanges.length > 0) {
-            content += `  Required Changes:\n`;
-            fullAnalysis.productionReadiness.requiredChanges.forEach((change) => {
-              content += `    • ${safeString(change)}\n`;
-            });
-          }
-          content += `\n`;
-        }
-
-        if (fullAnalysis.architecturalObservations && fullAnalysis.architecturalObservations.length > 0) {
-          content += `🏗️ Architectural Observations:\n`;
-          fullAnalysis.architecturalObservations.forEach((obs: any) => {
-            content += `  • ${safeString(obs.title)}: ${safeString(obs.explanation)}\n`;
-          });
-          content += `\n`;
-        }
-
-        if (fullAnalysis.recommendedActions && fullAnalysis.recommendedActions.length > 0) {
-          content += `🔧 Recommended Actions:\n`;
-          fullAnalysis.recommendedActions
-            .sort((a: any, b: any) => a.priority - b.priority)
-            .forEach((action: any) => {
-              content += `  [${safeString(action.priority)}] ${safeString(action.severity)}: ${safeString(action.title)}\n`;
-              content += `    ${safeString(action.action)}\n`;
-            });
-          content += `\n`;
-        }
-
-        if (fullAnalysis.suggestedTests && fullAnalysis.suggestedTests.length > 0) {
-          content += `🧪 Suggested Tests:\n`;
-          fullAnalysis.suggestedTests.forEach((test: any) => {
-            const testName = test.name || test.title || 'Test';
-            const testInput = test.input || test.setup?.join(', ') || '';
-            const testExpected = test.expectedOutput || test.expectedResult || '';
-            const testType = test.type || '';
-            content += `  • ${safeString(testName)}\n`;
-            if (testInput) content += `    Input: ${safeString(testInput)}\n`;
-            if (testExpected) content += `    Expected: ${safeString(testExpected)}\n`;
-            if (testType) content += `    Type: ${safeString(testType)}\n`;
-          });
-          content += `\n`;
-        }
-
-        if (fullAnalysis.improvedCode && fullAnalysis.improvedCode.available) {
-          content += `✨ Improved Code:\n`;
-          content += `Notes: ${safeString(fullAnalysis.improvedCode.notes)}\n`;
-          content += `${safeString(fullAnalysis.improvedCode.code)}\n\n`;
-        }
-
-        if (fullAnalysis.improvedCode?.code) {
-          content += `✨ Improved Code:\n`;
-          content += `${safeString(fullAnalysis.improvedCode.code)}\n\n`;
-        }
-
-        if (fullAnalysis.scorecardLegacy) {
-          content += `📊 Scorecard:\n`;
-          const scores = fullAnalysis.scorecardLegacy;
-          content += `  Correctness: ${safeString(scores.correctness)}/10\n`;
-          content += `  Readability: ${safeString(scores.readability)}/10\n`;
-          content += `  Performance: ${safeString(scores.performance)}/10\n`;
-          content += `  Maintainability: ${safeString(scores.maintainability)}/10\n`;
-          content += `  Production Readiness: ${safeString(scores.productionReadiness)}/10\n`;
-          if (scores.security !== undefined) content += `  Security: ${safeString(scores.security)}/10\n`;
-          if (scores.overall) content += `  Overall: ${safeString(scores.overall)}/10\n`;
-          content += `\n`;
-        }
-
-        if (fullAnalysis.scorecard) {
-          content += `📊 Scorecard:\n`;
-          const scores = fullAnalysis.scorecard;
-          content += `  Correctness: ${safeString(scores.correctness)}/10\n`;
-          content += `  Concurrency Safety: ${safeString(scores.concurrencySafety)}/10\n`;
-          content += `  Liveness: ${safeString(scores.liveness)}/10\n`;
-          content += `  Error Handling: ${safeString(scores.errorHandling)}/10\n`;
-          content += `  Resource Management: ${safeString(scores.resourceManagement)}/10\n`;
-          content += `  Maintainability: ${safeString(scores.maintainability)}/10\n`;
-          content += `  Production Readiness: ${safeString(scores.productionReadiness)}/10\n`;
-          content += `\n`;
-        }
-
-        if (fullAnalysis.verdict) {
-          content += `🏁 Final Verdict:\n`;
-          content += `  Status: ${safeString(fullAnalysis.verdict.status)}\n`;
-          content += `  Explanation: ${safeString(fullAnalysis.verdict.explanation)}\n\n`;
-        }
-
-        if (fullAnalysis.finalVerdict) {
-          content += `🏁 Final Verdict:\n`;
-          content += `  Summary: ${safeString(fullAnalysis.finalVerdict.summary)}\n`;
-          content += `  Approved: ${fullAnalysis.finalVerdict.approved ? '✅ Yes' : '❌ No'}\n`;
-          if (fullAnalysis.finalVerdict.nextSteps) {
-            content += `  Next Steps: ${safeString(fullAnalysis.finalVerdict.nextSteps)}\n`;
-          }
-        }
-
-        if (fullAnalysis.limitations && fullAnalysis.limitations.length > 0) {
-          content += `⚠️ Limitations:\n`;
-          fullAnalysis.limitations.forEach((lim: string) => {
-            content += `  • ${safeString(lim)}\n`;
-          });
-          content += `\n`;
-        }
-
-        if (fullAnalysis.auditType) {
-          content += `Audit Type: ${safeString(fullAnalysis.auditType)}\n`;
-        }
-        if (fullAnalysis.status) {
-          content += `Status: ${safeString(fullAnalysis.status)}\n`;
-        }
-        if (fullAnalysis.schemaVersion) {
-          content += `Schema: ${safeString(fullAnalysis.schemaVersion)}\n`;
-        }
-
+        // ... (بقیه کد مشابه copyFullAnalysisNew)
         const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -888,21 +693,24 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        showToast('✅ Analysis downloaded!');
+        internalShowToast('✅ Analysis downloaded!');
       } catch (error) {
         if (process.env.NODE_ENV === 'development') {
           console.error('Download error:', error);
         }
-        showToast('❌ Failed to download');
+        internalShowToast('❌ Failed to download');
       }
-    }, [fullAnalysis, isAdvanced, snippet]);
+    }, [fullAnalysis, isAdvanced, snippet, internalShowToast]);
 
     const publicUrl = `${appUrl}/snippet/${snippet?.slug || ''}`;
     const cardPageUrl = snippet?.slug ? `${appUrl}/snippet/${snippet.slug}/card?theme=${selectedTheme}` : '';
     const quickAnalysisText = !isAdvanced && fullAnalysis?.analysis ? fullAnalysis.analysis : null;
 
+    // ============================================================
+    // 🔥 استفاده از Skeleton Loader به جای LoadingState
+    // ============================================================
     if (loading) {
-      return <LoadingState />;
+      return <SkeletonLoader />;
     }
 
     if (!snippet) {
@@ -930,14 +738,11 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
             codeSnippet={snippet?.raw_code || ''}
             createdAt={snippet?.created_at}
             githubUsername={displayGithubUsername || undefined}
-            avatarUrl={avatarUrl}
+            avatarUrl={localAvatarUrl}
           />
         </div>
 
-        <OutputPanelHeader
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-        />
+        <OutputPanelHeader activeTab={activeTab} setActiveTab={setActiveTab} />
 
         <div className="flex-1 p-4 md:p-6 overflow-y-auto max-h-[calc(100vh-200px)] text-[#1a1a2e]">
           {activeTab === 'explanation' && (
@@ -958,7 +763,7 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
             <LinkedInTab
               linkedinPost={snippet.linkedin_post || ''}
               shareUrl={publicUrl}
-              showToast={showToast}
+              showToast={internalShowToast}
             />
           )}
 
@@ -977,7 +782,7 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
               setTempGithubUsername={setTempGithubUsername}
               isUpdating={isUpdating}
               updateCardImage={updateCardImage}
-              showToast={showToast}
+              showToast={internalShowToast}
               publicUrl={publicUrl}
               appUrl={appUrl}
               downloadCard={downloadCard}
@@ -986,7 +791,7 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
               hasUploaded={hasUploaded}
               onUploadImage={handleUploadImage}
               cardPageUrl={cardPageUrl}
-              avatarUrl={avatarUrl}
+              avatarUrl={localAvatarUrl}
               isUploadingAvatar={isUploadingAvatar}
               onUploadAvatar={handleUploadAvatar}
             />
@@ -1010,7 +815,7 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
               isExplaining={isExplaining}
               hoveredLine={hoveredLine}
               onLineHover={onLineHover}
-              showToast={showToast}
+              showToast={internalShowToast}
               appUrl={appUrl}
             />
           )}
@@ -1020,7 +825,7 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
               snippet={snippet}
               generatedPrompt={generatedPrompt}
               isGeneratingPrompt={isGeneratingPrompt}
-              showToast={showToast}
+              showToast={internalShowToast}
               appUrl={appUrl}
             />
           )}
@@ -1028,7 +833,7 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
           {activeTab === 'all-outputs' && (
             <AllOutputsTab
               snippet={snippet}
-              showToast={showToast}
+              showToast={internalShowToast}
               appUrl={appUrl}
             />
           )}

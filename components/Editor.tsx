@@ -15,28 +15,11 @@ import { php } from '@codemirror/lang-php';
 import { EditorView } from '@codemirror/view';
 import { RangeSetBuilder } from '@codemirror/state';
 import { Decoration } from '@codemirror/view';
+import { useAppContext } from '@/context';
 
-interface EditorProps {
-  code: string;
-  setCode: (val: string) => void;
-  language: string;
-  setLanguage: (val: string) => void;
-  onGenerate: () => void;
-  loading: boolean;
-  convertLanguage?: string;
-  setConvertLanguage?: (val: string) => void;
-  onConvert?: (targetLang: string) => void;
-  isConverting?: boolean;
-  convertError?: string | null;
-  onExplain?: () => void;
-  isExplaining?: boolean;
-  hoveredLine?: number | null;
-  onLineHover?: (lineNumber: number | null) => void;
-  onClear?: () => void;
-  onGeneratePrompt?: () => void;
-  isGeneratingPrompt?: boolean;
-  onStop?: () => void;
-}
+// ============================================================
+// 🔥 زبان‌های پشتیبانی‌شده
+// ============================================================
 
 const SUPPORTED_LANGUAGES = [
   { value: 'javascript', label: 'JavaScript', icon: '🟨' },
@@ -95,6 +78,10 @@ const EXTENSION_TO_LANGUAGE: Record<string, string> = {
   'yml': 'yaml',
 };
 
+// ============================================================
+// 🔥 اکستنشن هایلایت خط
+// ============================================================
+
 const highlightLineExtension = (lineNumber: number | null) => {
   if (lineNumber === null) return [];
 
@@ -121,47 +108,85 @@ const highlightLineExtension = (lineNumber: number | null) => {
   ];
 };
 
+// ============================================================
+// 🔥 پراپ‌های کامپوننت (فقط توابع)
+// ============================================================
+
+interface EditorProps {
+  onGenerate: () => void;
+  onConvert: (targetLang: string) => void;
+  onExplain: () => void;
+  onClear: () => void;
+  onGeneratePrompt: () => void;
+  onStop?: () => void;
+}
+
 export default function Editor({
-  code,
-  setCode,
-  language,
-  setLanguage,
   onGenerate,
-  loading,
-  convertLanguage,
-  setConvertLanguage,
   onConvert,
-  isConverting,
-  convertError,
   onExplain,
-  isExplaining,
-  hoveredLine,
-  onLineHover,
   onClear,
   onGeneratePrompt,
-  isGeneratingPrompt,
   onStop,
 }: EditorProps) {
+  const { state, dispatch } = useAppContext();
+  const {
+    code,
+    language,
+    loading,
+    convertLanguage,
+    isConverting,
+    convertError,
+    isExplaining,
+    hoveredLine,
+    isGeneratingPrompt,
+  } = state;
+
   const [isDragging, setIsDragging] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const dragCounter = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-        e.preventDefault();
-        onGenerate();
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onGenerate]);
+  // ============================================================
+  // 🔥 توابع dispatch برای تغییر state
+  // ============================================================
 
-  const detectLanguageFromExtension = (filename: string): string | null => {
+  const setCode = useCallback((newCode: string) => {
+    dispatch({ type: 'SET_CODE', payload: newCode });
+  }, [dispatch]);
+
+  const setLanguage = useCallback((newLang: string) => {
+    dispatch({ type: 'SET_LANGUAGE', payload: newLang });
+  }, [dispatch]);
+
+  const setConvertLanguage = useCallback((val: string) => {
+    dispatch({ type: 'SET_CONVERT_LANGUAGE', payload: val });
+  }, [dispatch]);
+
+  const setError = useCallback((msg: string | null) => {
+    dispatch({ type: 'SET_ERROR', payload: msg });
+  }, [dispatch]);
+
+  const setConvertError = useCallback((msg: string | null) => {
+    dispatch({ type: 'SET_CONVERT_ERROR', payload: msg });
+  }, [dispatch]);
+
+  const setHoveredLine = useCallback((line: number | null) => {
+    dispatch({ type: 'SET_HOVERED_LINE', payload: line });
+  }, [dispatch]);
+
+  // ============================================================
+  // 🔥 تشخیص خودکار زبان از پسوند فایل
+  // ============================================================
+
+  const detectLanguageFromExtension = useCallback((filename: string): string | null => {
     const ext = filename.split('.').pop()?.toLowerCase() || '';
     return EXTENSION_TO_LANGUAGE[ext] || null;
-  };
+  }, []);
+
+  // ============================================================
+  // 🔥 پردازش فایل آپلود شده
+  // ============================================================
 
   const processFile = useCallback((file: File) => {
     setUploadProgress(0);
@@ -186,14 +211,16 @@ export default function Editor({
       }
     };
     reader.onerror = () => {
-      if (process.env.NODE_ENV === 'development') {
-        console.error('File read error:', reader.error);
-      }
+      console.error('File read error:', reader.error);
       alert('❌ Failed to read file. Please try again.');
       setUploadProgress(null);
     };
     reader.readAsText(file);
-  }, [setCode, setLanguage]);
+  }, [setCode, setLanguage, detectLanguageFromExtension]);
+
+  // ============================================================
+  // 🔥 رویدادهای Drag & Drop
+  // ============================================================
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -237,8 +264,9 @@ export default function Editor({
     }
   }, [processFile]);
 
-  const nonConvertible = ['html', 'css', 'json'];
-  const canConvert = code.trim().length > 0 && !nonConvertible.includes(language);
+  // ============================================================
+  // 🔥 آپلود با کلیک
+  // ============================================================
 
   const handleUploadClick = useCallback(() => {
     fileInputRef.current?.click();
@@ -252,41 +280,71 @@ export default function Editor({
     e.target.value = '';
   }, [processFile]);
 
+  // ============================================================
+  // 🔥 پاک کردن کد
+  // ============================================================
+
   const handleClearCode = useCallback(() => {
     if (code.trim()) {
       if (confirm('Are you sure you want to clear all code and results?')) {
         setCode('');
         setUploadProgress(null);
-        if (onClear) {
-          onClear();
-        }
-      }
-    } else {
-      if (onClear) {
         onClear();
       }
+    } else {
+      onClear();
     }
   }, [code, setCode, onClear]);
 
+  // ============================================================
+  // 🔥 دکمه‌های اکشن
+  // ============================================================
+
   const handleExplainClick = useCallback(() => {
-    if (onExplain) {
-      onExplain();
-    }
+    if (onExplain) onExplain();
   }, [onExplain]);
 
   const handleGeneratePromptClick = useCallback(() => {
-    if (onGeneratePrompt) {
-      onGeneratePrompt();
-    }
+    if (onGeneratePrompt) onGeneratePrompt();
   }, [onGeneratePrompt]);
 
   const handleConvertClick = useCallback(() => {
-    if (convertLanguage && onConvert && canConvert) {
+    if (convertLanguage && onConvert) {
       onConvert(convertLanguage);
     }
-  }, [convertLanguage, onConvert, canConvert]);
+  }, [convertLanguage, onConvert]);
+
+  // ============================================================
+  // 🔥 کلید میانبر Ctrl+Enter
+  // ============================================================
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        onGenerate();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onGenerate]);
+
+  // ============================================================
+  // 🔥 اکستنشن هایلایت خط
+  // ============================================================
 
   const lineHighlightExtensions = hoveredLine ? highlightLineExtension(hoveredLine) : [];
+
+  // ============================================================
+  // 🔥 زبان‌های غیرقابل تبدیل
+  // ============================================================
+
+  const nonConvertible = ['html', 'css', 'json'];
+  const canConvert = code.trim().length > 0 && !nonConvertible.includes(language);
+
+  // ============================================================
+  // 🔥 رندر
+  // ============================================================
 
   return (
     <div
@@ -304,6 +362,7 @@ export default function Editor({
         onChange={handleFileSelected}
       />
 
+      {/* ===== Progress Bar ===== */}
       {(isDragging || uploadProgress !== null) && (
         <div className="w-full h-1 bg-[#e8e8f0] relative overflow-hidden z-20">
           <div
@@ -315,6 +374,7 @@ export default function Editor({
         </div>
       )}
 
+      {/* ===== Toolbar Top: Source Language ===== */}
       <div className="flex flex-col gap-2 p-3 bg-[#f1f3f5] border-b border-[#d0d0d8]">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-medium text-[#4a4a6a] whitespace-nowrap">📝 Source Language:</span>
@@ -331,14 +391,12 @@ export default function Editor({
           </select>
         </div>
 
+        {/* ===== Convert Section ===== */}
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-medium text-[#4a4a6a] whitespace-nowrap">🎯 Target Language:</span>
           <select
             value={convertLanguage || ''}
-            onChange={(e) => {
-              const newLang = e.target.value;
-              if (setConvertLanguage) setConvertLanguage(newLang);
-            }}
+            onChange={(e) => setConvertLanguage(e.target.value)}
             className="bg-white text-[#1a1a2e] text-sm rounded-md px-3 py-1 border border-[#d0d0d8] focus:outline-none focus:ring-2 focus:ring-[#4a86f7] disabled:opacity-50"
             disabled={!canConvert || isConverting}
           >
@@ -391,6 +449,7 @@ export default function Editor({
         </div>
       </div>
 
+      {/* ===== Action Buttons ===== */}
       <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2 bg-[#f8f9fa] border-b border-[#d0d0d8]">
         <div className="flex items-center gap-2 flex-wrap">
           <button
@@ -404,35 +463,31 @@ export default function Editor({
             {loading ? 'Generating...' : '✨ Generate'}
           </button>
 
-          {onExplain && (
-            <button
-              onClick={handleExplainClick}
-              disabled={!code.trim() || isExplaining}
-              className={`flex items-center text-sm px-3 py-1.5 rounded-md border transition ${
-                !code.trim() || isExplaining
-                  ? 'bg-[#f1f3f5] text-[#a0a0b0] border-[#d0d0d8] cursor-not-allowed'
-                  : 'bg-[#e8e8f0] hover:bg-[#d0d0d8] text-[#1a1a2e] border-[#d0d0d8] hover:border-[#4a86f7]'
-              }`}
-              title="Explain code line by line"
-            >
-              <span>{isExplaining ? 'Explaining...' : 'Explain'}</span>
-            </button>
-          )}
+          <button
+            onClick={handleExplainClick}
+            disabled={!code.trim() || isExplaining}
+            className={`flex items-center text-sm px-3 py-1.5 rounded-md border transition ${
+              !code.trim() || isExplaining
+                ? 'bg-[#f1f3f5] text-[#a0a0b0] border-[#d0d0d8] cursor-not-allowed'
+                : 'bg-[#e8e8f0] hover:bg-[#d0d0d8] text-[#1a1a2e] border-[#d0d0d8] hover:border-[#4a86f7]'
+            }`}
+            title="Explain code line by line"
+          >
+            <span>{isExplaining ? 'Explaining...' : 'Explain'}</span>
+          </button>
 
-          {onGeneratePrompt && (
-            <button
-              onClick={handleGeneratePromptClick}
-              disabled={!code.trim() || isGeneratingPrompt}
-              className={`flex items-center text-sm px-3 py-1.5 rounded-md border transition ${
-                !code.trim() || isGeneratingPrompt
-                  ? 'bg-[#f1f3f5] text-[#a0a0b0] border-[#d0d0d8] cursor-not-allowed'
-                  : 'bg-[#e8e8f0] hover:bg-[#d0d0d8] text-[#1a1a2e] border-[#d0d0d8] hover:border-[#4a86f7]'
-              }`}
-              title="Generate prompt from code"
-            >
-              <span>{isGeneratingPrompt ? 'Generating...' : 'Prompt'}</span>
-            </button>
-          )}
+          <button
+            onClick={handleGeneratePromptClick}
+            disabled={!code.trim() || isGeneratingPrompt}
+            className={`flex items-center text-sm px-3 py-1.5 rounded-md border transition ${
+              !code.trim() || isGeneratingPrompt
+                ? 'bg-[#f1f3f5] text-[#a0a0b0] border-[#d0d0d8] cursor-not-allowed'
+                : 'bg-[#e8e8f0] hover:bg-[#d0d0d8] text-[#1a1a2e] border-[#d0d0d8] hover:border-[#4a86f7]'
+            }`}
+            title="Generate prompt from code"
+          >
+            <span>{isGeneratingPrompt ? 'Generating...' : 'Prompt'}</span>
+          </button>
 
           {loading && onStop && (
             <button
@@ -464,6 +519,7 @@ export default function Editor({
         </div>
       </div>
 
+      {/* ===== Drop Zone Overlay ===== */}
       {isDragging && (
         <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#4a86f7]/5 backdrop-blur-sm">
           <div className="w-64 h-64 rounded-2xl border-4 border-dashed border-[#4a86f7] bg-white/80 flex flex-col items-center justify-center gap-4 shadow-2xl transition-all duration-300">
@@ -494,6 +550,7 @@ export default function Editor({
         </div>
       )}
 
+      {/* ===== Code Editor ===== */}
       <div className="flex-1 overflow-hidden bg-[#fafbfc] relative">
         <CodeMirror
           value={code}
@@ -503,7 +560,7 @@ export default function Editor({
             languageExtensions[language] || javascript(),
             ...lineHighlightExtensions,
           ]}
-          onChange={(value) => setCode(value)}
+          onChange={setCode}
           className="h-full"
           basicSetup={{
             lineNumbers: true,
@@ -512,7 +569,6 @@ export default function Editor({
             autocompletion: true,
             tabSize: 2,
           }}
-          placeholder=""
         />
 
         {!code.trim() && !isDragging && !uploadProgress && (

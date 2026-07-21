@@ -1,9 +1,12 @@
 // app/api/create-snippet/route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { randomBytes } from 'crypto';
-import { supabase } from '@/lib/supabase'; // ✅ استفاده از کلاینت موجود
+import { supabase } from '@/lib/supabase';
 import logger from '@/lib/logger';
+import { rateLimiter, getClientIP } from '@/lib/rateLimiter';
+import { withErrorHandlerAndLog } from '@/lib/errorHandler';
 
 // ============================================================
 // 1. Zod schemas
@@ -95,7 +98,6 @@ async function generateUniqueSlug(retries = MAX_SLUG_RETRIES): Promise<string> {
 // 3. Database mapper
 // ============================================================
 
-// 🔥 برای عبور از Build از `any` استفاده می‌شود (چون تایپ‌های دیتابیس کامل نشده‌اند)
 type SnippetInsert = any;
 
 function mapToDatabaseRow(body: CreateSnippetRequest, slug: string): SnippetInsert {
@@ -152,77 +154,84 @@ function mapToDatabaseRow(body: CreateSnippetRequest, slug: string): SnippetInse
 // 4. POST Handler
 // ============================================================
 
-export async function POST(req: NextRequest) {
-  try {
-    let rawBody: unknown;
-    try {
-      rawBody = await req.json();
-    } catch {
-      return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
-    }
+export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
+  const ip = getClientIP(req);
 
-    const validation = CreateSnippetRequestSchema.safeParse(rawBody);
-    if (!validation.success) {
-      logger.warn('[create-snippet] Validation failed:', validation.error.issues);
-      const firstError = validation.error.issues[0];
-      return NextResponse.json(
-        { error: `Validation error: ${firstError.path.join('.')} - ${firstError.message}` },
-        { status: 400 }
-      );
-    }
-
-    const body = validation.data;
-
-    let slug: string;
-    try {
-      slug = await generateUniqueSlug();
-    } catch (error) {
-      logger.error('[create-snippet] Slug generation failed:', error);
-      return NextResponse.json({ error: 'Failed to generate unique identifier' }, { status: 500 });
-    }
-
-    const row = mapToDatabaseRow(body, slug);
-
-    // 🔥 استفاده از `supabase` وارداتی (که fallback دارد) و `as any` برای عبور از Build
-    const { data, error } = await supabase
-      .from('snippets')
-      .insert(row as any)
-      .select('id, slug, card_title, username, github_username, avatar_url')
-      .single();
-
-    if (error) {
-      logger.error('[create-snippet] Supabase insert error:', error);
-      return NextResponse.json({ error: 'Failed to save snippet' }, { status: 500 });
-    }
-
-    if (!data) {
-      logger.error('[create-snippet] Insert succeeded but returned no data');
-      return NextResponse.json({ error: 'Snippet was not returned after creation' }, { status: 500 });
-    }
-
-    const parsed = CreatedSnippetSchema.safeParse(data);
-    if (!parsed.success) {
-      logger.error('[create-snippet] Invalid inserted row:', parsed.error.flatten());
-      return NextResponse.json({ error: 'Invalid database response' }, { status: 500 });
-    }
-
-    const created = parsed.data;
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || '';
-
+  // ===== Rate Limiter =====
+  const rateLimitResult = await rateLimiter(ip);
+  if (!rateLimitResult.allowed) {
+    logger.warn(`[create-snippet] Rate limit exceeded for IP ${ip}`);
     return NextResponse.json(
-      {
-        success: true,
-        id: created.id,
-        slug: created.slug,
-        url: `${baseUrl}/snippet/${created.slug}`,
-        username: created.username ?? null,
-        github_username: created.github_username ?? null,
-        avatar_url: created.avatar_url ?? null,
-      },
-      { status: 201 }
+      { error: rateLimitResult.message },
+      { status: 429 }
     );
-  } catch (error) {
-    logger.error('[create-snippet] Unhandled error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+
+  let rawBody: unknown;
+  try {
+    rawBody = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
+  }
+
+  const validation = CreateSnippetRequestSchema.safeParse(rawBody);
+  if (!validation.success) {
+    logger.warn('[create-snippet] Validation failed:', validation.error.issues);
+    const firstError = validation.error.issues[0];
+    return NextResponse.json(
+      { error: `Validation error: ${firstError.path.join('.')} - ${firstError.message}` },
+      { status: 400 }
+    );
+  }
+
+  const body = validation.data;
+
+  let slug: string;
+  try {
+    slug = await generateUniqueSlug();
+  } catch (error) {
+    logger.error('[create-snippet] Slug generation failed:', error);
+    return NextResponse.json({ error: 'Failed to generate unique identifier' }, { status: 500 });
+  }
+
+  const row = mapToDatabaseRow(body, slug);
+
+  const { data, error } = await supabase
+    .from('snippets')
+    .insert(row as any)
+    .select('id, slug, card_title, username, github_username, avatar_url')
+    .single();
+
+  if (error) {
+    logger.error('[create-snippet] Supabase insert error:', error);
+    return NextResponse.json({ error: 'Failed to save snippet' }, { status: 500 });
+  }
+
+  if (!data) {
+    logger.error('[create-snippet] Insert succeeded but returned no data');
+    return NextResponse.json({ error: 'Snippet was not returned after creation' }, { status: 500 });
+  }
+
+  const parsed = CreatedSnippetSchema.safeParse(data);
+  if (!parsed.success) {
+    logger.error('[create-snippet] Invalid inserted row:', parsed.error.flatten());
+    return NextResponse.json({ error: 'Invalid database response' }, { status: 500 });
+  }
+
+  const created = parsed.data;
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || '';
+
+  logger.info(`[create-snippet] Snippet created: ${created.slug} (IP ${ip})`);
+  return NextResponse.json(
+    {
+      success: true,
+      id: created.id,
+      slug: created.slug,
+      url: `${baseUrl}/snippet/${created.slug}`,
+      username: created.username ?? null,
+      github_username: created.github_username ?? null,
+      avatar_url: created.avatar_url ?? null,
+    },
+    { status: 201 }
+  );
+});

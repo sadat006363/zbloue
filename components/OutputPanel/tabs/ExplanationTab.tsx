@@ -1,6 +1,10 @@
+// components/OutputPanel/tabs/ExplanationTab.tsx
+
 'use client';
+
 import { safeString } from '@/lib/utils';
 import { useState } from 'react';
+import logger from '@/lib/logger';
 
 interface ExplanationTabProps {
   snippet: any;
@@ -11,7 +15,7 @@ interface ExplanationTabProps {
   optimization: string;
   keyConcept: string;
   cardTitle: string;
-  fullAnalysis?: any; // NEW: for new Advanced output
+  fullAnalysis?: any;
 }
 
 export default function ExplanationTab({
@@ -27,12 +31,16 @@ export default function ExplanationTab({
 }: ExplanationTabProps) {
   const [copySuccess, setCopySuccess] = useState(false);
 
-  // ===== Get content for copy/download =====
+  if (process.env.NODE_ENV === 'development') {
+    logger.debug('[ExplanationTab] fullAnalysis:', fullAnalysis);
+    logger.debug('[ExplanationTab] isAdvanced:', isAdvanced);
+    logger.debug('[ExplanationTab] quickAnalysisText:', quickAnalysisText);
+  }
+
   const getFullContent = () => {
     let content = '';
 
     if (isAdvanced && fullAnalysis) {
-      // NEW: Use structured data from advanced analysis
       content += `📌 ${safeString(fullAnalysis.title || cardTitle)}\n\n`;
       if (fullAnalysis.summary || fullAnalysis.highLevelSummary) {
         content += `💡 Summary:\n${safeString(fullAnalysis.summary || fullAnalysis.highLevelSummary)}\n\n`;
@@ -52,7 +60,6 @@ export default function ExplanationTab({
         content += `🏁 Verdict: ${safeString(fullAnalysis.verdict.status)} - ${safeString(fullAnalysis.verdict.explanation)}\n\n`;
       }
     } else if (isAdvanced) {
-      // Legacy Advanced
       content += `📌 ${safeString(cardTitle)}\n\n`;
       content += `💡 Key Concept:\n${safeString(keyConcept)}\n\n`;
       content += `🔍 What This Code Does:\n${safeString(analysisText)}\n\n`;
@@ -91,17 +98,15 @@ export default function ExplanationTab({
     URL.revokeObjectURL(url);
   };
 
-  // ===== Clean duplicate icons =====
   const cleanDuplicateIcons = (text: string) => {
     if (!text) return '';
-    const iconPattern = /^[📝🐛⚡💡🔍🔧📊✅🧪🔒💼🖼️📖📌⭐🔬🛡️🏁✨🚨🛡️🧩]\s*/;
+    const iconPattern = /^[📝🐛⚡💡🔍🔧✅🧪🔒💼🖼️📊📌⭐🔬🚨🛡️✨📈🧩🏗️🔧🧪⚠️🏁]\\s*/;
     return text.replace(iconPattern, '');
   };
 
-  // ===== Format text =====
   const formatText = (text: string) => {
     if (!text) return '';
-    let formatted = text.replace(/^###\s*/gm, '');
+    let formatted = text.replace(/^###\\s*/gm, '');
     const lines = formatted.split('\n');
     const cleanedLines = lines.map((line) => cleanDuplicateIcons(line));
     formatted = cleanedLines.join('\n');
@@ -110,7 +115,6 @@ export default function ExplanationTab({
     return formatted;
   };
 
-  // ===== Render section =====
   const renderSection = (title: string, content: string) => {
     if (!content || content === '-') return null;
 
@@ -151,7 +155,6 @@ export default function ExplanationTab({
     );
   };
 
-  // ===== Parse quick analysis =====
   const parseQuickAnalysis = (text: string) => {
     if (!text) return null;
     const lines = text.split('\n').filter((line) => line.trim().length > 0);
@@ -161,13 +164,13 @@ export default function ExplanationTab({
 
     for (const line of lines) {
       const trimmed = line.trim();
-      if (trimmed.startsWith('###') || trimmed.match(/^[📝🐛⚡💡🔍🔧📊✅🧪🔒💼🖼️📖📌⭐🔬🛡️🏁✨🚨🛡️🧩]\s/)) {
+      if (trimmed.startsWith('###') || trimmed.match(/^[📝🐛⚡💡🔍🔧✅🧪🔒💼🖼️📊📌⭐🔬🚨🛡️✨📈🧩🏗️🔧🧪⚠️🏁]\\s/)) {
         if (currentTitle && currentContent.length > 0) {
           sections.push({ title: currentTitle, content: currentContent.join('\n') });
         }
         currentTitle = trimmed
-          .replace(/^###\s*/, '')
-          .replace(/^[📝🐛⚡💡🔍🔧📊✅🧪🔒💼🖼️📖📌⭐🔬🛡️🏁✨🚨🛡️🧩]\s*/, '')
+          .replace(/^###\\s*/, '')
+          .replace(/^[📝🐛⚡💡🔍🔧✅🧪🔒💼🖼️📊📌⭐🔬🚨🛡️✨📈🧩🏗️🔧🧪⚠️🏁]\\s*/, '')
           .trim();
         currentContent = [];
       } else if (currentTitle) {
@@ -182,7 +185,6 @@ export default function ExplanationTab({
     return sections.length > 0 ? sections : null;
   };
 
-  // ===== Render findings for new advanced output =====
   const renderFindings = (findings: any[]) => {
     if (!findings || findings.length === 0) return null;
     return (
@@ -217,7 +219,6 @@ export default function ExplanationTab({
     );
   };
 
-  // ===== Render complexity for new advanced output =====
   const renderComplexity = (complexity: any) => {
     if (!complexity) return null;
     return (
@@ -234,7 +235,6 @@ export default function ExplanationTab({
     );
   };
 
-  // ===== Render verdict for new advanced output =====
   const renderVerdict = (verdict: any) => {
     if (!verdict) return null;
     const statusColors: Record<string, string> = {
@@ -258,7 +258,6 @@ export default function ExplanationTab({
 
   return (
     <div className="space-y-4">
-      {/* ===== Copy & Download Buttons ===== */}
       <div className="flex justify-end items-center gap-3 pb-2 border-b-2 border-[#e8e8f0]">
         <button
           onClick={handleCopy}
@@ -283,7 +282,6 @@ export default function ExplanationTab({
       </div>
 
       {isAdvanced && fullAnalysis ? (
-        // ===== NEW Advanced Analysis Output =====
         <div className="space-y-4">
           <h2 className="text-xl md:text-2xl font-bold text-[#1a1a2e] flex items-center gap-2">
             <span>📌</span> {safeString(fullAnalysis.title || cardTitle)}
@@ -313,7 +311,6 @@ export default function ExplanationTab({
           )}
         </div>
       ) : isAdvanced ? (
-        // ===== Legacy Advanced =====
         <div className="space-y-6">
           <h2 className="text-xl md:text-2xl font-bold text-[#1a1a2e] flex items-center gap-2">
             <span>📌</span> {safeString(cardTitle)}
@@ -324,7 +321,6 @@ export default function ExplanationTab({
           {renderSection('⚡ Optimization', optimization)}
         </div>
       ) : (
-        // ===== Simple / Medium =====
         <div className="space-y-6">
           <h2 className="text-xl md:text-2xl font-bold text-[#1a1a2e] flex items-center gap-2">
             <span>📌</span> {safeString(cardTitle)}

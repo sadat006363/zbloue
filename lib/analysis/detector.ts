@@ -1,8 +1,11 @@
-// ============================================================
-// 📁 فایل: lib/analysis/detector.ts
-// ============================================================
-import { SIGNAL_WEIGHTS, ANALYSIS_CONFIG } from './config';
+// lib/analysis/detector.ts
+
+import { ANALYSIS_CONFIG, SIGNAL_WEIGHTS } from './analysis.config';
 import { DetectorResult, DetectorSignal } from './types';
+
+// ============================================================
+// 🔥 سیگنال‌های هم‌روندی بر اساس زبان
+// ============================================================
 
 const CONCURRENCY_SIGNALS: Record<string, Array<{ pattern: RegExp; type: string }>> = {
   java: [
@@ -50,6 +53,10 @@ const CONCURRENCY_SIGNALS: Record<string, Array<{ pattern: RegExp; type: string 
   ],
 };
 
+// ============================================================
+// 🔥 توابع کمکی
+// ============================================================
+
 function getLanguageSignals(language: string): Array<{ pattern: RegExp; type: string }> {
   const normalized = language.toLowerCase();
   if (normalized.includes('java')) return CONCURRENCY_SIGNALS.java;
@@ -62,6 +69,10 @@ function getLineForMatch(code: string, matchIndex: number): number {
   const before = code.substring(0, matchIndex);
   return before.split('\n').length;
 }
+
+// ============================================================
+// 🔥 تابع اصلی تشخیص سیگنال‌های هم‌روندی
+// ============================================================
 
 export function detectConcurrencySignals(
   code: string,
