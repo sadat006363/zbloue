@@ -1,5 +1,5 @@
 // ============================================================
-// 📁 فایل: app/snippet/[slug]/page.tsx (نسخه کامل با DebugLogger)
+// 📁 فایل: app/snippet/[slug]/page.tsx
 // ============================================================
 
 import { notFound } from 'next/navigation';
@@ -166,20 +166,21 @@ async function highlightCode(code: string, language: string): Promise<string> {
 }
 
 // ============================================================
-// 🔥 تابع بررسی وجود Full Report (نسخه ساده‌تر)
+// 🔥 تابع بررسی وجود Full Report - نسخه ساده و قابل اعتماد
 // ============================================================
 function hasFullAnalysis(snippet: Snippet): boolean {
   // بررسی مستقیم فیلدهای جدید (اولویت اول)
+  // اگر هر کدام از این فیلدها مقدار truthy داشته باشند، یعنی Full Analysis وجود دارد.
   const hasNewFields = !!(
-    (Array.isArray(snippet.findings) && snippet.findings.length > 0) ||
+    snippet.findings ||
     snippet.scorecard_new ||
     snippet.verdict ||
     snippet.execution_overview ||
-    (Array.isArray(snippet.architectural_observations) && snippet.architectural_observations.length > 0) ||
-    (Array.isArray(snippet.recommended_actions) && snippet.recommended_actions.length > 0) ||
-    (Array.isArray(snippet.suggested_tests_new) && snippet.suggested_tests_new.length > 0) ||
+    snippet.architectural_observations ||
+    snippet.recommended_actions ||
+    snippet.suggested_tests_new ||
     snippet.complexity ||
-    (Array.isArray(snippet.limitations) && snippet.limitations.length > 0)
+    snippet.limitations
   );
 
   if (hasNewFields) {
@@ -189,18 +190,18 @@ function hasFullAnalysis(snippet: Snippet): boolean {
 
   // اگر فیلدهای جدید نبودند، فیلدهای Legacy را بررسی کن
   const hasLegacyFields = !!(
-    (Array.isArray(snippet.code_walkthrough) && snippet.code_walkthrough.length > 0) ||
-    (Array.isArray(snippet.what_works_well) && snippet.what_works_well.length > 0) ||
-    (Array.isArray(snippet.bugs_and_risky_cases) && snippet.bugs_and_risky_cases.length > 0) ||
-    (Array.isArray(snippet.edge_cases) && snippet.edge_cases.length > 0) ||
+    snippet.code_walkthrough ||
+    snippet.what_works_well ||
+    snippet.bugs_and_risky_cases ||
+    snippet.edge_cases ||
     snippet.performance_analysis ||
     snippet.security_analysis ||
     snippet.production_readiness ||
-    (Array.isArray(snippet.recommended_improvements) && snippet.recommended_improvements.length > 0) ||
-    (typeof snippet.improved_code === 'string' && snippet.improved_code.trim().length > 0) ||
-    (Array.isArray(snippet.suggested_tests) && snippet.suggested_tests.length > 0) ||
+    snippet.recommended_improvements ||
+    snippet.improved_code ||
+    snippet.suggested_tests ||
     snippet.scorecard ||
-    (typeof snippet.final_verdict_summary === 'string' && snippet.final_verdict_summary.trim().length > 0)
+    snippet.final_verdict_summary
   );
 
   console.log('[hasFullAnalysis] 🔍 Legacy fields:', hasLegacyFields);
@@ -232,9 +233,7 @@ export default async function SnippetPage({ params }: PageProps) {
   const highlightedHtml = await highlightCode(snippet.raw_code, snippet.language);
   const fullAnalysisExists = hasFullAnalysis(snippet);
 
-  // ============================================================
-  // 🔥 داده‌های دیباگ برای ارسال به کامپوننت DebugLogger
-  // ============================================================
+  // داده‌های دیباگ برای ارسال به کامپوننت DebugLogger
   const debugData = {
     fullAnalysisExists,
     findings: snippet.findings,
