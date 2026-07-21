@@ -37,6 +37,12 @@ type OutputsByMode = {
   };
 };
 
+type PromptInfo = {
+  auditType: 'simple' | 'medium' | 'advanced' | 'concurrency' | 'generic' | null;
+  status: 'complete' | 'repaired' | 'partially_complete' | 'failed_validation' | 'fallback' | null;
+  isPipeline: boolean;
+} | null;
+
 type AppState = {
   code: string;
   language: string;
@@ -56,6 +62,7 @@ type AppState = {
   convertLanguage: string;
   hoveredLine: number | null;
   toastMessage: string | null;
+  promptInfo: PromptInfo; // 🔥 اضافه شد
 };
 
 type Action =
@@ -78,7 +85,8 @@ type Action =
   | { type: 'SET_HOVERED_LINE'; payload: number | null }
   | { type: 'SET_TOAST'; payload: string | null }
   | { type: 'CLEAR_ALL' }
-  | { type: 'CLEAR_CURRENT_OUTPUT' };
+  | { type: 'CLEAR_CURRENT_OUTPUT' }
+  | { type: 'SET_PROMPT_INFO'; payload: PromptInfo }; // 🔥 اضافه شد
 
 const initialState: AppState = {
   code: '',
@@ -103,6 +111,7 @@ const initialState: AppState = {
   convertLanguage: '',
   hoveredLine: null,
   toastMessage: null,
+  promptInfo: null, // 🔥 مقدار اولیه
 };
 
 function appReducer(state: AppState, action: Action): AppState {
@@ -132,6 +141,7 @@ function appReducer(state: AppState, action: Action): AppState {
     case 'SET_CONVERT_LANGUAGE': return { ...state, convertLanguage: action.payload };
     case 'SET_HOVERED_LINE': return { ...state, hoveredLine: action.payload };
     case 'SET_TOAST': return { ...state, toastMessage: action.payload };
+    case 'SET_PROMPT_INFO': return { ...state, promptInfo: action.payload }; // 🔥 اضافه شد
     case 'CLEAR_ALL':
       return {
         ...state,
@@ -152,9 +162,10 @@ function appReducer(state: AppState, action: Action): AppState {
         isConverting: false,
         isExplaining: false,
         isGeneratingPrompt: false,
+        promptInfo: null, // 🔥 پاک می‌شود
       };
     case 'CLEAR_CURRENT_OUTPUT': {
-      const currentMode = state.mode;
+      const mode = state.mode;
       return {
         ...state,
         errorMessage: null,
@@ -163,7 +174,7 @@ function appReducer(state: AppState, action: Action): AppState {
         promptError: null,
         outputs: {
           ...state.outputs,
-          [currentMode]: {
+          [mode]: {
             snippet: null,
             fullAnalysis: null,
             lineExplanations: [],
@@ -172,7 +183,11 @@ function appReducer(state: AppState, action: Action): AppState {
         },
         convertLanguage: '',
         hoveredLine: null,
-        // 🔥 پرچم‌های بارگذاری دست‌نخورده می‌مانند تا با تغییر کد ریست نشوند
+        loading: false,
+        isConverting: false,
+        isExplaining: false,
+        isGeneratingPrompt: false,
+        // 🔥 promptInfo را پاک نمی‌کنیم تا اطلاعات آخرین تحلیل باقی بماند
       };
     }
     default: return state;
@@ -185,13 +200,13 @@ export default function Home() {
     code, language, mode, loading, isConverting, isExplaining, isGeneratingPrompt,
     errorMessage, convertError, explainError, promptError, outputs,
     username, githubUsername, avatarUrl, convertLanguage, hoveredLine, toastMessage,
+    promptInfo, // 🔥 اضافه شد
   } = state;
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const outputPanelRef = useRef<any>(null);
-  // 🔥 Ref to track loading start time for minimum display duration
   const loadingStartTimeRef = useRef<number | null>(null);
-  const MIN_LOADING_MS = 400; // minimum time to show loading state (ms)
+  const MIN_LOADING_MS = 400;
 
   const showToast = useCallback((message: string) => {
     dispatch({ type: 'SET_TOAST', payload: message });
@@ -432,8 +447,46 @@ export default function Home() {
     }
   }, [mode, username, githubUsername, avatarUrl]);
 
+  // ============================================================
+  // 🔥 تابع تشخیص وضعیت پرامپت (Prompt Info)
+  // ============================================================
+  const getPromptInfo = useCallback((genData: GenerateResponse, selectedMode: typeof mode): PromptInfo => {
+    // اگر mode ساده یا متوسط است
+    if (selectedMode === 'simple' || selectedMode === 'medium') {
+      return {
+        auditType: selectedMode,
+        status: 'complete',
+        isPipeline: false,
+      };
+    }
+
+    // اگر mode پیشرفته است
+    if (selectedMode === 'advanced') {
+      // بررسی وجود schemaVersion (نشان‌دهنده‌ی استفاده از پایپلاین)
+      const isPipeline = !!genData.schemaVersion;
+
+      if (isPipeline) {
+        // پایپلاین اجرا شده
+        return {
+          auditType: genData.auditType || 'advanced',
+          status: genData.status || 'complete',
+          isPipeline: true,
+        };
+      } else {
+        // Fallback به حالت معمولی
+        return {
+          auditType: 'advanced',
+          status: 'fallback',
+          isPipeline: false,
+        };
+      }
+    }
+
+    // حالت پیش‌فرض (نباید رخ دهد)
+    return null;
+  }, []);
+
   const handleGenerate = useCallback(async () => {
-    // 🔥 Record start time for minimum loading display
     loadingStartTimeRef.current = Date.now();
 
     // STEP 1: Set loading state immediately
@@ -450,6 +503,7 @@ export default function Home() {
     if (validationError) {
       dispatch({ type: 'SET_ERROR', payload: validationError });
       dispatch({ type: 'SET_LOADING', payload: false });
+      dispatch({ type: 'SET_PROMPT_INFO', payload: null });
       loadingStartTimeRef.current = null;
       return;
     }
@@ -464,7 +518,11 @@ export default function Home() {
       const newSnippet = buildSnippetFromPayload(saveResult, processedCode, language, saveDataPayload);
       const fullAnalysisData = mode === 'advanced' ? genData : { analysis: genData.analysis, linkedin_post: genData.linkedin_post };
 
-      // STEP 5: Update outputs
+      // 🔥 STEP 5: استخراج اطلاعات پرامپت
+      const promptInfo = getPromptInfo(genData, mode);
+      dispatch({ type: 'SET_PROMPT_INFO', payload: promptInfo });
+
+      // STEP 6: Update outputs
       dispatch({
         type: 'SET_OUTPUTS',
         payload: {
@@ -482,13 +540,14 @@ export default function Home() {
     } catch (error: unknown) {
       if (error instanceof Error && error.name === 'AbortError') {
         dispatch({ type: 'SET_ERROR', payload: null });
+        dispatch({ type: 'SET_PROMPT_INFO', payload: null });
         return;
       }
       const message = error instanceof Error ? error.message : 'Unknown error occurred.';
       if (process.env.NODE_ENV === 'development') console.error('Error:', error);
       dispatch({ type: 'SET_ERROR', payload: message });
+      dispatch({ type: 'SET_PROMPT_INFO', payload: null });
     } finally {
-      // 🔥 Ensure loading is shown for minimum duration (400ms)
       const elapsed = Date.now() - (loadingStartTimeRef.current || Date.now());
       const remaining = Math.max(0, MIN_LOADING_MS - elapsed);
       if (remaining > 0) {
@@ -498,7 +557,7 @@ export default function Home() {
       loadingStartTimeRef.current = null;
       abortControllerRef.current = null;
     }
-  }, [code, language, mode, outputs, processCode, validateCode, callGenerateAPI, prepareSaveData, saveSnippet, buildSnippetFromPayload, showToast]);
+  }, [code, language, mode, outputs, processCode, validateCode, callGenerateAPI, prepareSaveData, saveSnippet, buildSnippetFromPayload, showToast, getPromptInfo]);
 
   const handleGenerateExplanation = useCallback(async () => {
     const trimmedCode = removeEmptyLines(code);
@@ -675,6 +734,44 @@ export default function Home() {
           </div>
         </div>
         <ErrorDisplay message={errorMessage} />
+
+        {/* ============================================================
+            🔥 نمایش وضعیت پرامپت (Prompt Info)
+            ============================================================ */}
+        {promptInfo && (
+          <div className="mb-3 px-3 py-1.5 bg-[#1a1a2e] rounded-lg text-xs flex items-center gap-3 border border-[#313244] flex-wrap">
+            <span className="text-[#6c7086]">📋 Prompt:</span>
+            <span className="text-[#89b4fa] font-mono font-semibold">
+              {promptInfo.auditType?.toUpperCase()}
+            </span>
+            <span className="text-[#6c7086]">|</span>
+            <span className="text-[#6c7086]">Status:</span>
+            <span className={`font-medium ${
+              promptInfo.status === 'complete' ? 'text-[#a6e3a1]' :
+              promptInfo.status === 'repaired' ? 'text-[#f9e2af]' :
+              promptInfo.status === 'fallback' ? 'text-[#f38ba8]' :
+              'text-[#f38ba8]'
+            }`}>
+              {promptInfo.status?.toUpperCase()}
+            </span>
+            {promptInfo.isPipeline && (
+              <span className="text-[#6c7086] text-[10px] border border-[#313244] px-1.5 py-0.5 rounded">
+                Pipeline
+              </span>
+            )}
+            {!promptInfo.isPipeline && promptInfo.auditType !== 'simple' && promptInfo.auditType !== 'medium' && (
+              <span className="text-[#f38ba8] text-[10px] border border-[#f38ba8]/30 px-1.5 py-0.5 rounded">
+                Fallback
+              </span>
+            )}
+            {promptInfo.status === 'repaired' && (
+              <span className="text-[#f9e2af] text-[10px] border border-[#f9e2af]/30 px-1.5 py-0.5 rounded">
+                ⚡ Auto-repaired
+              </span>
+            )}
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8" style={{ minHeight: 'calc(100vh - 200px)' }}>
           <Editor
             code={code}
@@ -698,7 +795,8 @@ export default function Home() {
             onStop={handleStop}
           />
           <OutputPanel
-            ref={outputPanelRef}snippet={displaySnippet}
+            ref={outputPanelRef}
+            snippet={displaySnippet}
             loading={loading}
             fullAnalysis={displayFullAnalysis}
             analysisMode={mode}
