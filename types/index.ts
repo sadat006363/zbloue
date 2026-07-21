@@ -211,6 +211,13 @@ export interface SnippetLegacy {
 // 🔥 تعریف Schemas با Zod برای اعتبارسنجی داده‌ها
 // ============================================================
 
+// --- Schema برای LineExplanation ---
+export const LineExplanationSchema = z.object({
+  lineNumber: z.number().int().positive(),
+  code: z.string().optional(),
+  explanation: z.string(),
+});
+
 // --- Schema برای Evidence ---
 const EvidenceSchema = z.object({
   startLine: z.number().int().positive(),
