@@ -158,7 +158,10 @@ function appReducer(state: AppState, action: Action): AppState {
         },
         convertLanguage: '',
         hoveredLine: null,
-       
+        loading: false,
+        isConverting: false,
+        isExplaining: false,
+        isGeneratingPrompt: false,
         promptInfo: null,
       };
     case 'CLEAR_CURRENT_OUTPUT': {
@@ -180,11 +183,7 @@ function appReducer(state: AppState, action: Action): AppState {
         },
         convertLanguage: '',
         hoveredLine: null,
-        loading: false,
-        isConverting: false,
-        isExplaining: false,
-        isGeneratingPrompt: false,
-        promptInfo: null,
+        // 🔥 loading و flags حذف شدند تا فقط خروجی پاک شود
       };
     }
     default: return state;
@@ -203,6 +202,7 @@ export default function Home() {
   const abortControllerRef = useRef<AbortController | null>(null);
   const outputPanelRef = useRef<any>(null);
   const loadingStartTimeRef = useRef<number | null>(null);
+  const isProcessingRef = useRef(false); // 🔥 قفل برای جلوگیری از پاک شدن خروجی وسط عملیات
   const MIN_LOADING_MS = 400;
 
   const showToast = useCallback((message: string) => {
@@ -245,9 +245,12 @@ export default function Home() {
     }
   }, [code, language]);
 
+  // 🔥 useEffect با قفل isProcessingRef
   useEffect(() => {
     if (code.trim().length > 0 || language) {
-      dispatch({ type: 'CLEAR_CURRENT_OUTPUT' });
+      if (!isProcessingRef.current) {
+        dispatch({ type: 'CLEAR_CURRENT_OUTPUT' });
+      }
     }
   }, [code, language]);
 
@@ -446,6 +449,7 @@ export default function Home() {
 
   const handleGenerate = useCallback(async () => {
     loadingStartTimeRef.current = Date.now();
+    isProcessingRef.current = true; // 🔒 قفل فعال
     dispatch({ type: 'SET_LOADING', payload: true });
 
     const processedCode = processCode(code, language);
@@ -458,6 +462,7 @@ export default function Home() {
       dispatch({ type: 'SET_ERROR', payload: validationError });
       dispatch({ type: 'SET_LOADING', payload: false });
       loadingStartTimeRef.current = null;
+      isProcessingRef.current = false; // 🔓 قفل آزاد
       return;
     }
 
@@ -522,11 +527,11 @@ export default function Home() {
       }
       dispatch({ type: 'SET_LOADING', payload: false });
       loadingStartTimeRef.current = null;
+      isProcessingRef.current = false; // 🔓 قفل آزاد
       abortControllerRef.current = null;
     }
   }, [code, language, mode, outputs, processCode, validateCode, callGenerateAPI, prepareSaveData, saveSnippet, buildSnippetFromPayload, showToast]);
 
-  // 🔥 تابع کپی وضعیت پرامپت
   const copyPromptInfo = useCallback(() => {
     if (!promptInfo) return;
 
@@ -552,6 +557,7 @@ export default function Home() {
       return;
     }
 
+    isProcessingRef.current = true; // 🔒 قفل فعال
     dispatch({ type: 'SET_EXPLAIN_ERROR', payload: null });
     dispatch({ type: 'SET_EXPLAINING', payload: true });
 
@@ -582,6 +588,7 @@ export default function Home() {
       showToast(`❌ ${message}`);
     } finally {
       dispatch({ type: 'SET_EXPLAINING', payload: false });
+      isProcessingRef.current = false; // 🔓 قفل آزاد
     }
   }, [code, language, mode, displaySnippet, updateSnippet, showToast]);
 
@@ -598,6 +605,7 @@ export default function Home() {
       return;
     }
 
+    isProcessingRef.current = true; // 🔒 قفل فعال
     dispatch({ type: 'SET_PROMPT_ERROR', payload: null });
     dispatch({ type: 'SET_GENERATING_PROMPT', payload: true });
 
@@ -628,6 +636,7 @@ export default function Home() {
       showToast(`❌ ${message}`);
     } finally {
       dispatch({ type: 'SET_GENERATING_PROMPT', payload: false });
+      isProcessingRef.current = false; // 🔓 قفل آزاد
     }
   }, [code, language, mode, displaySnippet, updateSnippet, showToast]);
 
@@ -636,6 +645,7 @@ export default function Home() {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
       dispatch({ type: 'SET_LOADING', payload: false });
+      isProcessingRef.current = false; // 🔓 قفل آزاد
       showToast('⏹️ Generation stopped by user');
     }
   }, [showToast]);
@@ -658,8 +668,11 @@ export default function Home() {
       showToast(`❌ ${msg}`);
       return;
     }
+
+    isProcessingRef.current = true; // 🔒 قفل فعال
     dispatch({ type: 'SET_CONVERT_ERROR', payload: null });
     dispatch({ type: 'SET_CONVERTING', payload: true });
+
     try {
       const res = await fetch('/api/convert-code', {
         method: 'POST',
@@ -668,6 +681,7 @@ export default function Home() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Conversion failed');
+
       const convertedCode = removeEmptyLines(data.convertedCode);
       dispatch({ type: 'SET_CODE', payload: convertedCode });
       dispatch({ type: 'SET_LANGUAGE', payload: targetLang });
@@ -680,6 +694,7 @@ export default function Home() {
       showToast(`❌ ${message}`);
     } finally {
       dispatch({ type: 'SET_CONVERTING', payload: false });
+      isProcessingRef.current = false; // 🔓 قفل آزاد
     }
   }, [code, language, showToast]);
 
@@ -742,7 +757,7 @@ export default function Home() {
           />
 
           <div className="flex flex-col h-full">
-            {/* 🔥 نوار وضعیت پرامپت - رنگ روشن‌تر + دکمه کپی */}
+            {/* نوار وضعیت پرامپت */}
             {promptInfo && (
               <div className="mb-3 px-4 py-2.5 bg-[#3a3a6e] rounded-lg text-xs flex flex-wrap items-center gap-3 border border-[#5a5a8e] shadow-sm">
                 <div className="flex items-center gap-2">
@@ -800,7 +815,6 @@ export default function Home() {
                   )}
                 </div>
 
-                {/* 🔥 دکمه کپی */}
                 <button
                   onClick={copyPromptInfo}
                   className="ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#4a4a7e] hover:bg-[#5a5a9e] transition-colors border border-[#5a5a8e] text-[#a6adc8] hover:text-white"
