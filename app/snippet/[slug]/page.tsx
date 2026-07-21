@@ -16,7 +16,7 @@ import SnippetFooter from '@/components/snippet/SnippetFooter';
 import SnippetUserInfo from '@/components/snippet/SnippetUserInfo';
 import SnippetLineByLine from '@/components/snippet/SnippetLineByLine';
 import SnippetPrompt from '@/components/snippet/SnippetPrompt';
-import SnippetStatusBar from '@/components/snippet/SnippetStatusBar'; // ✅ جدید
+import SnippetStatusBar from '@/components/snippet/SnippetStatusBar';
 import DebugLogger from '@/components/DebugLogger';
 
 // ============================================================
@@ -168,7 +168,6 @@ async function highlightCode(code: string, language: string): Promise<string> {
 // 🔥 تابع بررسی وجود Full Report - نسخه ساده و قابل اعتماد
 // ============================================================
 function hasFullAnalysis(snippet: Snippet): boolean {
-  // بررسی مستقیم فیلدهای جدید (اولویت اول)
   const hasNewFields = !!(
     snippet.findings ||
     snippet.scorecard_new ||
@@ -186,7 +185,6 @@ function hasFullAnalysis(snippet: Snippet): boolean {
     return true;
   }
 
-  // اگر فیلدهای جدید نبودند، فیلدهای Legacy را بررسی کن
   const hasLegacyFields = !!(
     snippet.code_walkthrough ||
     snippet.what_works_well ||
@@ -231,7 +229,6 @@ export default async function SnippetPage({ params }: PageProps) {
   const highlightedHtml = await highlightCode(snippet.raw_code, snippet.language);
   const fullAnalysisExists = hasFullAnalysis(snippet);
 
-  // داده‌های دیباگ برای ارسال به کامپوننت DebugLogger
   const debugData = {
     fullAnalysisExists,
     findings: snippet.findings,
@@ -242,30 +239,30 @@ export default async function SnippetPage({ params }: PageProps) {
 
   return (
     <>
-      {/* 🔥 کامپوننت دیباگ لاگر - فقط در محیط Development */}
       {process.env.NODE_ENV === 'development' && <DebugLogger data={debugData} />}
 
       <main className="min-h-screen bg-[#f8f9fa]">
         <div className="max-w-5xl mx-auto px-4 py-6 md:py-8">
-          {/* ===== هدر ===== */}
+          
+          {/* ===== 🔹 جایگاه اول: هدر ===== */}
           <SnippetHeader shareUrl={shareUrl} />
 
-          {/* ===== 🔥 نوار وضعیت جدید ===== */}
-          <SnippetStatusBar snippet={snippet} />
-
-          {/* ===== اطلاعات کاربر ===== */}
+          {/* ===== 🔹 جایگاه دوم: اطلاعات کاربر ===== */}
           <SnippetUserInfo
             username={snippet.username || 'Anonymous'}
             githubUsername={snippet.github_username || undefined}
           />
 
-          {/* ===== دکمه‌های اشتراک‌گذاری ===== */}
+          {/* ===== 🔹 جایگاه سوم: نوار وضعیت ===== */}
+          <SnippetStatusBar snippet={snippet} />
+
+          {/* ===== 🔹 جایگاه چهارم: دکمه‌های اشتراک‌گذاری ===== */}
           <SnippetShareButtons slug={snippet.slug} title={snippet.card_title} />
 
-          {/* ===== لینک‌های مستقیم به تب‌ها ===== */}
+          {/* ===== 🔹 جایگاه پنجم: لینک‌های مستقیم به تب‌ها ===== */}
           <SnippetTabLinks shareUrl={shareUrl} />
 
-          {/* ===== کد منبع ===== */}
+          {/* ===== 🔹 جایگاه ششم: کد منبع ===== */}
           <div id="snippet-code">
             <SnippetCode
               code={snippet.raw_code}
@@ -274,7 +271,7 @@ export default async function SnippetPage({ params }: PageProps) {
             />
           </div>
 
-          {/* ===== تحلیل اولیه ===== */}
+          {/* ===== 🔹 جایگاه هفتم: تحلیل اولیه ===== */}
           <div id="snippet-analysis">
             <SnippetAnalysis
               keyConcept={snippet.key_concept}
@@ -282,7 +279,7 @@ export default async function SnippetPage({ params }: PageProps) {
             />
           </div>
 
-          {/* ===== دیباگ و بهینه‌سازی ===== */}
+          {/* ===== 🔹 جایگاه هشتم: دیباگ و بهینه‌سازی ===== */}
           <div id="snippet-debug">
             <SnippetDebug
               debugAnalysis={snippet.debug_analysis}
@@ -290,7 +287,7 @@ export default async function SnippetPage({ params }: PageProps) {
             />
           </div>
 
-          {/* ===== تحلیل کامل ===== */}
+          {/* ===== 🔹 جایگاه نهم: تحلیل کامل ===== */}
           <div id="snippet-full-analysis">
             {fullAnalysisExists ? (
               <SnippetFullAnalysis snippet={snippet} />
@@ -309,28 +306,28 @@ export default async function SnippetPage({ params }: PageProps) {
             )}
           </div>
 
-          {/* ===== خط به خط ===== */}
+          {/* ===== 🔹 جایگاه دهم: خط به خط (شرطی) ===== */}
           {snippet.line_explanations && snippet.line_explanations.length > 0 && (
             <div id="snippet-line-by-line">
               <SnippetLineByLine lineExplanations={snippet.line_explanations} />
             </div>
           )}
 
-          {/* ===== پرامپت ===== */}
+          {/* ===== 🔹 جایگاه یازدهم: پرامپت (شرطی) ===== */}
           {snippet.generated_prompt && (
             <div id="snippet-prompt">
               <SnippetPrompt generatedPrompt={snippet.generated_prompt} />
             </div>
           )}
 
-          {/* ===== لینکدین ===== */}
+          {/* ===== 🔹 جایگاه دوازدهم: لینکدین (شرطی) ===== */}
           {snippet.linkedin_post && (
             <div id="snippet-linkedin">
               <SnippetLinkedIn linkedinPost={snippet.linkedin_post} />
             </div>
           )}
 
-          {/* ===== فوتر ===== */}
+          {/* ===== 🔹 جایگاه سیزدهم: فوتر ===== */}
           <SnippetFooter appUrl={baseUrl || 'https://zbloue.vercel.app'} />
         </div>
       </main>
