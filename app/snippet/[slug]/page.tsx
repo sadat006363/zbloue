@@ -1,6 +1,4 @@
-// ============================================================
-// 📁 فایل: app/snippet/[slug]/page.tsx
-// ============================================================
+// app/snippet/[slug]/page.tsx
 
 import { notFound } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -18,6 +16,7 @@ import SnippetFooter from '@/components/snippet/SnippetFooter';
 import SnippetUserInfo from '@/components/snippet/SnippetUserInfo';
 import SnippetLineByLine from '@/components/snippet/SnippetLineByLine';
 import SnippetPrompt from '@/components/snippet/SnippetPrompt';
+import SnippetStatusBar from '@/components/snippet/SnippetStatusBar'; // ✅ جدید
 import DebugLogger from '@/components/DebugLogger';
 
 // ============================================================
@@ -170,7 +169,6 @@ async function highlightCode(code: string, language: string): Promise<string> {
 // ============================================================
 function hasFullAnalysis(snippet: Snippet): boolean {
   // بررسی مستقیم فیلدهای جدید (اولویت اول)
-  // اگر هر کدام از این فیلدها مقدار truthy داشته باشند، یعنی Full Analysis وجود دارد.
   const hasNewFields = !!(
     snippet.findings ||
     snippet.scorecard_new ||
@@ -249,55 +247,90 @@ export default async function SnippetPage({ params }: PageProps) {
 
       <main className="min-h-screen bg-[#f8f9fa]">
         <div className="max-w-5xl mx-auto px-4 py-6 md:py-8">
+          {/* ===== هدر ===== */}
           <SnippetHeader shareUrl={shareUrl} />
+
+          {/* ===== 🔥 نوار وضعیت جدید ===== */}
+          <SnippetStatusBar snippet={snippet} />
+
+          {/* ===== اطلاعات کاربر ===== */}
           <SnippetUserInfo
             username={snippet.username || 'Anonymous'}
             githubUsername={snippet.github_username || undefined}
           />
-          <SnippetShareButtons slug={snippet.slug} title={snippet.card_title} />
-          <SnippetTabLinks shareUrl={shareUrl} />
-          <SnippetCode
-            code={snippet.raw_code}
-            language={snippet.language}
-            highlightedHtml={highlightedHtml}
-          />
-          <SnippetAnalysis
-            keyConcept={snippet.key_concept}
-            whatItDoes={snippet.what_this_code_does}
-          />
-          <SnippetDebug
-            debugAnalysis={snippet.debug_analysis}
-            optimization={snippet.optimization}
-          />
 
-          {fullAnalysisExists ? (
-            <SnippetFullAnalysis snippet={snippet} />
-          ) : (
-            <div className="mt-8 pt-6 border-t border-[#313244]">
-              <div className="bg-[#11111b] p-6 rounded-lg border border-[#313244] text-center">
-                <p className="text-[#a6adc8] text-sm">
-                  📊 Full report has not been generated for this snippet yet.
-                </p>
-                <p className="text-[#6c7086] text-xs mt-2">
-                  Generate a full analysis to see detailed insights including code walkthrough,
-                  performance analysis, security review, and more.
-                </p>
+          {/* ===== دکمه‌های اشتراک‌گذاری ===== */}
+          <SnippetShareButtons slug={snippet.slug} title={snippet.card_title} />
+
+          {/* ===== لینک‌های مستقیم به تب‌ها ===== */}
+          <SnippetTabLinks shareUrl={shareUrl} />
+
+          {/* ===== کد منبع ===== */}
+          <div id="snippet-code">
+            <SnippetCode
+              code={snippet.raw_code}
+              language={snippet.language}
+              highlightedHtml={highlightedHtml}
+            />
+          </div>
+
+          {/* ===== تحلیل اولیه ===== */}
+          <div id="snippet-analysis">
+            <SnippetAnalysis
+              keyConcept={snippet.key_concept}
+              whatItDoes={snippet.what_this_code_does}
+            />
+          </div>
+
+          {/* ===== دیباگ و بهینه‌سازی ===== */}
+          <div id="snippet-debug">
+            <SnippetDebug
+              debugAnalysis={snippet.debug_analysis}
+              optimization={snippet.optimization}
+            />
+          </div>
+
+          {/* ===== تحلیل کامل ===== */}
+          <div id="snippet-full-analysis">
+            {fullAnalysisExists ? (
+              <SnippetFullAnalysis snippet={snippet} />
+            ) : (
+              <div className="mt-8 pt-6 border-t border-[#313244]">
+                <div className="bg-[#11111b] p-6 rounded-lg border border-[#313244] text-center">
+                  <p className="text-[#a6adc8] text-sm">
+                    📊 Full report has not been generated for this snippet yet.
+                  </p>
+                  <p className="text-[#6c7086] text-xs mt-2">
+                    Generate a full analysis to see detailed insights including code walkthrough,
+                    performance analysis, security review, and more.
+                  </p>
+                </div>
               </div>
+            )}
+          </div>
+
+          {/* ===== خط به خط ===== */}
+          {snippet.line_explanations && snippet.line_explanations.length > 0 && (
+            <div id="snippet-line-by-line">
+              <SnippetLineByLine lineExplanations={snippet.line_explanations} />
             </div>
           )}
 
-          {snippet.line_explanations && snippet.line_explanations.length > 0 && (
-            <SnippetLineByLine lineExplanations={snippet.line_explanations} />
-          )}
-
+          {/* ===== پرامپت ===== */}
           {snippet.generated_prompt && (
-            <SnippetPrompt generatedPrompt={snippet.generated_prompt} />
+            <div id="snippet-prompt">
+              <SnippetPrompt generatedPrompt={snippet.generated_prompt} />
+            </div>
           )}
 
+          {/* ===== لینکدین ===== */}
           {snippet.linkedin_post && (
-            <SnippetLinkedIn linkedinPost={snippet.linkedin_post} />
+            <div id="snippet-linkedin">
+              <SnippetLinkedIn linkedinPost={snippet.linkedin_post} />
+            </div>
           )}
 
+          {/* ===== فوتر ===== */}
           <SnippetFooter appUrl={baseUrl || 'https://zbloue.vercel.app'} />
         </div>
       </main>
