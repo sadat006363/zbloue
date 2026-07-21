@@ -14,7 +14,7 @@ import { css } from '@codemirror/lang-css';
 import { json } from '@codemirror/lang-json';
 import { cpp } from '@codemirror/lang-cpp';
 import { php } from '@codemirror/lang-php';
-import { EditorView } from '@codemirror/view'; // ✅ Import added
+import { EditorView } from '@codemirror/view';
 import type { Extension } from '@codemirror/state';
 
 // ============================================================
@@ -341,7 +341,7 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
 
   // --- Check if there is any content ---
   const hasContent = useMemo(() => {
-    return !!(
+    const result = !!(
       snippet.card_title ||
       snippet.key_concept ||
       snippet.code_walkthrough ||
@@ -365,10 +365,36 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
       snippet.verdict ||
       snippet.limitations
     );
+
+    // ===== 🔍 DEBUG LOGS =====
+    console.log('🔍 [SnippetFullAnalysis] ===== HAS CONTENT DEBUG =====');
+    console.log('🔍 [SnippetFullAnalysis] hasContent:', result);
+    console.log('🔍 [SnippetFullAnalysis] snippet.code_walkthrough:', snippet.code_walkthrough);
+    console.log('🔍 [SnippetFullAnalysis] snippet.what_works_well:', snippet.what_works_well);
+    console.log('🔍 [SnippetFullAnalysis] snippet.suggested_tests_new:', snippet.suggested_tests_new);
+    console.log('🔍 [SnippetFullAnalysis] snippet.scorecard_new:', snippet.scorecard_new);
+    console.log('🔍 [SnippetFullAnalysis] snippet.verdict:', snippet.verdict);
+    console.log('🔍 [SnippetFullAnalysis] snippet.limitations:', snippet.limitations);
+    console.log('🔍 [SnippetFullAnalysis] snippet.execution_overview:', snippet.execution_overview);
+    console.log('🔍 [SnippetFullAnalysis] snippet.findings:', snippet.findings);
+    console.log('🔍 [SnippetFullAnalysis] snippet.architectural_observations:', snippet.architectural_observations);
+    console.log('🔍 [SnippetFullAnalysis] snippet.recommended_actions:', snippet.recommended_actions);
+    console.log('🔍 [SnippetFullAnalysis] snippet.complexity:', snippet.complexity);
+    console.log('🔍 [SnippetFullAnalysis] hasFindings:', hasFindings);
+    console.log('🔍 [SnippetFullAnalysis] ===== END =====');
+
+    return result;
   }, [
     snippet,
     hasFindings,
   ]);
+
+  // ===== Debug logs before conditional render =====
+  if (!hasContent) {
+    console.log('🔍 [SnippetFullAnalysis] ❌ hasContent is false, showing fallback message');
+  } else {
+    console.log('🔍 [SnippetFullAnalysis] ✅ hasContent is true, rendering full analysis');
+  }
 
   if (!hasContent) {
     return (

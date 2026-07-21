@@ -6,9 +6,18 @@ interface SnippetDebugProps {
 }
 
 export default function SnippetDebug({ debugAnalysis, optimization }: SnippetDebugProps) {
+  // ===== DEBUG LOGS =====
+  console.log('🔍 [SnippetDebug] ===== START =====');
+  console.log('🔍 [SnippetDebug] debugAnalysis:', debugAnalysis);
+  console.log('🔍 [SnippetDebug] optimization:', optimization);
+
   if ((!debugAnalysis || debugAnalysis === '-') && (!optimization || optimization === '-')) {
+    console.log('🔍 [SnippetDebug] ❌ Both are empty or "-", returning null');
     return null;
   }
+
+  console.log('🔍 [SnippetDebug] ✅ Rendering SnippetDebug...');
+  console.log('🔍 [SnippetDebug] ===== END =====');
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-[#313244]">
