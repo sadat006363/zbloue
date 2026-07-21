@@ -7,7 +7,7 @@ import Editor from '@/components/Editor';
 import OutputPanel from '@/components/OutputPanel';
 import { HomeHeader, ErrorDisplay, HomeFooter } from '@/components/home';
 import { AppProvider, useAppContext } from '@/context';
-import { snippetService, analysisService, type SaveSnippetData } from '@/services';
+import { snippetService, analysisService,  SaveSnippetData } from '@/services';
 import { detectLanguage } from '@/lib/languageDetector';
 import { isCodeLike, removeComments } from '@/lib/utils';
 import {

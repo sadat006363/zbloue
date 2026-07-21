@@ -2,7 +2,10 @@
 
 import { Snippet, CreateSnippetResponse } from '@/types';
 
-interface SaveSnippetData {
+/**
+ * داده‌های مورد نیاز برای ذخیره‌سازی Snippet جدید
+ */
+export interface SaveSnippetData {
   code: string;
   language: string;
   card_title?: string;
@@ -14,13 +17,15 @@ interface SaveSnippetData {
   username?: string | null;
   github_username?: string | null;
   avatar_url?: string | null;
-  // ... سایر فیلدهای اختیاری
-  [key: string]: unknown;
+  [key: string]: unknown; // برای فیلدهای اضافی مثل findings, scorecard و ...
 }
 
+/**
+ * سرویس مدیریت Snippetها
+ */
 export const snippetService = {
   /**
-   * ذخیره‌سازی یک Snippet جدید
+   * ذخیره‌سازی یک Snippet جدید در دیتابیس
    */
   async save(data: SaveSnippetData): Promise<CreateSnippetResponse> {
     const response = await fetch('/api/create-snippet', {
@@ -37,7 +42,7 @@ export const snippetService = {
   },
 
   /**
-   * به‌روزرسانی یک Snippet موجود
+   * به‌روزرسانی یک Snippet موجود با استفاده از slug
    */
   async update(slug: string, data: Record<string, unknown>): Promise<Snippet> {
     const apiKey = process.env.NEXT_PUBLIC_API_KEY || '';
