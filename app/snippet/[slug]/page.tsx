@@ -42,30 +42,22 @@ function escapeHtml(value: string): string {
 // 🔧 Helpers: بررسی وجود محتوا در آرایه‌ها و رشته‌ها
 // ============================================================
 function hasItems<T>(value: readonly T[] | null | undefined): boolean {
-  const result = Array.isArray(value) && value.length > 0;
-  console.log(`[hasItems] value:`, value, `→ result: ${result}`);
-  return result;
+  return Array.isArray(value) && value.length > 0;
 }
 
 function hasText(value: string | null | undefined): boolean {
-  const result = typeof value === 'string' && value.trim().length > 0;
-  console.log(`[hasText] value:`, value, `→ result: ${result}`);
-  return result;
+  return typeof value === 'string' && value.trim().length > 0;
 }
 
 function hasExecutionOverview(value: Snippet['execution_overview']): boolean {
-  if (!value) {
-    console.log('[hasExecutionOverview] value is null/undefined → false');
-    return false;
-  }
-  const result =
+  if (!value) return false;
+  return (
     hasItems(value.entryPoints) ||
     hasItems(value.taskSubmissionPoints) ||
     hasItems(value.blockingWaitPoints) ||
     hasItems(value.sharedResources) ||
-    hasItems(value.resourceLifecycle);
-  console.log('[hasExecutionOverview] result:', result);
-  return result;
+    hasItems(value.resourceLifecycle)
+  );
 }
 
 // ============================================================
@@ -141,11 +133,6 @@ async function getSnippet(slug: string): Promise<Snippet> {
     limitations: data.limitations ?? undefined,
   };
 
-  console.log('🔍 [getSnippet] candidate findings:', candidate.findings);
-  console.log('🔍 [getSnippet] candidate scorecard_new:', candidate.scorecard_new);
-  console.log('🔍 [getSnippet] candidate verdict:', candidate.verdict);
-  console.log('🔍 [getSnippet] candidate execution_overview:', candidate.execution_overview);
-
   const validation = SnippetDataSchema.safeParse(candidate);
 
   if (!validation.success) {
@@ -156,7 +143,6 @@ async function getSnippet(slug: string): Promise<Snippet> {
     throw new Error('Snippet data is invalid');
   }
 
-  console.log('🔍 [getSnippet] validation.data:', validation.data);
   return validation.data;
 }
 
@@ -179,41 +165,45 @@ async function highlightCode(code: string, language: string): Promise<string> {
 }
 
 // ============================================================
-// 🔥 تابع بررسی وجود Full Report (با در نظر گرفتن آرایه‌های خالی)
+// 🔥 تابع بررسی وجود Full Report (نسخه ساده‌تر)
 // ============================================================
 function hasFullAnalysis(snippet: Snippet): boolean {
-  console.log('🔍 [hasFullAnalysis] START ==========================');
-  console.log('🔍 [hasFullAnalysis] snippet.findings:', snippet.findings);
-  console.log('🔍 [hasFullAnalysis] snippet.scorecard_new:', snippet.scorecard_new);
-  console.log('🔍 [hasFullAnalysis] snippet.verdict:', snippet.verdict);
-  console.log('🔍 [hasFullAnalysis] snippet.execution_overview:', snippet.execution_overview);
+  // بررسی مستقیم فیلدهای جدید (اولویت اول)
+  const hasNewFields = !!(
+    (Array.isArray(snippet.findings) && snippet.findings.length > 0) ||
+    snippet.scorecard_new ||
+    snippet.verdict ||
+    snippet.execution_overview ||
+    (Array.isArray(snippet.architectural_observations) && snippet.architectural_observations.length > 0) ||
+    (Array.isArray(snippet.recommended_actions) && snippet.recommended_actions.length > 0) ||
+    (Array.isArray(snippet.suggested_tests_new) && snippet.suggested_tests_new.length > 0) ||
+    snippet.complexity ||
+    (Array.isArray(snippet.limitations) && snippet.limitations.length > 0)
+  );
 
-  const result =
-    hasItems(snippet.code_walkthrough) ||
-    hasItems(snippet.what_works_well) ||
-    hasItems(snippet.bugs_and_risky_cases) ||
-    hasItems(snippet.edge_cases) ||
-    snippet.performance_analysis != null ||
-    snippet.security_analysis != null ||
-    snippet.production_readiness != null ||
-    hasItems(snippet.recommended_improvements) ||
-    hasText(snippet.improved_code) ||
-    hasItems(snippet.suggested_tests) ||
-    snippet.scorecard != null ||
-    hasText(snippet.final_verdict_summary) ||
-    hasItems(snippet.findings) ||
-    hasExecutionOverview(snippet.execution_overview) ||
-    hasItems(snippet.architectural_observations) ||
-    hasItems(snippet.recommended_actions) ||
-    hasItems(snippet.suggested_tests_new) ||
-    snippet.complexity != null ||
-    snippet.scorecard_new != null ||
-    snippet.verdict != null ||
-    hasItems(snippet.limitations);
+  if (hasNewFields) {
+    console.log('[hasFullAnalysis] ✅ New fields detected → true');
+    return true;
+  }
 
-  console.log('🔍 [hasFullAnalysis] FINAL RESULT:', result);
-  console.log('🔍 [hasFullAnalysis] END ==========================');
-  return result;
+  // اگر فیلدهای جدید نبودند، فیلدهای Legacy را بررسی کن
+  const hasLegacyFields = !!(
+    (Array.isArray(snippet.code_walkthrough) && snippet.code_walkthrough.length > 0) ||
+    (Array.isArray(snippet.what_works_well) && snippet.what_works_well.length > 0) ||
+    (Array.isArray(snippet.bugs_and_risky_cases) && snippet.bugs_and_risky_cases.length > 0) ||
+    (Array.isArray(snippet.edge_cases) && snippet.edge_cases.length > 0) ||
+    snippet.performance_analysis ||
+    snippet.security_analysis ||
+    snippet.production_readiness ||
+    (Array.isArray(snippet.recommended_improvements) && snippet.recommended_improvements.length > 0) ||
+    (typeof snippet.improved_code === 'string' && snippet.improved_code.trim().length > 0) ||
+    (Array.isArray(snippet.suggested_tests) && snippet.suggested_tests.length > 0) ||
+    snippet.scorecard ||
+    (typeof snippet.final_verdict_summary === 'string' && snippet.final_verdict_summary.trim().length > 0)
+  );
+
+  console.log('[hasFullAnalysis] 🔍 Legacy fields:', hasLegacyFields);
+  return hasLegacyFields;
 }
 
 // ============================================================
@@ -240,11 +230,6 @@ export default async function SnippetPage({ params }: PageProps) {
   const shareUrl = `${baseUrl}/snippet/${snippet.slug}`;
   const highlightedHtml = await highlightCode(snippet.raw_code, snippet.language);
   const fullAnalysisExists = hasFullAnalysis(snippet);
-
-  console.log('🔍 [SnippetPage] fullAnalysisExists:', fullAnalysisExists);
-  console.log('🔍 [SnippetPage] snippet.findings:', snippet.findings);
-  console.log('🔍 [SnippetPage] snippet.scorecard_new:', snippet.scorecard_new);
-  console.log('🔍 [SnippetPage] snippet.verdict:', snippet.verdict);
 
   return (
     <main className="min-h-screen bg-[#f8f9fa]">
