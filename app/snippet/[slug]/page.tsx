@@ -1,5 +1,5 @@
 // ============================================================
-// 📁 فایل: app/snippet/[slug]/page.tsx
+// 📁 فایل: app/snippet/[slug]/page.tsx (نسخه کامل با DebugLogger)
 // ============================================================
 
 import { notFound } from 'next/navigation';
@@ -18,6 +18,7 @@ import SnippetFooter from '@/components/snippet/SnippetFooter';
 import SnippetUserInfo from '@/components/snippet/SnippetUserInfo';
 import SnippetLineByLine from '@/components/snippet/SnippetLineByLine';
 import SnippetPrompt from '@/components/snippet/SnippetPrompt';
+import DebugLogger from '@/components/DebugLogger';
 
 // ============================================================
 // 🔥 params باید از نوع Promise باشد (Next.js 16)
@@ -231,7 +232,9 @@ export default async function SnippetPage({ params }: PageProps) {
   const highlightedHtml = await highlightCode(snippet.raw_code, snippet.language);
   const fullAnalysisExists = hasFullAnalysis(snippet);
 
-  // داده‌های دیباگ برای نمایش در صفحه
+  // ============================================================
+  // 🔥 داده‌های دیباگ برای ارسال به کامپوننت DebugLogger
+  // ============================================================
   const debugData = {
     fullAnalysisExists,
     findings: snippet.findings,
@@ -242,13 +245,8 @@ export default async function SnippetPage({ params }: PageProps) {
 
   return (
     <>
-      {/* 🔥 باکس دیباگ - فقط در محیط Development نمایش داده می‌شود */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="fixed top-20 left-4 z-50 bg-black/90 text-white p-4 rounded-lg max-w-md max-h-96 overflow-auto text-xs font-mono border border-gray-600 shadow-2xl">
-          <div className="font-bold text-yellow-400 mb-2">🔍 DEBUG</div>
-          <pre>{JSON.stringify(debugData, null, 2)}</pre>
-        </div>
-      )}
+      {/* 🔥 کامپوننت دیباگ لاگر - فقط در محیط Development */}
+      {process.env.NODE_ENV === 'development' && <DebugLogger data={debugData} />}
 
       <main className="min-h-screen bg-[#f8f9fa]">
         <div className="max-w-5xl mx-auto px-4 py-6 md:py-8">
