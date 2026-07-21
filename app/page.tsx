@@ -158,10 +158,7 @@ function appReducer(state: AppState, action: Action): AppState {
         },
         convertLanguage: '',
         hoveredLine: null,
-        loading: false,
-        isConverting: false,
-        isExplaining: false,
-        isGeneratingPrompt: false,
+       
         promptInfo: null,
       };
     case 'CLEAR_CURRENT_OUTPUT': {
