@@ -7,7 +7,7 @@ import Editor from '@/components/Editor';
 import OutputPanel from '@/components/OutputPanel';
 import { HomeHeader, ErrorDisplay, HomeFooter } from '@/components/home';
 import { AppProvider, useAppContext } from '@/context';
-import { snippetService, analysisService } from '@/services';
+import { snippetService, analysisService, type SaveSnippetData } from '@/services';
 import { detectLanguage } from '@/lib/languageDetector';
 import { isCodeLike, removeComments } from '@/lib/utils';
 import {
@@ -218,7 +218,7 @@ function HomeContent() {
     processedCode: string,
     lang: string,
     genData: GenerateResponse
-  ): Record<string, unknown> => {
+  ): SaveSnippetData => {
     const linkedin_post = genData.linkedin_post || 'Check out this code analysis! #Zbloue';
 
     if (mode === 'advanced') {
