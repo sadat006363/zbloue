@@ -42,22 +42,30 @@ function escapeHtml(value: string): string {
 // 🔧 Helpers: بررسی وجود محتوا در آرایه‌ها و رشته‌ها
 // ============================================================
 function hasItems<T>(value: readonly T[] | null | undefined): boolean {
-  return Array.isArray(value) && value.length > 0;
+  const result = Array.isArray(value) && value.length > 0;
+  console.log(`[hasItems] value:`, value, `→ result: ${result}`);
+  return result;
 }
 
 function hasText(value: string | null | undefined): boolean {
-  return typeof value === 'string' && value.trim().length > 0;
+  const result = typeof value === 'string' && value.trim().length > 0;
+  console.log(`[hasText] value:`, value, `→ result: ${result}`);
+  return result;
 }
 
 function hasExecutionOverview(value: Snippet['execution_overview']): boolean {
-  if (!value) return false;
-  return (
+  if (!value) {
+    console.log('[hasExecutionOverview] value is null/undefined → false');
+    return false;
+  }
+  const result =
     hasItems(value.entryPoints) ||
     hasItems(value.taskSubmissionPoints) ||
     hasItems(value.blockingWaitPoints) ||
     hasItems(value.sharedResources) ||
-    hasItems(value.resourceLifecycle)
-  );
+    hasItems(value.resourceLifecycle);
+  console.log('[hasExecutionOverview] result:', result);
+  return result;
 }
 
 // ============================================================
@@ -133,6 +141,11 @@ async function getSnippet(slug: string): Promise<Snippet> {
     limitations: data.limitations ?? undefined,
   };
 
+  console.log('🔍 [getSnippet] candidate findings:', candidate.findings);
+  console.log('🔍 [getSnippet] candidate scorecard_new:', candidate.scorecard_new);
+  console.log('🔍 [getSnippet] candidate verdict:', candidate.verdict);
+  console.log('🔍 [getSnippet] candidate execution_overview:', candidate.execution_overview);
+
   const validation = SnippetDataSchema.safeParse(candidate);
 
   if (!validation.success) {
@@ -143,6 +156,7 @@ async function getSnippet(slug: string): Promise<Snippet> {
     throw new Error('Snippet data is invalid');
   }
 
+  console.log('🔍 [getSnippet] validation.data:', validation.data);
   return validation.data;
 }
 
@@ -168,7 +182,13 @@ async function highlightCode(code: string, language: string): Promise<string> {
 // 🔥 تابع بررسی وجود Full Report (با در نظر گرفتن آرایه‌های خالی)
 // ============================================================
 function hasFullAnalysis(snippet: Snippet): boolean {
-  return (
+  console.log('🔍 [hasFullAnalysis] START ==========================');
+  console.log('🔍 [hasFullAnalysis] snippet.findings:', snippet.findings);
+  console.log('🔍 [hasFullAnalysis] snippet.scorecard_new:', snippet.scorecard_new);
+  console.log('🔍 [hasFullAnalysis] snippet.verdict:', snippet.verdict);
+  console.log('🔍 [hasFullAnalysis] snippet.execution_overview:', snippet.execution_overview);
+
+  const result =
     hasItems(snippet.code_walkthrough) ||
     hasItems(snippet.what_works_well) ||
     hasItems(snippet.bugs_and_risky_cases) ||
@@ -189,8 +209,11 @@ function hasFullAnalysis(snippet: Snippet): boolean {
     snippet.complexity != null ||
     snippet.scorecard_new != null ||
     snippet.verdict != null ||
-    hasItems(snippet.limitations)
-  );
+    hasItems(snippet.limitations);
+
+  console.log('🔍 [hasFullAnalysis] FINAL RESULT:', result);
+  console.log('🔍 [hasFullAnalysis] END ==========================');
+  return result;
 }
 
 // ============================================================
@@ -217,6 +240,11 @@ export default async function SnippetPage({ params }: PageProps) {
   const shareUrl = `${baseUrl}/snippet/${snippet.slug}`;
   const highlightedHtml = await highlightCode(snippet.raw_code, snippet.language);
   const fullAnalysisExists = hasFullAnalysis(snippet);
+
+  console.log('🔍 [SnippetPage] fullAnalysisExists:', fullAnalysisExists);
+  console.log('🔍 [SnippetPage] snippet.findings:', snippet.findings);
+  console.log('🔍 [SnippetPage] snippet.scorecard_new:', snippet.scorecard_new);
+  console.log('🔍 [SnippetPage] snippet.verdict:', snippet.verdict);
 
   return (
     <main className="min-h-screen bg-[#f8f9fa]">
