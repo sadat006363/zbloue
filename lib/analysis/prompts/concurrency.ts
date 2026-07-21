@@ -111,6 +111,31 @@ ${numberedCode}
     - Explain whether each mechanism has distinct semantics.
     - Report duplication of responsibility if mechanisms redundantly control the same capacity.
 
+==================== DUPLICATE CODE DETECTION ====================
+
+Identify and report duplicate code patterns, including:
+
+1. **Exact Duplication**: Identical code blocks repeated in multiple places.
+2. **Structural Duplication**: Similar logic with minor variations (e.g., different variable names but same algorithm).
+3. **Conceptual Duplication**: Multiple methods or classes that serve the same purpose but are implemented differently.
+
+For each duplicate found, report:
+- The location (file, class, method, line numbers) of each duplicate instance.
+- The type of duplication (exact, structural, conceptual).
+- The impact on maintainability and risk of inconsistency.
+
+If duplicate code is found, create a finding with:
+- category: "architectural-duplication"
+- severity: "medium" (or "high" if it significantly impacts maintainability)
+- confidence: "definite"
+- evidence: list of duplicate code snippets with line references
+- executionPath: ["method1", "method2"]
+- triggerConditions: ["When changes are made to one duplicate instance"]
+- consequence: "Increased maintenance cost and risk of inconsistency"
+- remediation: "Refactor duplicate code into a shared method or utility class"
+
+If no duplicate code is found, simply omit this finding or state "No significant duplication detected."
+
 ==================== JSON OUTPUT STRUCTURE (MUST BE EXACT) ====================
 
 Return your analysis as a JSON object with the following fields.
@@ -255,6 +280,10 @@ The following fields are MANDATORY and MUST NOT be empty arrays:
    - MUST contain at least 1 limitation.
    - At minimum, include: "Analysis is based solely on the provided source code, without runtime context."
    - Add additional limitations if applicable.
+
+4. duplicateCode:
+   - MUST include a dedicated finding for duplicate code if any duplication exists.
+   - If no duplicate code is found, this finding should be omitted or listed as "No significant duplication detected."
 
 ==================== MANDATORY OUTPUT ====================
 
