@@ -238,10 +238,27 @@ Verdict statuses: not-production-ready, requires-major-changes, requires-minor-c
 - Always include all required fields, even if empty.
 - The output must be pure JSON; do NOT use Markdown code fences or any text before/after the JSON.
 
+==================== MANDATORY FIELDS RULES ====================
+
+The following fields are MANDATORY and MUST NOT be empty arrays:
+
+1. architecturalObservations:
+   - MUST contain at least 1 observation.
+   - If no major architectural issues exist, describe a positive aspect (e.g., "Clear separation of concerns", "Well-structured concurrency management", or "Good use of builder pattern for configuration").
+
+2. suggestedTests:
+   - MUST contain at least 2 tests (one success case, one failure case).
+   - If no specific tests are identified from the code, provide generic tests based on the code's functionality.
+   - Each test must include: title, purpose, setup (array), steps (array), and expectedResult.
+
+3. limitations:
+   - MUST contain at least 1 limitation.
+   - At minimum, include: "Analysis is based solely on the provided source code, without runtime context."
+   - Add additional limitations if applicable.
+
 ==================== MANDATORY OUTPUT ====================
 
 Return a JSON object matching the structure above.
-Use empty arrays when no findings exist.
 The linkedin_post field MUST NOT exceed 300 characters and should focus on a high-level technical takeaway about concurrency, liveness, or production risks.
 
 `;
