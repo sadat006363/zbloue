@@ -1,6 +1,10 @@
+// components/OutputPanel/LoadingState.tsx
+
+'use client';
+
 export default function LoadingState() {
   return (
-    <div className="flex items-center justify-center h-full min-h-[400px] bg-white rounded-xl border-2 border-[#d0d0d8] p-8 shadow-sm">
+    <div className="flex flex-col items-center justify-start w-full min-h-[200px] bg-white rounded-xl border-2 border-[#d0d0d8] p-8 shadow-sm pt-10">
       <div className="flex flex-col items-center gap-3">
         <div className="relative w-12 h-12">
           <div className="absolute inset-0 border-4 border-[#4a86f7]/20 rounded-full"></div>
