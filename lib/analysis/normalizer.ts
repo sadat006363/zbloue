@@ -1,6 +1,6 @@
 // lib/analysis/normalizer.ts
 
-import type { AdvancedAuditResult, AuditFinding, AuditScorecard } from './schema';
+import type { AdvancedAuditResult, AuditFinding, AuditScorecard, ScoreItem } from './schema';
 import {
   SeveritySchema,
   ConfidenceSchema,
@@ -65,6 +65,28 @@ function normalizeScore(value: unknown, fallback: number = 0): number {
 }
 
 // ============================================================
+// Normalize Score Item (new structure)
+// ============================================================
+
+function normalizeScoreItem(value: unknown, fallback: number = 0): ScoreItem {
+  // If value is already an object with score, reason, relatedFindings
+  if (isObject(value)) {
+    const score = normalizeScore(value.score, fallback);
+    const reason = typeof value.reason === 'string' ? value.reason.trim() : '';
+    const relatedFindings = Array.isArray(value.relatedFindings)
+      ? value.relatedFindings.filter((id): id is string => typeof id === 'string')
+      : [];
+    return { score, reason, relatedFindings };
+  }
+  // Otherwise, extract only the numeric score
+  return {
+    score: normalizeScore(value, fallback),
+    reason: '',
+    relatedFindings: [],
+  };
+}
+
+// ============================================================
 // Main Normalizer
 // ============================================================
 
@@ -81,14 +103,12 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
 
   const findingsArray = getSafeArray<unknown>(findingsSource, []);
 
-  // Track used IDs to enforce uniqueness
   const usedIds = new Set<string>();
 
   const normalizedFindings: AuditFinding[] = findingsArray
     .map((f: unknown, index: number) => {
       const finding = getSafeObject(f);
 
-      // Evidence
       const evidenceList = getSafeArray<unknown>(finding.evidence, []);
       const normalizedEvidence = evidenceList.map((e: unknown) => {
         const ev = getSafeObject(e);
@@ -105,7 +125,6 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
         };
       });
 
-      // Test to reproduce
       let testToReproduce = null;
       const testRaw = finding.testToReproduce ?? finding.test;
       if (isObject(testRaw)) {
@@ -121,7 +140,6 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
         }
       }
 
-      // Generate unique ID
       let id = getSafeString(finding.id, `F-${String(index + 1).padStart(3, '0')}`);
       if (!/^F-\d{3,}$/.test(id)) {
         id = `F-${String(index + 1).padStart(3, '0')}`;
@@ -176,19 +194,19 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
     resourceLifecycle: getStringArray(overviewSource.resourceLifecycle) || [],
   };
 
-  // --- 3. Scorecard (canonical 0–100 range, consistent with prompt) ---
+  // --- 3. Scorecard (normalize to new ScoreItem structure) ---
   const scorecardSource = getSafeObject(
     input.scorecard_new ?? input.scorecardLegacy ?? input.scorecard ?? {}
   );
 
   const scorecard: AuditScorecard = {
-    correctness: normalizeScore(scorecardSource.correctness, 0),
-    concurrencySafety: normalizeScore(scorecardSource.concurrencySafety, 0),
-    liveness: normalizeScore(scorecardSource.liveness, 0),
-    errorHandling: normalizeScore(scorecardSource.errorHandling, 0),
-    resourceManagement: normalizeScore(scorecardSource.resourceManagement, 0),
-    maintainability: normalizeScore(scorecardSource.maintainability, 0),
-    productionReadiness: normalizeScore(scorecardSource.productionReadiness, 0),
+    correctness: normalizeScoreItem(scorecardSource.correctness, 0),
+    concurrencySafety: normalizeScoreItem(scorecardSource.concurrencySafety, 0),
+    liveness: normalizeScoreItem(scorecardSource.liveness, 0),
+    errorHandling: normalizeScoreItem(scorecardSource.errorHandling, 0),
+    resourceManagement: normalizeScoreItem(scorecardSource.resourceManagement, 0),
+    maintainability: normalizeScoreItem(scorecardSource.maintainability, 0),
+    productionReadiness: normalizeScoreItem(scorecardSource.productionReadiness, 0),
   };
 
   // --- 4. Verdict ---
@@ -211,7 +229,7 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
     assumptions: getStringArray(complexitySource.assumptions) || [],
   };
 
-  // --- 6. linkedin_post (with fallback to avoid validation errors) ---
+  // --- 6. linkedin_post ---
   let linkedinPost =
     typeof input.linkedin_post === 'string'
       ? input.linkedin_post.trim()
@@ -219,12 +237,11 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
         ? input.linkedinPost.trim()
         : '';
 
-  // 🔥 If linkedin_post is empty, set a default value to pass Zod validation
   if (!linkedinPost) {
     linkedinPost = 'Check out this code analysis! #Zbloue';
   }
 
-  // --- 7. Other arrays with filtering ---
+  // --- 7. Other arrays ---
   const architecturalObservations = getSafeArray<unknown>(input.architecturalObservations, [])
     .map((obs: unknown) => {
       const o = getSafeObject(obs);
@@ -276,6 +293,14 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
   const summary = getSafeString(input.summary, getSafeString(input.highLevelSummary, ''));
   const schemaVersion: '1.0' = '1.0';
 
+  // --- 9. Improved Code ---
+  const improvedCodeSource = getSafeObject(input.improvedCode, {});
+  const improvedCode = {
+    available: typeof improvedCodeSource.available === 'boolean' ? improvedCodeSource.available : false,
+    code: typeof improvedCodeSource.code === 'string' ? improvedCodeSource.code : null,
+    notes: typeof improvedCodeSource.notes === 'string' ? improvedCodeSource.notes : '',
+  };
+
   return {
     schemaVersion,
     auditType,
@@ -291,6 +316,7 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
     scorecard,
     verdict,
     limitations,
+    improvedCode,
     linkedin_post: linkedinPost,
   };
 }
