@@ -2,9 +2,9 @@
 
 import { callOpenAI } from '@/lib/openaiClient';
 import { buildRepairPrompt } from './prompts/repair';
-import type { AdvancedAuditResult, AuditValidationResult } from './types';
+import { AdvancedAuditResultSchema, type AdvancedAuditResult } from './schema';
+import type { AuditValidationResult } from './types';
 import logger from '@/lib/logger';
-import { AdvancedAuditResultSchema } from './schema';
 
 // ============================================================
 // EXTRACT JSON
@@ -61,7 +61,9 @@ export async function repairAudit(
     // Validate with Zod before returning
     const result = AdvancedAuditResultSchema.safeParse(parsed);
     if (result.success) {
-      return result.data;
+      // result.data is already typed as z.infer<typeof AdvancedAuditResultSchema>
+      // which matches AdvancedAuditResult from the same schema.
+      return result.data as AdvancedAuditResult;
     } else {
       logger.warn('[Repair] Repair produced invalid schema:', result.error.issues);
       return null;
