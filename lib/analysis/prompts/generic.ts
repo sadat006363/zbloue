@@ -73,6 +73,31 @@ ${numberedCode}
    - If package manifests, lockfiles, or runtime configuration are not provided, record this as a limitation instead of making assumptions.
    - Check whether imported APIs are used consistently with the visible code.
 
+==================== DUPLICATE CODE DETECTION ====================
+
+Identify and report duplicate code patterns, including:
+
+1. **Exact Duplication**: Identical code blocks repeated in multiple places.
+2. **Structural Duplication**: Similar logic with minor variations (e.g., different variable names but same algorithm).
+3. **Conceptual Duplication**: Multiple methods or classes that serve the same purpose but are implemented differently.
+
+For each duplicate found, report:
+- The location (file, class, method, line numbers) of each duplicate instance.
+- The type of duplication (exact, structural, conceptual).
+- The impact on maintainability and risk of inconsistency.
+
+If duplicate code is found, create a finding with:
+- category: "architectural-duplication"
+- severity: "medium" (or "high" if it significantly impacts maintainability)
+- confidence: "definite"
+- evidence: list of duplicate code snippets with line references
+- executionPath: ["method1", "method2"]
+- triggerConditions: ["When changes are made to one duplicate instance"]
+- consequence: "Increased maintenance cost and risk of inconsistency"
+- remediation: "Refactor duplicate code into a shared method or utility class"
+
+If no duplicate code is found, simply omit this finding or state "No significant duplication detected."
+
 ==================== JSON OUTPUT STRUCTURE (MUST BE EXACT) ====================
 
 Return your analysis as a JSON object with the following fields.
@@ -176,56 +201,54 @@ This structure is mandatory; do not add, remove, or rename any field.
 
   "limitations": ["Limitation 1", "Limitation 2"],
 
+  "improvedCode": {
+    "available": true,
+    "code": "the full improved code snippet",
+    "notes": "brief explanation of what was fixed and why"
+  },
+
   "linkedin_post": "A professional LinkedIn post (max 300 characters) summarising the key insight."
 }
 
-==================== SCORECARD RULES ====================
+==================== SCORECARD RULES (MVP FRIENDLY - CONSTRUCTIVE) ====================
 
 - Every score must be an integer from 0 to 100.
-- 0 means critically unsafe or absent.
-- 100 means strong and production-ready.
-- Base scores only on evidence from the supplied source.
-- If evidence is insufficient, use a conservative score and explain the limitation.
+- **0-20**: Critical flaws present (e.g., deadlock, data corruption, major security hole).
+- **21-40**: Major issues that require significant refactoring.
+- **41-60**: Some issues but code is functional with moderate risk.
+- **61-80**: Good code with minor improvements needed.
+- **81-100**: Production-ready with best practices.
 
-==================== EXECUTION OVERVIEW RULES ====================
+**Tone Guideline:** Scores should be constructive, not punitive.
+For example, if the code is functional but has one critical concurrency bug, the score should be around **40-50**, not 2-3.
 
-For executionOverview:
-- Use empty arrays [] when the corresponding concept is not present or cannot be established from the supplied code.
-- Do NOT invent entry points, shared resources, task submissions, or lifecycle behavior.
+Base scores on evidence from the supplied source. If evidence is insufficient, use a conservative score and explain the limitation.
 
-==================== TEST TO REPRODUCE RULES ====================
+==================== IMPROVED CODE (MANDATORY FOR MVP) ====================
 
-- Include testToReproduce only when the supplied code provides enough information to define a deterministic reproduction.
-- The test must identify the input, execution context, or environment needed.
-- Do NOT invent external services, database schemas, credentials, or configuration.
+You MUST provide an improved version of the source code that addresses the critical findings.
 
-==================== STATUS RULES ====================
+**Rules:**
+1. The improved code MUST fix ALL issues reported in findings.
+2. If the original code cannot be improved (e.g., design is fundamentally flawed), provide a refactored version with a brief explanation.
+3. Include comments to explain the changes made.
+4. The improved code MUST be syntactically correct and follow best practices for the target language.
+5. If the code is already production-ready, set "available": false and explain why in "notes".
 
-- Set status to "complete" only when the analysis has been completed.
-- The model must not use "repaired" or pipeline-specific statuses.
-- The orchestrator may overwrite the final status after validation or repair.
-- If the pipeline controls the final status, the model should still output "complete" as the initial status.
+**Output Format:**
+"improvedCode": {
+  "available": true,
+  "code": "the full improved code snippet",
+  "notes": "brief explanation of what was fixed and why"
+}
 
-==================== GENERIC AUDIT OUTPUT RULES ====================
+==================== TONE GUIDELINES ====================
 
-- Report only issues supported by the supplied source code.
-- Do NOT report subjective style preferences as defects.
-- Do NOT infer dependency vulnerabilities without visible version information.
-- Do NOT claim runtime behavior that cannot be established from the source.
-- Use "conditional" confidence when behavior depends on deployment, configuration, runtime input, or unavailable code.
-- Every finding must contain at least one concrete evidence item.
-- Every scorecard value must be an integer from 0 to 100.
-- Use "info" severity only for useful observations that are not defects.
-- Keep summary concise and evidence-based.
-- The linkedin_post field MUST NOT exceed 300 characters.
-- The linkedin_post must contain only a high-level technical takeaway; do NOT include unsupported claims, secrets, or fabricated metrics.
-- Each finding id must be unique and use the format F-001, F-002, F-003, ...
-- relatedFindingIds must reference only existing finding ids.
-- recommendedActions.priority must start at 1 and increase by 1 with no duplicates.
-- The summary must reflect only evidence-backed findings and must not mention issues absent from the findings array.
-- Scorecard values must be consistent with the findings severity and verdict. Critical or multiple high-severity findings should materially reduce productionReadiness.
-- For every required string field that is present, the value must be non-empty after trimming.
-- Do not fabricate content merely to avoid empty strings.
+- Be constructive and encouraging, not punitive.
+- Use simple language and avoid jargon where possible; if technical terms are necessary, briefly explain them (e.g., "deadlock" → "a situation where threads are stuck waiting for each other forever").
+- When reporting issues, always include a clear, actionable fix.
+- Scores should reflect potential for improvement, not failure.
+- Write the summary and findings in a way that a junior developer can understand the impact and the next steps.
 
 ==================== ENUM REFERENCE ====================
 
@@ -266,10 +289,17 @@ The following fields are MANDATORY and MUST NOT be empty arrays:
    - At minimum, include: "Analysis is based solely on the provided source code, without runtime context."
    - Add additional limitations if applicable.
 
+4. duplicateCode:
+   - MUST include a dedicated finding for duplicate code if any duplication exists.
+   - If no duplicate code is found, this finding should be omitted or listed as "No significant duplication detected."
+
+5. improvedCode:
+   - MUST be included with "available": true if ANY critical or high severity finding exists.
+   - If no critical/high findings, "available": false with a note explaining why no improvement is necessary.
+
 ==================== MANDATORY OUTPUT ====================
 
 Return a JSON object matching the structure above.
-Use empty arrays when no findings exist.
 The linkedin_post field MUST NOT exceed 300 characters and should focus on a high-level technical takeaway about code quality, security, performance, or production readiness.
 
 `;

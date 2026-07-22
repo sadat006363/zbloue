@@ -136,6 +136,31 @@ If duplicate code is found, create a finding with:
 
 If no duplicate code is found, simply omit this finding or state "No significant duplication detected."
 
+==================== SEMAPHORE ANALYSIS (REFINED - REDUCE FALSE POSITIVES) ====================
+
+When analyzing Semaphore usage, be careful to distinguish safe patterns from real leaks:
+
+**SAFE PATTERN (do NOT report as a leak):**
+- If semaphore.tryAcquire() is called, and release() is placed inside a finally block that is opened immediately after acquisition (before any possible exit), the permit WILL be released correctly even if exceptions occur.
+
+**Example of SAFE usage:**
+if (semaphore.tryAcquire(timeout, unit)) {
+    try {
+        // critical section
+    } finally {
+        semaphore.release();
+    }
+}
+
+**UNSAFE PATTERN (report as a leak):**
+- If acquire() is called but release() is not in a finally block, or there is an early return/throw before the finally block that would skip the release.
+- If the semaphore is acquired in one method and released in another without guaranteed execution.
+
+**Guidelines:**
+- Only report a semaphore leak as "high" severity and "definite" confidence if the leak is guaranteed.
+- If the leak depends on exceptional conditions (e.g., JVM crashes), treat as "low" or omit.
+- If the pattern is safe but could be improved (e.g., using try-with-resources), mention it as an "info" level suggestion, not a critical finding.
+
 ==================== JSON OUTPUT STRUCTURE (MUST BE EXACT) ====================
 
 Return your analysis as a JSON object with the following fields.
@@ -239,8 +264,59 @@ This structure is mandatory; do not add, remove, or rename any field.
 
   "limitations": ["Limitation 1", "Limitation 2"],
 
+  "improvedCode": {
+    "available": true,
+    "code": "the full improved code snippet",
+    "notes": "brief explanation of what was fixed and why"
+  },
+
   "linkedin_post": "A professional LinkedIn post (max 300 characters) summarising the key concurrency insight."
 }
+
+==================== SCORECARD RULES (MVP FRIENDLY - CONSTRUCTIVE) ====================
+
+- Every score must be an integer from 0 to 100.
+- **0-20**: Critical flaws present (e.g., deadlock, data corruption, major security hole).
+- **21-40**: Major issues that require significant refactoring.
+- **41-60**: Some issues but code is functional with moderate risk.
+- **61-80**: Good code with minor improvements needed.
+- **81-100**: Production-ready with best practices.
+
+**Tone Guideline:** Scores should be constructive, not punitive.
+For example, if the code is functional but has one critical concurrency bug, the score should be around **40-50**, not 2-3.
+
+**Example:**
+- Thread-Starvation Deadlock present ➔ Concurrency Safety = 30-40 (not 2)
+- Semaphore managed correctly ➔ Resource Management = 70-80 (not 30)
+- Good use of builder pattern ➔ Maintainability = 70-80 (not 40)
+
+Base scores on evidence from the supplied source. If evidence is insufficient, use a conservative score and explain the limitation.
+
+==================== IMPROVED CODE (MANDATORY FOR MVP) ====================
+
+You MUST provide an improved version of the source code that addresses the critical findings.
+
+**Rules:**
+1. The improved code MUST fix ALL issues reported in findings.
+2. If the original code cannot be improved (e.g., design is fundamentally flawed), provide a refactored version with a brief explanation.
+3. Include comments to explain the changes made.
+4. The improved code MUST be syntactically correct and follow best practices for the target language.
+5. If the code is already production-ready, set "available": false and explain why in "notes".
+
+**Output Format:**
+"improvedCode": {
+  "available": true,
+  "code": "the full improved code snippet",
+  "notes": "brief explanation of what was fixed and why"
+}
+
+==================== TONE GUIDELINES ====================
+
+- Be constructive and encouraging, not punitive.
+- Use simple language and avoid jargon where possible; if technical terms are necessary, briefly explain them (e.g., "deadlock" → "a situation where threads are stuck waiting for each other forever").
+- When reporting issues, always include a clear, actionable fix.
+- Scores should reflect potential for improvement, not failure.
+- Write the summary and findings in a way that a junior developer can understand the impact and the next steps.
 
 ==================== ENUM REFERENCE ====================
 
@@ -284,6 +360,10 @@ The following fields are MANDATORY and MUST NOT be empty arrays:
 4. duplicateCode:
    - MUST include a dedicated finding for duplicate code if any duplication exists.
    - If no duplicate code is found, this finding should be omitted or listed as "No significant duplication detected."
+
+5. improvedCode:
+   - MUST be included with "available": true if ANY critical or high severity finding exists.
+   - If no critical/high findings, "available": false with a note explaining why no improvement is necessary.
 
 ==================== MANDATORY OUTPUT ====================
 
