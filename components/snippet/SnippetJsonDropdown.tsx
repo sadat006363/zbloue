@@ -117,6 +117,7 @@ export default function SnippetJsonDropdown({ snippet }: SnippetJsonDropdownProp
 
   return (
     <div className="relative" ref={dropdownRef}>
+      {/* ===== دکمه اصلی ===== */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={`
@@ -140,6 +141,7 @@ export default function SnippetJsonDropdown({ snippet }: SnippetJsonDropdownProp
         </svg>
       </button>
 
+      {/* ===== منوی کشویی ===== */}
       {isOpen && (
         <div className="absolute right-0 mt-2 w-72 bg-[#1e1e2e] rounded-xl border border-[#313244] shadow-2xl z-50 overflow-hidden">
           <div className="px-4 py-2 border-b border-[#313244] bg-[#11111b]">
@@ -174,6 +176,7 @@ export default function SnippetJsonDropdown({ snippet }: SnippetJsonDropdownProp
         </div>
       )}
 
+      {/* ===== نمایش JSON انتخاب‌شده ===== */}
       {!isOpen && (
         <div className="mt-3 rounded-lg border border-[#313244] overflow-hidden bg-[#0d0d14]">
           <div className="flex items-center justify-between px-3 py-2 bg-[#1a1a2e] border-b border-[#313244]">
@@ -201,6 +204,7 @@ export default function SnippetJsonDropdown({ snippet }: SnippetJsonDropdownProp
         </div>
       )}
 
+      {/* ===== استایل اسکرول‌بار ===== */}
       <style jsx>{`
         .custom-scrollbar::-webkit-scrollbar {
           width: 4px;
