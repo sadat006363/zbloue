@@ -42,3 +42,6 @@ next-env.d.ts
 
 .vercel
 .env*
+
+# Debug prompts generated during development
+debug/

@@ -17,6 +17,8 @@ import { ANALYSIS_CONFIG } from './analysis.config';
 import { callOpenAI } from '@/lib/openaiClient';
 import logger from '@/lib/logger';
 import { z } from 'zod';
+import fs from 'fs';
+import path from 'path';
 
 // ============================================================
 // CONSTANTS
@@ -208,6 +210,52 @@ export async function runAdvancedPipeline(
       logger.info('[Pipeline] Generic audit selected');
     }
     stages.push({ name: 'select_strategy', durationMs: Date.now() - stageStart3, data: { auditType } });
+
+    // ============================================================
+    // 📁 SAVE PROMPT TO FILE (Only in development environment)
+    // ============================================================
+    if (process.env.NODE_ENV === 'development') {
+      try {
+        const debugDir = path.join(process.cwd(), 'debug');
+        if (!fs.existsSync(debugDir)) {
+          fs.mkdirSync(debugDir, { recursive: true });
+        }
+
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const fileName = `prompt-${auditType}-${timestamp}.md`;
+        const filePath = path.join(debugDir, fileName);
+
+        // System Prompt (defined below)
+        const systemPrompt = 'You are an expert code auditor. Return ONLY valid JSON. Do not use Markdown fences. Do not include any text before or after the JSON.';
+
+        const content = [
+          `# Prompt sent to OpenAI (${auditType})`,
+          `## Timestamp: ${new Date().toISOString()}`,
+          `## Language: ${language}`,
+          `## Audit Type: ${auditType}`,
+          '',
+          '## System Prompt',
+          '```',
+          systemPrompt,
+          '```',
+          '',
+          '## User Prompt',
+          '```',
+          prompt,
+          '```',
+          '',
+          '## Code Context',
+          '```',
+          `Total lines: ${lineCount}`,
+          '```',
+        ].join('\n');
+
+        fs.writeFileSync(filePath, content, 'utf8');
+        console.log(`📄 Prompt saved to: ${filePath}`);
+      } catch (err) {
+        console.warn('⚠️ Failed to save debug prompt:', err);
+      }
+    }
 
     // ===== 4. First AI call =====
     const stageStart4 = Date.now();
