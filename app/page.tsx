@@ -63,6 +63,69 @@ function HomeContent() {
   const isProcessingRef = useRef(false);
   const MIN_LOADING_MS = 400;
 
+  // ============================================================
+  // 🔍 لاگ‌گذاری نوع پرامپت در کنسول مرورگر
+  // ============================================================
+  useEffect(() => {
+    if (promptInfo) {
+      const { auditType, status, isPipeline } = promptInfo;
+      
+      // تشخیص فایل پرامپت
+      let filePath = '';
+      let promptName = '';
+      
+      if (isPipeline) {
+        // پایپلاین جدید (concurrency یا generic)
+        if (auditType === 'concurrency') {
+          filePath = 'lib/analysis/prompts/concurrency.ts';
+          promptName = 'CONCURRENCY (Pipeline)';
+        } else if (auditType === 'generic') {
+          filePath = 'lib/analysis/prompts/generic.ts';
+          promptName = 'GENERIC (Pipeline)';
+        } else {
+          filePath = 'lib/analysis/prompts/* (unknown)';
+          promptName = `${auditType?.toUpperCase() || 'UNKNOWN'} (Pipeline)`;
+        }
+      } else {
+        // Legacy / Fallback
+        if (auditType === 'simple') {
+          filePath = 'lib/ai.ts (SIMPLE_PROMPT)';
+          promptName = 'SIMPLE (Legacy)';
+        } else if (auditType === 'medium') {
+          filePath = 'lib/ai.ts (MEDIUM_PROMPT)';
+          promptName = 'MEDIUM (Legacy)';
+        } else if (auditType === 'advanced') {
+          filePath = 'lib/ai.ts (ADVANCED_PROMPT - Fallback)';
+          promptName = 'ADVANCED (Legacy Fallback)';
+        } else {
+          filePath = 'lib/ai.ts (unknown)';
+          promptName = `${auditType?.toUpperCase() || 'UNKNOWN'} (Legacy)`;
+        }
+      }
+
+      // نمایش لاگ در کنسول با رنگ و فرمت مشخص
+      console.log(
+        `%c🔍 [Zbloue] Prompt Execution Report`,
+        'font-size:14px; font-weight:bold; color:#4a86f7;'
+      );
+      console.log(`   📄 File: ${filePath}`);
+      console.log(`   📝 Type: ${promptName}`);
+      console.log(`   📊 Status: ${status?.toUpperCase() || 'UNKNOWN'}`);
+      console.log(`   🏷️  Mode: ${mode.toUpperCase()}`);
+      
+      // نمایش جزئیات بیشتر در محیط توسعه
+      if (process.env.NODE_ENV === 'development') {
+        console.log('   📋 Full promptInfo:', promptInfo);
+      }
+      
+      // خط جداکننده
+      console.log(
+        `%c${'─'.repeat(60)}`,
+        'color:#6c7086;'
+      );
+    }
+  }, [promptInfo, mode]);
+
   const showToast = useCallback((message: string) => {
     dispatch({ type: 'SET_TOAST', payload: message });
     setTimeout(() => dispatch({ type: 'SET_TOAST', payload: null }), 3000);
@@ -222,13 +285,9 @@ function HomeContent() {
     const linkedin_post = genData.linkedin_post || 'Check out this code analysis! #Zbloue';
 
     if (mode === 'advanced') {
-      // ===== فیلدهای جدید از پایپلاین =====
       const card_title = genData.title ?? genData.card_title ?? 'Code Analysis';
-
-      // 🔥 Key Concept = summary
       const key_concept = genData.highLevelSummary ?? genData.summary ?? 'No summary provided.';
-
-      // 🔥 What This Code Does = از summary یا codeWalkthrough
+      
       let what_this_code_does = '';
       if (genData.codeWalkthrough && genData.codeWalkthrough.length > 0) {
         what_this_code_does = genData.codeWalkthrough.map((item) => item.explanation).join(' ');
@@ -238,7 +297,6 @@ function HomeContent() {
         what_this_code_does = 'No description available.';
       }
 
-      // 🔥 Debug Analysis = از findings
       let debug_analysis = '';
       if (genData.findings && genData.findings.length > 0) {
         debug_analysis = genData.findings
@@ -248,7 +306,6 @@ function HomeContent() {
         debug_analysis = 'No bugs identified.';
       }
 
-      // 🔥 Optimization = از recommendedActions
       let optimization = '';
       if (genData.recommendedActions && genData.recommendedActions.length > 0) {
         optimization = genData.recommendedActions
@@ -300,7 +357,6 @@ function HomeContent() {
         limitations: genData.limitations || null,
       };
     } else {
-      // ===== حالت simple/medium =====
       const analysisText = genData.analysis || 'No analysis generated.';
       const summaryLines = analysisText.split('\n').slice(0, 4).join('\n');
       const card_title = mode === 'simple' ? 'Quick Analysis' : 'Standard Analysis';
