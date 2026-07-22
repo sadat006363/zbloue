@@ -40,8 +40,10 @@ const viewModes: { id: JsonViewMode; label: string; icon: string }[] = [
 
 export default function SnippetJsonDropdown({ snippet }: SnippetJsonDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [selectedMode, setSelectedMode] = useState<JsonViewMode>('full');
+  const [selectedLabel, setSelectedLabel] = useState('Full Snippet JSON');
+  const [selectedIcon, setSelectedIcon] = useState('📦');
   const [copied, setCopied] = useState(false);
+  const [isCopying, setIsCopying] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -56,7 +58,7 @@ export default function SnippetJsonDropdown({ snippet }: SnippetJsonDropdownProp
 
   if (!snippet) return null;
 
-  const getJsonData = (): { label: string; data: unknown } => {
+  const getJsonData = (mode: JsonViewMode): { label: string; data: unknown } => {
     const dataMap: Record<JsonViewMode, { label: string; data: unknown }> = {
       full: { label: 'Full Snippet Data', data: snippet },
       findings: { label: 'Findings', data: snippet.findings || [] },
@@ -95,13 +97,19 @@ export default function SnippetJsonDropdown({ snippet }: SnippetJsonDropdownProp
         data: snippet.debug_trace || null,
       },
     };
-    return dataMap[selectedMode];
+    return dataMap[mode];
   };
 
-  const { label, data } = getJsonData();
-  const jsonString = JSON.stringify(data, null, 2);
+  const handleSelect = async (mode: JsonViewMode) => {
+    const { label, data } = getJsonData(mode);
+    const jsonString = JSON.stringify(data, null, 2);
 
-  const handleCopy = async () => {
+    const modeInfo = viewModes.find((m) => m.id === mode);
+    setSelectedLabel(modeInfo?.label || label);
+    setSelectedIcon(modeInfo?.icon || '📦');
+    setIsOpen(false);
+    setIsCopying(true);
+
     try {
       await navigator.clipboard.writeText(jsonString);
       setCopied(true);
@@ -109,15 +117,29 @@ export default function SnippetJsonDropdown({ snippet }: SnippetJsonDropdownProp
     } catch (error) {
       console.error('Failed to copy JSON:', error);
       alert('❌ Failed to copy JSON');
+    } finally {
+      setIsCopying(false);
     }
   };
 
-  const currentModeLabel = viewModes.find((m) => m.id === selectedMode)?.label || 'Full Snippet JSON';
-  const currentModeIcon = viewModes.find((m) => m.id === selectedMode)?.icon || '📦';
+  const handleCopyFull = async () => {
+    const jsonString = JSON.stringify(snippet, null, 2);
+    setIsCopying(true);
+    try {
+      await navigator.clipboard.writeText(jsonString);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (error) {
+      console.error('Failed to copy JSON:', error);
+      alert('❌ Failed to copy JSON');
+    } finally {
+      setIsCopying(false);
+    }
+  };
 
   return (
-    <div className="relative" ref={dropdownRef}>
-      {/* ===== دکمه اصلی ===== */}
+    <div className="relative flex items-center gap-2" ref={dropdownRef}>
+      {/* ===== دکمه کشویی ===== */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={`
@@ -127,9 +149,10 @@ export default function SnippetJsonDropdown({ snippet }: SnippetJsonDropdownProp
             : 'bg-[#4a86f7]/10 text-[#89b4fa] border border-[#4a86f7]/30 hover:bg-[#4a86f7]/20 hover:border-[#4a86f7]/50'
           }
         `}
+        title="Select JSON view to copy"
       >
-        <span>{currentModeIcon}</span>
-        <span className="hidden sm:inline">{currentModeLabel}</span>
+        <span>{selectedIcon}</span>
+        <span className="hidden sm:inline">{selectedLabel}</span>
         <span className="sm:hidden">📋</span>
         <svg
           className={`w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
@@ -141,9 +164,39 @@ export default function SnippetJsonDropdown({ snippet }: SnippetJsonDropdownProp
         </svg>
       </button>
 
+      {/* ===== دکمه کپی کامل ===== */}
+      <button
+        onClick={handleCopyFull}
+        disabled={isCopying}
+        className={`
+          flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-all duration-200
+          ${copied
+            ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+            : 'bg-[#4a86f7]/10 text-[#89b4fa] border border-[#4a86f7]/30 hover:bg-[#4a86f7]/20 hover:border-[#4a86f7]/50'
+          }
+          ${isCopying && 'opacity-50 cursor-not-allowed'}
+        `}
+        title="Copy full JSON to clipboard"
+      >
+        {isCopying ? (
+          <div className="w-4 h-4 border-2 border-[#89b4fa]/30 border-t-[#89b4fa] rounded-full animate-spin" />
+        ) : copied ? (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+          </svg>
+        ) : (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+          </svg>
+        )}
+        <span className="hidden sm:inline">
+          {copied ? '✅ Copied!' : isCopying ? 'Copying...' : 'Copy All'}
+        </span>
+      </button>
+
       {/* ===== منوی کشویی ===== */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-72 bg-[#1e1e2e] rounded-xl border border-[#313244] shadow-2xl z-50 overflow-hidden">
+        <div className="absolute right-0 top-full mt-2 w-72 bg-[#1e1e2e] rounded-xl border border-[#313244] shadow-2xl z-50 overflow-hidden">
           <div className="px-4 py-2 border-b border-[#313244] bg-[#11111b]">
             <span className="text-xs font-medium text-[#6c7086] uppercase tracking-wider">
               📊 JSON Views
@@ -153,53 +206,13 @@ export default function SnippetJsonDropdown({ snippet }: SnippetJsonDropdownProp
             {viewModes.map((mode) => (
               <button
                 key={mode.id}
-                onClick={() => {
-                  setSelectedMode(mode.id);
-                  setIsOpen(false);
-                }}
-                className={`
-                  w-full flex items-center gap-3 px-4 py-2 text-sm transition-colors
-                  ${selectedMode === mode.id
-                    ? 'bg-[#4a86f7]/20 text-[#89b4fa]'
-                    : 'text-[#a6adc8] hover:bg-[#2a2a3e]'
-                  }
-                `}
+                onClick={() => handleSelect(mode.id)}
+                className="w-full flex items-center gap-3 px-4 py-2 text-sm transition-colors text-[#a6adc8] hover:bg-[#2a2a3e]"
               >
                 <span className="text-base">{mode.icon}</span>
                 <span>{mode.label}</span>
-                {selectedMode === mode.id && (
-                  <span className="ml-auto text-[#4a86f7]">✓</span>
-                )}
               </button>
             ))}
-          </div>
-        </div>
-      )}
-
-      {/* ===== نمایش JSON انتخاب‌شده ===== */}
-      {!isOpen && (
-        <div className="mt-3 rounded-lg border border-[#313244] overflow-hidden bg-[#0d0d14]">
-          <div className="flex items-center justify-between px-3 py-2 bg-[#1a1a2e] border-b border-[#313244]">
-            <span className="text-xs text-[#6c7086] font-medium">
-              {currentModeIcon} {label}
-            </span>
-            <button
-              onClick={handleCopy}
-              className={`
-                flex items-center gap-1.5 text-xs px-2 py-1 rounded transition-colors
-                ${copied
-                  ? 'bg-green-500/20 text-green-400'
-                  : 'text-[#6c7086] hover:text-[#89b4fa] hover:bg-[#2a2a3e]'
-                }
-              `}
-            >
-              {copied ? '✅ Copied!' : '📋 Copy'}
-            </button>
-          </div>
-          <div className="p-3 max-h-[400px] overflow-auto">
-            <pre className="text-xs text-[#cdd6f4] font-mono whitespace-pre-wrap break-all">
-              {jsonString}
-            </pre>
           </div>
         </div>
       )}
