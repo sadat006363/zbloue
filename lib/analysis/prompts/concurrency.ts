@@ -7,19 +7,13 @@ import { getBaseSystemInstructions } from './base';
 // ============================================================
 
 const SUPPORTED_LANGUAGES = ['English', 'Persian'] as const;
-
 type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
-
 const SUPPORTED_LANGUAGE_SET = new Set<string>(SUPPORTED_LANGUAGES);
 
 function getSafeLanguage(language: unknown): SupportedLanguage {
-  if (
-    typeof language === 'string' &&
-    SUPPORTED_LANGUAGE_SET.has(language)
-  ) {
+  if (typeof language === 'string' && SUPPORTED_LANGUAGE_SET.has(language)) {
     return language as SupportedLanguage;
   }
-
   return 'English';
 }
 
@@ -27,7 +21,6 @@ function serializeUntrustedSource(value: unknown): string {
   if (typeof value !== 'string') {
     throw new TypeError('numberedCode must be a string');
   }
-
   return JSON.stringify(value)
     .replace(/&/g, '\\u0026')
     .replace(/</g, '\\u003c')
@@ -38,9 +31,7 @@ export function buildConcurrencyAuditPrompt(
   numberedCode: string,
   language: string
 ): string {
-  const serializedNumberedCode =
-    serializeUntrustedSource(numberedCode);
-
+  const serializedNumberedCode = serializeUntrustedSource(numberedCode);
   const safeLanguage = getSafeLanguage(language);
   const serializedLanguage = JSON.stringify(safeLanguage);
 
@@ -385,9 +376,13 @@ or map alone is not sufficient for a finding.
 
 ==================== RECOMMENDED ACTION TRACEABILITY ====================
 
-- recommendedActions is a string array.
-- Every finding-specific action must include the existing finding ID in its text,
-  for example "F-001: ...".
+- recommendedActions is an array of objects with the following fields:
+  - priority (integer, starts at 1)
+  - severity (one of: critical, high, medium, low, info)
+  - title (string)
+  - action (string)
+  - relatedFindingIds (array of strings, referencing existing finding IDs)
+- Every finding-specific recommended action must reference an existing finding ID.
 - Do not reference omitted, merged, renumbered, or nonexistent findings.
 - General actions must not fabricate a finding association.
 
