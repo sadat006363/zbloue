@@ -1,7 +1,8 @@
 // lib/errorHandler.ts
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import logger from './logger';
+import { getClientIP } from './rateLimiter';
 
 // ============================================================
 // 🔥 تایپ‌های خطا
@@ -14,7 +15,7 @@ export interface AppError extends Error {
   statusCode?: number;
   severity?: ErrorSeverity;
   context?: Record<string, unknown>;
-  isOperational?: boolean; // خطاهای عملیاتی (پیش‌بینی‌شده) vs برنامه‌نویسی
+  isOperational?: boolean;
 }
 
 export interface ErrorResponse {
@@ -53,8 +54,6 @@ export class AppErrorClass extends Error implements AppError {
     this.severity = options?.severity || 'medium';
     this.context = options?.context;
     this.isOperational = options?.isOperational ?? true;
-
-    // حفظ stack trace
     Error.captureStackTrace(this, this.constructor);
   }
 }
@@ -64,29 +63,16 @@ export class AppErrorClass extends Error implements AppError {
 // ============================================================
 
 export const ErrorCodes = {
-  // Validation
   VALIDATION_ERROR: 'VALIDATION_ERROR',
   INVALID_INPUT: 'INVALID_INPUT',
-
-  // Authentication
   UNAUTHORIZED: 'UNAUTHORIZED',
   FORBIDDEN: 'FORBIDDEN',
-
-  // Rate Limiting
   RATE_LIMIT_EXCEEDED: 'RATE_LIMIT_EXCEEDED',
-
-  // Database
   DATABASE_ERROR: 'DATABASE_ERROR',
   NOT_FOUND: 'NOT_FOUND',
-
-  // AI
   AI_ERROR: 'AI_ERROR',
   AI_TIMEOUT: 'AI_TIMEOUT',
-
-  // Storage
   STORAGE_ERROR: 'STORAGE_ERROR',
-
-  // Generic
   INTERNAL_ERROR: 'INTERNAL_ERROR',
 };
 
@@ -158,7 +144,7 @@ export function createDatabaseError(
 }
 
 // ============================================================
-// 🔥 تابع اصلی مدیریت خطا
+// 🔥 تابع اصلی مدیریت خطا (برگشت‌دهی Response)
 // ============================================================
 
 export function handleError(error: unknown): {
@@ -166,7 +152,6 @@ export function handleError(error: unknown): {
   response: ErrorResponse;
   logLevel: 'info' | 'warn' | 'error';
 } {
-  // ===== اگر خطا از نوع AppError باشد =====
   if (error instanceof AppErrorClass) {
     const statusCode = error.statusCode || 500;
     const response: ErrorResponse = {
@@ -175,24 +160,17 @@ export function handleError(error: unknown): {
       code: error.code,
       timestamp: new Date().toISOString(),
     };
-
-    // اضافه کردن details در محیط توسعه
     if (process.env.NODE_ENV === 'development' && error.context) {
       response.details = error.context;
     }
-
-    // تعیین سطح لاگ بر اساس severity
     let logLevel: 'info' | 'warn' | 'error' = 'error';
     if (error.severity === 'low') logLevel = 'info';
     else if (error.severity === 'medium') logLevel = 'warn';
     else logLevel = 'error';
-
     return { statusCode, response, logLevel };
   }
 
-  // ===== اگر خطا از نوع Error باشد =====
   if (error instanceof Error) {
-    // خطاهای خاص Node.js
     if (error.name === 'TimeoutError' || error.message.includes('timeout')) {
       return {
         statusCode: 504,
@@ -205,8 +183,6 @@ export function handleError(error: unknown): {
         logLevel: 'warn',
       };
     }
-
-    // خطاهای شبکه
     if (error.message.includes('fetch') || error.message.includes('network')) {
       return {
         statusCode: 503,
@@ -219,7 +195,6 @@ export function handleError(error: unknown): {
         logLevel: 'warn',
       };
     }
-
     return {
       statusCode: 500,
       response: {
@@ -235,7 +210,6 @@ export function handleError(error: unknown): {
     };
   }
 
-  // ===== خطاهای ناشناخته =====
   return {
     statusCode: 500,
     response: {
@@ -254,8 +228,6 @@ export function handleError(error: unknown): {
 
 export function createErrorResponse(error: unknown): NextResponse {
   const { statusCode, response, logLevel } = handleError(error);
-
-  // لاگ کردن خطا با سطح مناسب
   const logMessage = `[API Error] ${response.code || 'UNKNOWN'}: ${response.error}`;
   if (logLevel === 'error') {
     logger.error(logMessage, error instanceof Error ? error : undefined);
@@ -264,12 +236,11 @@ export function createErrorResponse(error: unknown): NextResponse {
   } else {
     logger.info(logMessage);
   }
-
   return NextResponse.json(response, { status: statusCode });
 }
 
 // ============================================================
-// 🔥 تابع لاگ خطا (برای استفاده در try-catch)
+// 🔥 تابع لاگ خطا
 // ============================================================
 
 export function logError(
@@ -277,13 +248,11 @@ export function logError(
   context?: Record<string, unknown>
 ): void {
   const { logLevel, response } = handleError(error);
-
   const logData = {
     ...response,
     context,
     ...(error instanceof Error && { stack: error.stack }),
   };
-
   if (logLevel === 'error') {
     logger.error('[Error]', logData);
   } else if (logLevel === 'warn') {
@@ -294,12 +263,12 @@ export function logError(
 }
 
 // ============================================================
-// 🔥 تابع wrapper برای API handlers
+// 🔥 Wrapper با قابلیت برگشت Response (برای Streaming)
 // ============================================================
 
 export function withErrorHandler(
-  handler: (req: NextRequest, ...args: any[]) => Promise<NextResponse>
-): (req: NextRequest, ...args: any[]) => Promise<NextResponse> {
+  handler: (req: NextRequest, ...args: any[]) => Promise<Response>
+): (req: NextRequest, ...args: any[]) => Promise<Response> {
   return async (req: NextRequest, ...args: any[]) => {
     try {
       return await handler(req, ...args);
@@ -309,16 +278,9 @@ export function withErrorHandler(
   };
 }
 
-// ============================================================
-// 🔥 تابع wrapper با لاگ IP
-// ============================================================
-
-import { getClientIP } from './rateLimiter';
-import { NextRequest } from 'next/server';
-
 export function withErrorHandlerAndLog(
-  handler: (req: NextRequest, ...args: any[]) => Promise<NextResponse>
-): (req: NextRequest, ...args: any[]) => Promise<NextResponse> {
+  handler: (req: NextRequest, ...args: any[]) => Promise<Response>
+): (req: NextRequest, ...args: any[]) => Promise<Response> {
   return async (req: NextRequest, ...args: any[]) => {
     const ip = getClientIP(req);
     try {
