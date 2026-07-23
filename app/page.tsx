@@ -1,5 +1,4 @@
 // app/page.tsx
-
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
@@ -18,6 +17,9 @@ import {
   ProductionReadiness,
   RecommendedImprovement,
 } from '@/types';
+
+// 🔥 جلوگیری از prerender در build
+export const dynamic = 'force-dynamic';
 
 // ============================================================
 // 🔥 تابع تبدیل Legacy به Advanced
@@ -253,7 +255,6 @@ export default function HomePage() {
       const explanations = await analysisService.explainLineByLine(code, language);
       const modeKey = mode as 'simple' | 'medium' | 'advanced';
 
-      // 🔥 استفاده از SET_OUTPUTS برای به‌روزرسانی lineExplanations
       const currentOutput = outputs[modeKey] || { snippet: null, fullAnalysis: null, lineExplanations: [], generatedPrompt: '' };
       dispatch({
         type: 'SET_OUTPUTS',
@@ -291,7 +292,6 @@ export default function HomePage() {
       const prompt = await analysisService.generatePrompt(code, language, mode);
       const modeKey = mode as 'simple' | 'medium' | 'advanced';
 
-      // 🔥 استفاده از SET_OUTPUTS برای به‌روزرسانی generatedPrompt
       const currentOutput = outputs[modeKey] || { snippet: null, fullAnalysis: null, lineExplanations: [], generatedPrompt: '' };
       dispatch({
         type: 'SET_OUTPUTS',
