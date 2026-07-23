@@ -4,7 +4,7 @@ import { callLLM, callLLMJson, type GatewayRequest, type GatewayResult } from '.
 import type { z } from 'zod';
 
 // ============================================================
-// 🔥 Legacy interface - wraps the new Gateway
+// 🔥 Legacy configuration (برای سازگاری با عقب)
 // ============================================================
 
 export const MODEL_CONFIG = {
@@ -30,6 +30,20 @@ export const MODEL_CONFIG = {
 
 export type ModelMode = keyof typeof MODEL_CONFIG;
 
+// ============================================================
+// 🔥 نگاشت mode به role در Gateway
+// ============================================================
+
+const MODE_TO_GATEWAY_ROLE: Record<ModelMode, 'primary' | 'codeFallback' | 'stableFallback'> = {
+  simple: 'stableFallback',   // gpt-4o-mini
+  medium: 'codeFallback',      // gpt-4-turbo
+  advanced: 'primary',         // gpt-4o
+};
+
+// ============================================================
+// 🔥 گزینه‌های فراخوانی
+// ============================================================
+
 export interface OpenAICallOptions {
   mode?: ModelMode;
   model?: string;
@@ -41,7 +55,7 @@ export interface OpenAICallOptions {
 }
 
 // ============================================================
-// 🔥 Legacy callOpenAI - uses Gateway for Advanced, direct for others
+// 🔥 تابع اصلی با Gateway (برای همه حالت‌ها)
 // ============================================================
 
 export async function callOpenAI(
@@ -51,72 +65,30 @@ export async function callOpenAI(
 ): Promise<string> {
   const mode = options.mode || 'advanced';
 
-  // For Advanced mode, use the Gateway with GPT-5 family
-  if (mode === 'advanced' && process.env.LLM_GATEWAY_ENABLED !== 'false') {
-    const result = await callLLM<string>({
-      systemPrompt,
-      userPrompt,
-      role: 'primary',
-      temperature: options.temperature,
-      maxTokens: options.maxCompletionTokens,
-      responseFormat: options.responseFormat || 'json_object',
-    });
-
-    if (result.success && result.data !== undefined) {
-      return result.data as string;
-    }
-
-    // If Gateway fails, we could fall back to legacy, but we'll throw the error
-    throw new Error(result.error?.message || 'LLM Gateway request failed');
-  }
-
-  // For Simple/Medium or when Gateway is disabled, use the legacy direct call
+  // دریافت تنظیمات مربوط به mode
   const config = MODEL_CONFIG[mode];
-  const model = options.model || config.model;
-  const maxCompletionTokens = options.maxCompletionTokens || config.maxCompletionTokens;
-  const timeout = options.timeout || config.timeout;
-  const temperature = options.temperature ?? config.temperature;
-  const responseFormat = options.responseFormat || 'json_object';
+  const role = MODE_TO_GATEWAY_ROLE[mode];
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeout);
+  // فراخوانی Gateway
+  const result = await callLLM<string>({
+    systemPrompt,
+    userPrompt,
+    role,
+    temperature: options.temperature ?? config.temperature,
+    maxTokens: options.maxCompletionTokens || config.maxCompletionTokens,
+    responseFormat: options.responseFormat || 'json_object',
+    rootRequestId: `callOpenAI-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+  });
 
-  try {
-    const response = await fetch('/api/openai-proxy', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        systemPrompt,
-        userPrompt,
-        model,
-        maxCompletionTokens,
-        temperature,
-        responseFormat,
-        mode,
-      }),
-      signal: options.signal || controller.signal,
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'OpenAI request failed');
-    }
-
-    const data = await response.json();
-    return data.content || '{}';
-  } catch (error: unknown) {
-    clearTimeout(timeoutId);
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error(`Request timed out after ${timeout / 1000}s`);
-    }
-    throw error;
+  if (result.success && result.data !== undefined) {
+    return result.data as string;
   }
+
+  throw new Error(result.error?.message || 'LLM Gateway request failed');
 }
 
 // ============================================================
-// 🔥 Legacy callOpenAIJson
+// 🔥 تابع JSON (با Gateway)
 // ============================================================
 
 export async function callOpenAIJson<T>(
@@ -124,24 +96,27 @@ export async function callOpenAIJson<T>(
   userPrompt: string,
   options: OpenAICallOptions = {}
 ): Promise<T> {
-  const content = await callOpenAI(systemPrompt, userPrompt, {
-    ...options,
-    responseFormat: 'json_object',
+  const mode = options.mode || 'advanced';
+  const config = MODEL_CONFIG[mode];
+  const role = MODE_TO_GATEWAY_ROLE[mode];
+
+  const result = await callLLMJson<T>(systemPrompt, userPrompt, {
+    role,
+    schema: undefined as any, // برای JSON خام، schema نمی‌دهیم
+    temperature: options.temperature ?? config.temperature,
+    maxTokens: options.maxCompletionTokens || config.maxCompletionTokens,
+    rootRequestId: `callOpenAIJson-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
   });
 
-  try {
-    return JSON.parse(content) as T;
-  } catch (parseError) {
-    if (process.env.NODE_ENV === 'development') {
-      console.error('[OpenAI] JSON Parse Error:', parseError);
-      console.error('[OpenAI] Raw content:', content);
-    }
-    throw new Error('AI response format error. Please try again.');
+  if (result.success && result.data !== undefined) {
+    return result.data as T;
   }
+
+  throw new Error(result.error?.message || 'LLM Gateway JSON request failed');
 }
 
 // ============================================================
-// 🔥 New: Direct Gateway access for Advanced pipeline
+// 🔥 Export مستقیم Gateway برای استفاده در Pipeline
 // ============================================================
 
 export { callLLM, callLLMJson } from './llm-gateway';
