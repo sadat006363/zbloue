@@ -14,7 +14,8 @@ import {
 } from './schema';
 import type { DetectorResult, AuditValidationResult } from './types';
 import { ANALYSIS_CONFIG } from './analysis.config';
-import { callLLMJson } from '@/lib/openaiClient';
+import { callOpenAI } from '@/lib/openaiClient';
+import { normalizeAnalysisOutput } from './normalizer';
 import logger from '@/lib/logger';
 import { z } from 'zod';
 import fs from 'fs';
@@ -27,7 +28,7 @@ import path from 'path';
 const MAX_REPAIR_ATTEMPTS = ANALYSIS_CONFIG.maxRepairPasses;
 
 // ============================================================
-// HELPER: SAFE JSON EXTRACTION (for legacy fallback)
+// HELPER: SAFE JSON EXTRACTION
 // ============================================================
 
 function extractJSON(text: string): string {
@@ -170,9 +171,7 @@ export async function runAdvancedPipeline(
   language: string
 ): Promise<PipelineResult> {
   const startTime = Date.now();
-  const rootRequestId = `pipeline-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const stages: { name: string; durationMs: number; data?: unknown }[] = [];
-  const pipelineDeadline = Date.now() + 180000; // ۳ دقیقه کل زمان
 
   try {
     // ===== 1. Input validation =====
@@ -258,72 +257,32 @@ export async function runAdvancedPipeline(
       }
     }
 
-    // ===== 4. First AI call using Gateway (GPT-5 family) =====
+    // ===== 4. First AI call =====
     const stageStart4 = Date.now();
     const systemPrompt = 'You are an expert code auditor. Return ONLY valid JSON. Do not use Markdown fences. Do not include any text before or after the JSON.';
 
-    // 🔥 Use the Gateway with the Advanced schema
-    const gatewayResult = await callLLMJson<AdvancedAuditResult>(systemPrompt, prompt, {
-      role: 'primary',
-      schema: AdvancedAuditResultSchema,
-      temperature: undefined, // GPT-5 reasoning models don't use temperature
-      maxTokens: parseInt(process.env.OPENAI_ADVANCED_MAX_OUTPUT_TOKENS || '12000', 10),
-      rootRequestId,
-      deadline: pipelineDeadline,
-      metadata: { auditType, language },
-    });
-
     let rawContent: string;
-    let parsed: unknown;
-
-    if (gatewayResult.success && gatewayResult.data) {
-      // The Gateway already validated with Zod and returned the parsed data
-      parsed = gatewayResult.data;
-      rawContent = JSON.stringify(parsed);
-      stages.push({ name: 'ai_call_gateway_success', durationMs: Date.now() - stageStart4, data: { model: gatewayResult.modelUsed } });
-    } else {
-      // Gateway failed - try legacy fallback
-      logger.warn('[Pipeline] Gateway failed, falling back to legacy OpenAI call', {
-        rootRequestId,
-        error: gatewayResult.error,
+    try {
+      rawContent = await callOpenAI(systemPrompt, prompt, {
+        mode: 'advanced',
+        responseFormat: 'text',
       });
-
-      try {
-        // Legacy از یک مدل مستقل با timeout کمتر و بدون fallback استفاده می‌کند
-        const legacyResult = await callLLMJson<AdvancedAuditResult>(systemPrompt, prompt, {
-          role: 'stableFallback', // فقط gpt-4o-mini
-          schema: AdvancedAuditResultSchema,
-          temperature: 0.1,
-          maxTokens: 4000,
-          rootRequestId: `${rootRequestId}-legacy`,
-          deadline: pipelineDeadline,
-          disableFallback: true, // بدون fallback
-          metadata: { auditType, language, legacy: true },
-        });
-
-        if (legacyResult.success && legacyResult.data) {
-          parsed = legacyResult.data;
-          rawContent = JSON.stringify(parsed);
-          stages.push({ name: 'ai_call_legacy_success', durationMs: Date.now() - stageStart4, data: { model: legacyResult.modelUsed } });
-        } else {
-          throw new Error(legacyResult.error?.message || 'Legacy fallback failed');
-        }
-      } catch (legacyError) {
-        logger.error('[Pipeline] Legacy fallback failed:', { rootRequestId, error: legacyError });
-        stages.push({ name: 'ai_call_failed', durationMs: Date.now() - stageStart4, data: { error: legacyError instanceof Error ? legacyError.message : 'unknown' } });
-        return {
-          result: null,
-          status: 'failed_validation',
-          error: legacyError instanceof Error ? legacyError.message : 'AI call failed',
-          trace: { stages },
-        };
-      }
+    } catch (aiError) {
+      logger.error('[Pipeline] AI call failed:', aiError);
+      stages.push({ name: 'ai_call_failed', durationMs: Date.now() - stageStart4, data: { error: aiError instanceof Error ? aiError.message : 'unknown' } });
+      return {
+        result: null,
+        status: 'failed_validation',
+        error: aiError instanceof Error ? aiError.message : 'AI call failed',
+        trace: { stages },
+      };
     }
+    stages.push({ name: 'ai_call', durationMs: Date.now() - stageStart4 });
 
     // ============================================================
     // 📁 SAVE RAW OPENAI RESPONSE TO FILE (Development only)
     // ============================================================
-    if (process.env.NODE_ENV === 'development' && rawContent) {
+    if (process.env.NODE_ENV === 'development') {
       try {
         const debugDir = path.join(process.cwd(), 'debug');
         if (!fs.existsSync(debugDir)) {
@@ -339,7 +298,6 @@ export async function runAdvancedPipeline(
           auditType,
           language,
           rawResponse: rawContent,
-          modelUsed: gatewayResult.success ? gatewayResult.modelUsed : 'legacy-fallback',
         }, null, 2);
 
         fs.writeFileSync(filePath, content, 'utf8');
@@ -349,27 +307,137 @@ export async function runAdvancedPipeline(
       }
     }
 
-    // ===== 5. If parsed is not set (Gateway didn't return parsed data), parse manually =====
-    if (!parsed && rawContent) {
-      const jsonString = extractJSON(rawContent);
+    // ============================================================
+    // 🔥 STEP: Normalize the raw AI output BEFORE Zod validation
+    // ============================================================
+    let normalizedData: AdvancedAuditResult | null = null;
+    let normalizationError: string | null = null;
+    let jsonString: string | null = null;
+
+    try {
+      // 1. Extract JSON from raw response
+      jsonString = extractJSON(rawContent);
       if (!jsonString) {
-        logger.warn('[Pipeline] Failed to extract valid JSON from AI response');
+        throw new Error('Failed to extract JSON from AI response');
+      }
+
+      // 2. Parse JSON
+      const parsed = JSON.parse(jsonString);
+
+      // 3. Normalize the parsed data (fills missing fields with defaults)
+      normalizedData = normalizeAnalysisOutput(parsed);
+    } catch (normError) {
+      normalizationError = normError instanceof Error ? normError.message : 'Normalization failed';
+      logger.warn('[Pipeline] Normalization failed:', normError);
+    }
+
+    // ===== If normalization succeeded =====
+    if (normalizedData) {
+      // Validate the normalized data with Zod
+      const zodResult = AdvancedAuditResultSchema.safeParse(normalizedData);
+      if (zodResult.success) {
+        stages.push({ name: 'normalization_success', durationMs: Date.now() - stageStart4 });
+
+        // ===== Initial validation on normalized data =====
+        let initialValidation = validateSemanticCompleteness(zodResult.data, detectorResult, code);
+
+        // ===== Repair loop (structured) =====
+        let lastCandidate = zodResult.data;
+        let lastValidation = initialValidation;
+        let repairAttempts = 0;
+        let wasRepaired = false;
+        let finalCandidate: unknown = zodResult.data;
+        let finalValidation = initialValidation;
+
+        while (lastValidation.repairRequired && repairAttempts < MAX_REPAIR_ATTEMPTS) {
+          const stageStartRepair = Date.now();
+          logger.info(`[Pipeline] Repair attempt ${repairAttempts + 1} triggered`);
+          const repaired = await attemptRepairWithBudget(
+            numberedCode,
+            lastCandidate,
+            lastValidation,
+            language,
+            auditType,
+            repairAttempts,
+            MAX_REPAIR_ATTEMPTS
+          );
+
+          if (repaired) {
+            const revalidation = validateSemanticCompleteness(repaired, detectorResult, code);
+            if (revalidation.structurallyValid && !revalidation.repairRequired) {
+              finalCandidate = repaired;
+              finalValidation = revalidation;
+              wasRepaired = true;
+              stages.push({ name: 'repair_success', durationMs: Date.now() - stageStartRepair, data: { attempt: repairAttempts + 1 } });
+              break;
+            } else if (revalidation.structurallyValid && revalidation.repairRequired) {
+              finalCandidate = repaired;
+              finalValidation = revalidation;
+              wasRepaired = true;
+              stages.push({ name: 'repair_partial', durationMs: Date.now() - stageStartRepair, data: { attempt: repairAttempts + 1, issuesCount: revalidation.issues.length } });
+            } else {
+              logger.warn('[Pipeline] Repair produced structurally invalid data despite Zod pass');
+              stages.push({ name: 'repair_invalid', durationMs: Date.now() - stageStartRepair, data: { attempt: repairAttempts + 1 } });
+              break;
+            }
+          } else {
+            logger.warn('[Pipeline] Repair attempt failed');
+            stages.push({ name: 'repair_failed', durationMs: Date.now() - stageStartRepair, data: { attempt: repairAttempts + 1 } });
+            break;
+          }
+          repairAttempts++;
+        }
+
+        // ===== Determine final outcome =====
+        if (finalValidation.structurallyValid) {
+          const status: AuditStatus = wasRepaired ? 'repaired' : 'complete';
+          const finalizeResult = finalizeAuditCandidate(finalCandidate, {
+            status,
+            auditType,
+            language,
+          });
+
+          if (finalizeResult.success) {
+            const duration = Date.now() - startTime;
+            logger.info(`[Pipeline] Completed in ${duration}ms, status: ${status}`);
+            const trace = {
+              stages,
+              rawAIResponse: rawContent,
+              extractedJSON: jsonString || '',
+              finalData: finalizeResult.data,
+            };
+            return {
+              result: finalizeResult.data,
+              status,
+              trace,
+            };
+          } else {
+            logger.error('[Pipeline] Finalization failed despite structural validity:', finalizeResult.issues);
+            return {
+              result: null,
+              status: 'failed_validation',
+              error: 'Internal error: final validation failed unexpectedly',
+              trace: { stages, rawAIResponse: rawContent, extractedJSON: jsonString || '' },
+            };
+          }
+        }
+      } else {
+        logger.warn('[Pipeline] Zod validation failed even after normalization:', zodResult.error.issues);
+        // Try repair if normalization produced invalid data
         if (MAX_REPAIR_ATTEMPTS > 0) {
           const repairResult = await attemptRepairWithBudget(
             numberedCode,
-            null,
+            normalizedData,
             {
               structurallyValid: false,
               semanticallyComplete: false,
-              issues: [
-                {
-                  code: 'INVALID_JSON',
-                  severity: 'error',
-                  message: 'AI response did not contain valid JSON',
-                  relatedLines: [],
-                  expectedCoverage: 'Valid JSON matching AdvancedAuditResultSchema',
-                },
-              ],
+              issues: zodResult.error.issues.map((issue) => ({
+                code: 'ZOD_VALIDATION_FAILED',
+                severity: 'error',
+                message: `${issue.path.join('.')}: ${issue.message}`,
+                relatedLines: [],
+                expectedCoverage: 'Valid JSON matching AdvancedAuditResultSchema',
+              })),
               repairRequired: true,
             },
             language,
@@ -378,129 +446,63 @@ export async function runAdvancedPipeline(
             MAX_REPAIR_ATTEMPTS
           );
           if (repairResult) {
-            stages.push({ name: 'repair_success', durationMs: Date.now() - stageStart4 });
+            stages.push({ name: 'repair_success_after_normalization', durationMs: Date.now() - stageStart4 });
             return {
               result: repairResult,
               status: 'repaired',
-              trace: { stages, rawAIResponse: rawContent },
+              trace: { stages, rawAIResponse: rawContent, extractedJSON: jsonString || '' },
             };
           }
         }
-        return {
-          result: null,
-          status: 'failed_validation',
-          error: 'Failed to extract valid JSON from AI response',
-          trace: { stages, rawAIResponse: rawContent },
-        };
       }
+    }
 
+    // ===== If normalization failed, try repair from raw parsed data =====
+    if (MAX_REPAIR_ATTEMPTS > 0 && jsonString) {
       try {
-        parsed = JSON.parse(jsonString);
-      } catch (parseError) {
-        logger.warn('[Pipeline] JSON parse error:', parseError);
-        // ... rest of parse error handling
-      }
-    }
-
-    // ===== 6. If we still don't have parsed data, fail =====
-    if (!parsed) {
-      return {
-        result: null,
-        status: 'failed_validation',
-        error: 'No valid data available from AI response',
-        trace: { stages },
-      };
-    }
-
-    // ===== 7. Initial validation (if not already validated by Gateway) =====
-    let initialValidation = validateSemanticCompleteness(parsed, detectorResult, code);
-
-    // ===== 8. Repair loop (structured) =====
-    let lastCandidate = parsed;
-    let lastValidation = initialValidation;
-    let repairAttempts = 0;
-    let wasRepaired = false;
-    let finalCandidate: unknown = parsed;
-    let finalValidation = initialValidation;
-
-    while (lastValidation.repairRequired && repairAttempts < MAX_REPAIR_ATTEMPTS) {
-      const stageStartRepair = Date.now();
-      logger.info(`[Pipeline] Repair attempt ${repairAttempts + 1} triggered`);
-      const repaired = await attemptRepairWithBudget(
-        numberedCode,
-        lastCandidate,
-        lastValidation,
-        language,
-        auditType,
-        repairAttempts,
-        MAX_REPAIR_ATTEMPTS
-      );
-
-      if (repaired) {
-        const revalidation = validateSemanticCompleteness(repaired, detectorResult, code);
-        if (revalidation.structurallyValid && !revalidation.repairRequired) {
-          finalCandidate = repaired;
-          finalValidation = revalidation;
-          wasRepaired = true;
-          stages.push({ name: 'repair_success', durationMs: Date.now() - stageStartRepair, data: { attempt: repairAttempts + 1 } });
-          break;
-        } else if (revalidation.structurallyValid && revalidation.repairRequired) {
-          finalCandidate = repaired;
-          finalValidation = revalidation;
-          wasRepaired = true;
-          stages.push({ name: 'repair_partial', durationMs: Date.now() - stageStartRepair, data: { attempt: repairAttempts + 1, issuesCount: revalidation.issues.length } });
-        } else {
-          logger.warn('[Pipeline] Repair produced structurally invalid data despite Zod pass');
-          stages.push({ name: 'repair_invalid', durationMs: Date.now() - stageStartRepair, data: { attempt: repairAttempts + 1 } });
-          break;
+        const parsed = JSON.parse(jsonString);
+        const repairResult = await attemptRepairWithBudget(
+          numberedCode,
+          parsed,
+          {
+            structurallyValid: false,
+            semanticallyComplete: false,
+            issues: [
+              {
+                code: 'NORMALIZATION_FAILED',
+                severity: 'error',
+                message: normalizationError || 'Normalization failed',
+                relatedLines: [],
+                expectedCoverage: 'Valid JSON matching AdvancedAuditResultSchema',
+              },
+            ],
+            repairRequired: true,
+          },
+          language,
+          auditType,
+          0,
+          MAX_REPAIR_ATTEMPTS
+        );
+        if (repairResult) {
+          stages.push({ name: 'repair_success_after_normalization_failure', durationMs: Date.now() - stageStart4 });
+          return {
+            result: repairResult,
+            status: 'repaired',
+            trace: { stages, rawAIResponse: rawContent, extractedJSON: jsonString || '' },
+          };
         }
-      } else {
-        logger.warn('[Pipeline] Repair attempt failed');
-        stages.push({ name: 'repair_failed', durationMs: Date.now() - stageStartRepair, data: { attempt: repairAttempts + 1 } });
-        break;
-      }
-      repairAttempts++;
-    }
-
-    // ===== 9. Determine final outcome =====
-    if (finalValidation.structurallyValid) {
-      const status: AuditStatus = wasRepaired ? 'repaired' : 'complete';
-      const finalizeResult = finalizeAuditCandidate(finalCandidate, {
-        status,
-        auditType,
-        language,
-      });
-
-      if (finalizeResult.success) {
-        const duration = Date.now() - startTime;
-        logger.info(`[Pipeline] Completed in ${duration}ms, status: ${status}`);
-        const trace = {
-          stages,
-          rawAIResponse: rawContent,
-          finalData: finalizeResult.data,
-        };
-        return {
-          result: finalizeResult.data,
-          status,
-          trace,
-        };
-      } else {
-        logger.error('[Pipeline] Finalization failed despite structural validity:', finalizeResult.issues);
-        return {
-          result: null,
-          status: 'failed_validation',
-          error: 'Internal error: final validation failed unexpectedly',
-          trace: { stages, rawAIResponse: rawContent },
-        };
+      } catch (parseError) {
+        logger.warn('[Pipeline] Failed to parse JSON for repair:', parseError);
       }
     }
 
+    // ===== All normalization and repair attempts failed =====
     logger.error('[Pipeline] Failed to obtain valid audit result');
     return {
       result: null,
       status: 'failed_validation',
-      error: 'Validation failed after all repair attempts',
-      trace: { stages, rawAIResponse: rawContent },
+      error: normalizationError || 'Failed to produce valid audit result',
+      trace: { stages, rawAIResponse: rawContent, extractedJSON: jsonString || '' },
     };
   } catch (error) {
     logger.error('[Pipeline] Unhandled error:', error);
