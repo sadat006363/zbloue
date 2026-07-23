@@ -113,6 +113,11 @@ export default function HomePage() {
       const optimization = genData.optimization ?? '-';
       const linkedin_post = genData.linkedin_post ?? '';
 
+      // 🔥 نرمالایز کردن فیلدهای اختیاری (رفع خطای ۴۰۰)
+      const normalizedUsername = username && username.trim() !== '' ? username : 'Developer';
+      const normalizedGithubUsername = githubUsername && githubUsername.trim() !== '' ? githubUsername : undefined;
+      const normalizedAvatarUrl = avatarUrl && avatarUrl.trim() !== '' ? avatarUrl : undefined;
+
       // ===== ساخت شیء برای SaveSnippetData =====
       const saveData = {
         code: code,
@@ -123,9 +128,9 @@ export default function HomePage() {
         debug_analysis,
         optimization,
         linkedin_post,
-        username: username || 'Developer',
-        github_username: githubUsername ?? undefined,
-        avatar_url: avatarUrl ?? undefined,
+        username: normalizedUsername,
+        github_username: normalizedGithubUsername,
+        avatar_url: normalizedAvatarUrl,
         code_walkthrough: genData.codeWalkthrough ?? undefined,
         what_works_well: genData.whatWorksWell ?? undefined,
         bugs_and_risky_cases: genData.bugsAndRiskyCases ?? undefined,
@@ -171,8 +176,8 @@ export default function HomePage() {
         is_public: true,
         created_at: new Date().toISOString(),
         username: saveResult.username || username || 'Developer',
-        github_username: saveResult.github_username ?? githubUsername ?? undefined,
-        avatar_url: avatarUrl ?? undefined,
+        github_username: saveResult.github_username ?? normalizedGithubUsername,
+        avatar_url: saveResult.avatar_url ?? normalizedAvatarUrl,
         card_image_url: undefined,
         code_walkthrough: genData.codeWalkthrough ?? undefined,
         what_works_well: genData.whatWorksWell ?? undefined,
