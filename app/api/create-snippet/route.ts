@@ -9,7 +9,7 @@ import { rateLimiter, getClientIP } from '@/lib/rateLimiter';
 import { withErrorHandlerAndLog } from '@/lib/errorHandler';
 
 // ============================================================
-// 1. Zod schemas (همه فیلدها optional هستند)
+// 1. Zod schemas (با catchall برای پذیرش فیلدهای اضافی)
 // ============================================================
 
 const CreateSnippetRequestSchema = z
@@ -53,7 +53,8 @@ const CreateSnippetRequestSchema = z
     verdict: z.any().optional().nullable(),
     limitations: z.array(z.string().max(300)).max(20).optional().nullable(),
   })
-  .strict();
+  // ✅ افزودن catchall برای پذیرش فیلدهای اضافی (مثل debug_trace)
+  .catchall(z.any());
 
 type CreateSnippetRequest = z.infer<typeof CreateSnippetRequestSchema>;
 
@@ -99,7 +100,7 @@ async function generateUniqueSlug(retries = MAX_SLUG_RETRIES): Promise<string> {
 }
 
 // ============================================================
-// 3. Database mapper (با پشتیبانی از فیلدهای جدید)
+// 3. Database mapper
 // ============================================================
 
 type SnippetInsert = any;
@@ -124,7 +125,7 @@ function mapToDatabaseRow(body: CreateSnippetRequest, slug: string): SnippetInse
     created_at: now,
   };
 
-  // ===== Legacy fields =====
+  // Legacy fields
   if (body.code_walkthrough !== undefined) row.code_walkthrough = body.code_walkthrough;
   if (body.what_works_well !== undefined) row.what_works_well = body.what_works_well;
   if (body.bugs_and_risky_cases !== undefined) row.bugs_and_risky_cases = body.bugs_and_risky_cases;
@@ -140,7 +141,7 @@ function mapToDatabaseRow(body: CreateSnippetRequest, slug: string): SnippetInse
   if (body.final_verdict_approved !== undefined) row.final_verdict_approved = body.final_verdict_approved;
   if (body.final_verdict_next_steps !== undefined) row.final_verdict_next_steps = body.final_verdict_next_steps;
 
-  // ===== New fields =====
+  // New fields
   if (body.findings !== undefined) row.findings = body.findings;
   if (body.execution_overview !== undefined) row.execution_overview = body.execution_overview;
   if (body.architectural_observations !== undefined) row.architectural_observations = body.architectural_observations;
@@ -155,7 +156,7 @@ function mapToDatabaseRow(body: CreateSnippetRequest, slug: string): SnippetInse
 }
 
 // ============================================================
-// 4. POST Handler
+// 4. POST Handler (با لاگ دقیق)
 // ============================================================
 
 export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
@@ -173,12 +174,16 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
   let rawBody: unknown;
   try {
     rawBody = await req.json();
+    // 🔍 لاگ کامل بدنه برای عیب‌یابی
+    console.log('🔍 [create-snippet] Received body:', JSON.stringify(rawBody, null, 2));
   } catch {
     return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
   }
 
   const validation = CreateSnippetRequestSchema.safeParse(rawBody);
   if (!validation.success) {
+    // 🔍 چاپ خطاهای اعتبارسنجی
+    console.error('❌ [create-snippet] Validation failed:', validation.error.issues);
     logger.warn('[create-snippet] Validation failed:', validation.error.issues);
     const firstError = validation.error.issues[0];
     return NextResponse.json(
