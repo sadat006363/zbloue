@@ -133,6 +133,7 @@ export default function Editor({
   const {
     code,
     language,
+    mode,
     loading,
     convertLanguage,
     isConverting,
@@ -157,6 +158,10 @@ export default function Editor({
 
   const setLanguage = useCallback((newLang: string) => {
     dispatch({ type: 'SET_LANGUAGE', payload: newLang });
+  }, [dispatch]);
+
+  const setMode = useCallback((newMode: 'simple' | 'medium' | 'advanced') => {
+    dispatch({ type: 'SET_MODE', payload: newMode });
   }, [dispatch]);
 
   const setConvertLanguage = useCallback((val: string) => {
@@ -343,6 +348,16 @@ export default function Editor({
   const canConvert = code.trim().length > 0 && !nonConvertible.includes(language);
 
   // ============================================================
+  // 🔥 Mode Selector
+  // ============================================================
+
+  const modes: { value: 'simple' | 'medium' | 'advanced'; label: string; icon: string; color: string }[] = [
+    { value: 'simple', label: 'Simple', icon: '📘', color: 'bg-green-500' },
+    { value: 'medium', label: 'Medium', icon: '📗', color: 'bg-yellow-500' },
+    { value: 'advanced', label: 'Advanced', icon: '📕', color: 'bg-red-500' },
+  ];
+
+  // ============================================================
   // 🔥 رندر
   // ============================================================
 
@@ -374,8 +389,9 @@ export default function Editor({
         </div>
       )}
 
-      {/* ===== Toolbar Top: Source Language ===== */}
+      {/* ===== Toolbar Top: Source Language & Mode ===== */}
       <div className="flex flex-col gap-2 p-3 bg-[#f1f3f5] border-b border-[#d0d0d8]">
+        {/* ===== Row 1: Language ===== */}
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-medium text-[#4a4a6a] whitespace-nowrap">📝 Source Language:</span>
           <select
@@ -391,9 +407,35 @@ export default function Editor({
           </select>
         </div>
 
-        {/* ===== Convert Section ===== */}
+        {/* ===== Row 2: Mode Selector ===== */}
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-medium text-[#4a4a6a] whitespace-nowrap">🎯 Target Language:</span>
+          <span className="text-xs font-medium text-[#4a4a6a] whitespace-nowrap">🎯 Mode:</span>
+          <div className="flex gap-1">
+            {modes.map((m) => (
+              <button
+                key={m.value}
+                onClick={() => setMode(m.value)}
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                  mode === m.value
+                    ? 'bg-[#4a86f7] text-white shadow-sm'
+                    : 'bg-white text-[#4a4a6a] hover:bg-[#e8e8f0] border border-[#d0d0d8]'
+                }`}
+              >
+                <span className="mr-1">{m.icon}</span>
+                {m.label}
+              </button>
+            ))}
+          </div>
+          <span className="text-[10px] text-[#6c7086] ml-1">
+            {mode === 'simple' && 'Quick overview'}
+            {mode === 'medium' && 'Detailed analysis'}
+            {mode === 'advanced' && 'Deep audit with concurrency checks'}
+          </span>
+        </div>
+
+        {/* ===== Row 3: Convert Section ===== */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-[#4a4a6a] whitespace-nowrap">🔄 Target Language:</span>
           <select
             value={convertLanguage || ''}
             onChange={(e) => setConvertLanguage(e.target.value)}

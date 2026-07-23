@@ -177,7 +177,8 @@ export default function HomePage() {
         created_at: new Date().toISOString(),
         username: saveResult.username || username || 'Developer',
         github_username: saveResult.github_username ?? normalizedGithubUsername,
-        avatar_url: saveResult.avatar_url ?? normalizedAvatarUrl,
+        // 🔥 اصلاح: استفاده از normalizedAvatarUrl به جای saveResult.avatar_url
+        avatar_url: normalizedAvatarUrl,
         card_image_url: undefined,
         code_walkthrough: genData.codeWalkthrough ?? undefined,
         what_works_well: genData.whatWorksWell ?? undefined,
