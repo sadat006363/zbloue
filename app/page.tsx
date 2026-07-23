@@ -203,15 +203,15 @@ export default function HomePage() {
       const fullAnalysis = convertLegacyToAdvanced(genData);
       const modeKey = mode as 'simple' | 'medium' | 'advanced';
 
-      // 🔥 اصلاح: استفاده از 'SET_OUTPUTS' به‌جای 'SET_OUTPUT'
       dispatch({
         type: 'SET_OUTPUTS',
         payload: {
-          mode: modeKey,
-          snippet: snippetData,
-          fullAnalysis,
-          lineExplanations: [],
-          generatedPrompt: '',
+          [modeKey]: {
+            snippet: snippetData,
+            fullAnalysis,
+            lineExplanations: [],
+            generatedPrompt: '',
+          },
         },
       });
 
@@ -253,11 +253,15 @@ export default function HomePage() {
       const explanations = await analysisService.explainLineByLine(code, language);
       const modeKey = mode as 'simple' | 'medium' | 'advanced';
 
+      // 🔥 استفاده از SET_OUTPUTS برای به‌روزرسانی lineExplanations
+      const currentOutput = outputs[modeKey] || { snippet: null, fullAnalysis: null, lineExplanations: [], generatedPrompt: '' };
       dispatch({
-        type: 'SET_LINE_EXPLANATIONS',
+        type: 'SET_OUTPUTS',
         payload: {
-          mode: modeKey,
-          explanations,
+          [modeKey]: {
+            ...currentOutput,
+            lineExplanations: explanations,
+          },
         },
       });
 
@@ -271,7 +275,7 @@ export default function HomePage() {
     } finally {
       dispatch({ type: 'SET_EXPLAINING', payload: false });
     }
-  }, [code, language, mode, dispatch, clearError]);
+  }, [code, language, mode, outputs, dispatch, clearError]);
 
   // ===== Generate prompt =====
   const handleGeneratePrompt = useCallback(async () => {
@@ -287,11 +291,15 @@ export default function HomePage() {
       const prompt = await analysisService.generatePrompt(code, language, mode);
       const modeKey = mode as 'simple' | 'medium' | 'advanced';
 
+      // 🔥 استفاده از SET_OUTPUTS برای به‌روزرسانی generatedPrompt
+      const currentOutput = outputs[modeKey] || { snippet: null, fullAnalysis: null, lineExplanations: [], generatedPrompt: '' };
       dispatch({
-        type: 'SET_GENERATED_PROMPT',
+        type: 'SET_OUTPUTS',
         payload: {
-          mode: modeKey,
-          prompt,
+          [modeKey]: {
+            ...currentOutput,
+            generatedPrompt: prompt,
+          },
         },
       });
 
@@ -305,7 +313,7 @@ export default function HomePage() {
     } finally {
       dispatch({ type: 'SET_GENERATING_PROMPT', payload: false });
     }
-  }, [code, language, mode, dispatch, clearError]);
+  }, [code, language, mode, outputs, dispatch, clearError]);
 
   // ===== Convert code =====
   const handleConvert = useCallback(async (targetLang: string) => {
