@@ -111,7 +111,7 @@ export default function HomePage() {
       const optimization = genData.optimization ?? '-';
       const linkedin_post = genData.linkedin_post ?? '';
 
-      // ===== ساخت شیء برای SaveSnippetData (با فیلد `code`) =====
+      // ===== ساخت شیء برای SaveSnippetData =====
       const saveData = {
         code: code,
         language,
@@ -124,7 +124,6 @@ export default function HomePage() {
         username: username || 'Developer',
         github_username: githubUsername ?? undefined,
         avatar_url: avatarUrl ?? undefined,
-        // Legacy fields
         code_walkthrough: genData.codeWalkthrough ?? undefined,
         what_works_well: genData.whatWorksWell ?? undefined,
         bugs_and_risky_cases: genData.bugsAndRiskyCases ?? undefined,
@@ -139,7 +138,6 @@ export default function HomePage() {
         final_verdict_summary: genData.finalVerdict?.summary ?? undefined,
         final_verdict_approved: genData.finalVerdict?.approved ?? undefined,
         final_verdict_next_steps: genData.finalVerdict?.nextSteps ?? undefined,
-        // Advanced fields
         findings: genData.findings ?? undefined,
         execution_overview: genData.executionOverview ?? undefined,
         architectural_observations: genData.architecturalObservations ?? undefined,
@@ -156,7 +154,7 @@ export default function HomePage() {
       // ===== ذخیره در دیتابیس =====
       const saveResult = await snippetService.save(saveData);
 
-      // ===== ساخت Snippet کامل برای UI =====
+      // ===== ساخت Snippet کامل =====
       const snippetData: Snippet = {
         id: saveResult.id,
         slug: saveResult.slug,
@@ -172,9 +170,8 @@ export default function HomePage() {
         created_at: new Date().toISOString(),
         username: saveResult.username || username || 'Developer',
         github_username: saveResult.github_username ?? githubUsername ?? undefined,
-        avatar_url: avatarUrl ?? undefined, // 🔥 استفاده از avatarUrl موجود در state
+        avatar_url: avatarUrl ?? undefined,
         card_image_url: undefined,
-        // Legacy fields
         code_walkthrough: genData.codeWalkthrough ?? undefined,
         what_works_well: genData.whatWorksWell ?? undefined,
         bugs_and_risky_cases: genData.bugsAndRiskyCases ?? undefined,
@@ -189,7 +186,6 @@ export default function HomePage() {
         final_verdict_summary: genData.finalVerdict?.summary ?? undefined,
         final_verdict_approved: genData.finalVerdict?.approved ?? undefined,
         final_verdict_next_steps: genData.finalVerdict?.nextSteps ?? undefined,
-        // Advanced fields
         findings: genData.findings ?? undefined,
         execution_overview: genData.executionOverview ?? undefined,
         architectural_observations: genData.architecturalObservations ?? undefined,
@@ -207,8 +203,9 @@ export default function HomePage() {
       const fullAnalysis = convertLegacyToAdvanced(genData);
       const modeKey = mode as 'simple' | 'medium' | 'advanced';
 
+      // 🔥 اصلاح: استفاده از 'SET_OUTPUTS' به‌جای 'SET_OUTPUT'
       dispatch({
-        type: 'SET_OUTPUT',
+        type: 'SET_OUTPUTS',
         payload: {
           mode: modeKey,
           snippet: snippetData,
@@ -354,7 +351,7 @@ export default function HomePage() {
     setTimeout(() => dispatch({ type: 'SET_TOAST', payload: null }), 3000);
   }, [dispatch]);
 
-  // ===== Keyboard shortcut =====
+  // ===== Keyboard shortcut: Ctrl+Enter =====
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
@@ -369,6 +366,7 @@ export default function HomePage() {
   return (
     <main className="min-h-screen bg-[#f8f9fa] p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
+        {/* ===== Header ===== */}
         <div className="mb-4">
           <h1 className="text-2xl font-bold text-[#1a1a2e] flex items-center gap-2">
             <span className="text-[#4a86f7]">⚡</span> Zbloue
@@ -379,6 +377,7 @@ export default function HomePage() {
           </p>
         </div>
 
+        {/* ===== Error Display ===== */}
         {errorMessage && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm flex items-center justify-between">
             <span>❌ {errorMessage}</span>
@@ -388,6 +387,7 @@ export default function HomePage() {
           </div>
         )}
 
+        {/* ===== Editor + Output ===== */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 h-[calc(100vh-180px)] min-h-[600px]">
           <div className="min-h-[400px] lg:min-h-0">
             <Editor
@@ -410,6 +410,7 @@ export default function HomePage() {
           </div>
         </div>
 
+        {/* ===== Footer ===== */}
         <div className="mt-4 text-center text-xs text-[#a0a0b0] border-t border-[#d0d0d8] pt-3">
           Press <kbd className="px-1.5 py-0.5 bg-[#e8e8f0] rounded text-[#4a4a6a] text-xs font-mono">Ctrl+Enter</kbd> to generate
         </div>
