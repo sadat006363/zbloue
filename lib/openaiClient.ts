@@ -1,10 +1,10 @@
 // lib/openaiClient.ts
 
-import { callLLM, callLLMJson, type GatewayRequest, type GatewayResult } from './llm-gateway';
+import OpenAI from 'openai';
 import type { z } from 'zod';
 
 // ============================================================
-// 🔥 Legacy configuration (برای سازگاری با عقب)
+// 🔥 تنظیمات مدل‌ها (برای حالت مستقیم و Gateway)
 // ============================================================
 
 export const MODEL_CONFIG = {
@@ -31,14 +31,17 @@ export const MODEL_CONFIG = {
 export type ModelMode = keyof typeof MODEL_CONFIG;
 
 // ============================================================
-// 🔥 نگاشت mode به role در Gateway
+// 🔥 کلاینت OpenAI (برای حالت مستقیم)
 // ============================================================
 
-const MODE_TO_GATEWAY_ROLE: Record<ModelMode, 'primary' | 'codeFallback' | 'stableFallback'> = {
-  simple: 'stableFallback',   // gpt-4o-mini
-  medium: 'codeFallback',      // gpt-4o-mini
-  advanced: 'primary',         // gpt-4o
-};
+const openaiApiKey = process.env.OPENAI_API_KEY || '';
+if (!openaiApiKey) {
+  console.warn('⚠️ OPENAI_API_KEY is not set.');
+}
+
+const openai = new OpenAI({
+  apiKey: openaiApiKey,
+});
 
 // ============================================================
 // 🔥 گزینه‌های فراخوانی
@@ -55,7 +58,7 @@ export interface OpenAICallOptions {
 }
 
 // ============================================================
-// 🔥 تابع اصلی با Gateway (برای همه حالت‌ها)
+// 🔥 تابع اصلی (با پشتیبانی از Gateway یا مستقیم)
 // ============================================================
 
 export async function callOpenAI(
@@ -65,27 +68,86 @@ export async function callOpenAI(
 ): Promise<string> {
   const mode = options.mode || 'advanced';
   const config = MODEL_CONFIG[mode];
-  const role = MODE_TO_GATEWAY_ROLE[mode];
 
-  const result = await callLLM<string>({
-    systemPrompt,
-    userPrompt,
-    role,
-    temperature: options.temperature ?? config.temperature,
-    maxTokens: options.maxCompletionTokens || config.maxCompletionTokens,
-    responseFormat: options.responseFormat || 'json_object',
-    rootRequestId: `callOpenAI-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-  });
+  // ===== اگر Gateway فعال است =====
+  if (process.env.LLM_GATEWAY_ENABLED !== 'false') {
+    console.log('[Gateway] Using LLM Gateway for mode:', mode);
+    try {
+      const { callLLM } = await import('./llm-gateway');
+      const roleMap: Record<ModelMode, 'primary' | 'codeFallback' | 'stableFallback'> = {
+        simple: 'stableFallback',
+        medium: 'codeFallback',
+        advanced: 'primary',
+      };
 
-  if (result.success && result.data !== undefined) {
-    return result.data as string;
+      const result = await callLLM<string>({
+        systemPrompt,
+        userPrompt,
+        role: roleMap[mode],
+        temperature: options.temperature ?? config.temperature,
+        maxTokens: options.maxCompletionTokens || config.maxCompletionTokens,
+        responseFormat: options.responseFormat || 'json_object',
+        rootRequestId: `callOpenAI-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      });
+
+      if (result.success && result.data !== undefined) {
+        console.log('[Gateway] Success, raw content length:', result.data.length);
+        return result.data as string;
+      }
+      console.warn('[Gateway] Failed, error:', result.error);
+      throw new Error(result.error?.message || 'LLM Gateway request failed');
+    } catch (gatewayError) {
+      console.error('[Gateway] Exception:', gatewayError);
+      // اگر Gateway خطا داد، به حالت مستقیم برگردیم
+      console.warn('[Gateway] Falling back to direct OpenAI call');
+    }
   }
 
-  throw new Error(result.error?.message || 'LLM Gateway request failed');
+  // ===== حالت مستقیم (زمانی که Gateway غیرفعال است یا خطا داد) =====
+  console.log('[OpenAI] Direct call for mode:', mode);
+
+  const model = options.model || config.model;
+  const maxCompletionTokens = options.maxCompletionTokens || config.maxCompletionTokens;
+  const timeout = options.timeout || config.timeout;
+  const temperature = options.temperature ?? config.temperature;
+  const responseFormat = options.responseFormat || 'json_object';
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+  try {
+    const response = await openai.chat.completions.create(
+      {
+        model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        response_format:
+          responseFormat === 'json_object' ? { type: 'json_object' } : undefined,
+        temperature,
+        max_completion_tokens: maxCompletionTokens,
+      },
+      { signal: options.signal || controller.signal }
+    );
+
+    clearTimeout(timeoutId);
+
+    const content = response.choices[0]?.message?.content || '';
+    console.log('[OpenAI] Direct call success, content length:', content.length);
+    return content;
+  } catch (error: unknown) {
+    clearTimeout(timeoutId);
+    console.error('[OpenAI] Direct call error:', error);
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error(`Request timed out after ${timeout / 1000}s`);
+    }
+    throw error;
+  }
 }
 
 // ============================================================
-// 🔥 تابع JSON (با Gateway)
+// 🔥 تابع JSON (با Gateway یا مستقیم)
 // ============================================================
 
 export async function callOpenAIJson<T>(
@@ -93,23 +155,18 @@ export async function callOpenAIJson<T>(
   userPrompt: string,
   options: OpenAICallOptions = {}
 ): Promise<T> {
-  const mode = options.mode || 'advanced';
-  const config = MODEL_CONFIG[mode];
-  const role = MODE_TO_GATEWAY_ROLE[mode];
-
-  const result = await callLLMJson<T>(systemPrompt, userPrompt, {
-    role,
-    schema: undefined as any,
-    temperature: options.temperature ?? config.temperature,
-    maxTokens: options.maxCompletionTokens || config.maxCompletionTokens,
-    rootRequestId: `callOpenAIJson-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+  const content = await callOpenAI(systemPrompt, userPrompt, {
+    ...options,
+    responseFormat: 'json_object',
   });
 
-  if (result.success && result.data !== undefined) {
-    return result.data as T;
+  try {
+    return JSON.parse(content) as T;
+  } catch (parseError) {
+    console.error('[OpenAI] JSON Parse Error:', parseError);
+    console.error('[OpenAI] Raw content:', content);
+    throw new Error('AI response format error. Please try again.');
   }
-
-  throw new Error(result.error?.message || 'LLM Gateway JSON request failed');
 }
 
 // ============================================================
