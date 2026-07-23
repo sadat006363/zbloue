@@ -48,11 +48,11 @@ export interface ModelCapability {
 }
 
 // ============================================================
-// 🔥 Model Registry (با مدل‌های موجود)
+// 🔥 Model Registry (با مدل‌های موجود - بدون gpt-4-turbo)
 // ============================================================
 
 export const LLM_MODELS = {
-  // ===== مدل‌های موجود برای Advanced =====
+  // ===== مدل اصلی برای Advanced =====
   'gpt-4o': {
     model: getEnv('OPENAI_ADVANCED_MODEL', 'gpt-4o'),
     api: 'chat-completions',
@@ -66,8 +66,9 @@ export const LLM_MODELS = {
     defaultMaxTokens: getEnvNumber('OPENAI_ADVANCED_MAX_OUTPUT_TOKENS', 12000),
   },
 
-  'gpt-4-turbo': {
-    model: getEnv('OPENAI_CODE_MODEL', 'gpt-4-turbo'),
+  // ===== مدل codeFallback (جایگزین gpt-4-turbo) =====
+  'gpt-4o-mini': {
+    model: getEnv('OPENAI_CODE_MODEL', 'gpt-4o-mini'),
     api: 'chat-completions',
     purpose: 'code-analysis',
     supportsReasoning: false,
@@ -76,10 +77,11 @@ export const LLM_MODELS = {
     supportsFrequencyPenalty: true,
     supportsPresencePenalty: true,
     tokenParam: 'max_completion_tokens',
-    defaultMaxTokens: 12000,
+    defaultMaxTokens: 8000,
   },
 
-  'gpt-4o-mini': {
+  // ===== مدل fallback دوم =====
+  'gpt-4o-mini-fallback': {
     model: getEnv('OPENAI_FALLBACK_MODEL', 'gpt-4o-mini'),
     api: 'chat-completions',
     purpose: 'fallback',
@@ -92,7 +94,7 @@ export const LLM_MODELS = {
     defaultMaxTokens: 8000,
   },
 
-  // ===== مدل Legacy (برای Fallback نهایی) =====
+  // ===== مدل Legacy =====
   'legacy-stable': {
     model: getEnv('OPENAI_LEGACY_MODEL', 'gpt-4o-mini'),
     api: 'chat-completions',
@@ -113,8 +115,8 @@ export const LLM_MODELS = {
 
 export const ADVANCED_MODEL_ROLES = {
   primary: 'gpt-4o',
-  codeFallback: 'gpt-4-turbo',
-  stableFallback: 'gpt-4o-mini',
+  codeFallback: 'gpt-4o-mini',        // ← قبلاً gpt-4-turbo بود
+  stableFallback: 'gpt-4o-mini-fallback',
 } as const;
 
 export type AdvancedModelRole = keyof typeof ADVANCED_MODEL_ROLES;
@@ -132,7 +134,6 @@ export function getModelByRole(role: AdvancedModelRole): ModelCapability {
   return model;
 }
 
-// ✅ اصلاح شده: استفاده از type guard برای دسترسی به LLM_MODELS
 export function getModelByKey(key: string): ModelCapability | undefined {
   if (key in LLM_MODELS) {
     return LLM_MODELS[key as keyof typeof LLM_MODELS];
@@ -145,7 +146,5 @@ export function getModelKeys(): string[] {
 }
 
 export function getAvailableModelKeys(): string[] {
-  // مدل‌هایی که واقعاً در دسترس هستند (برای Production)
-  // فعلاً همه مدل‌های ثبت‌شده را برمی‌گردانیم
   return getModelKeys();
 }

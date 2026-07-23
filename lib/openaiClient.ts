@@ -15,7 +15,7 @@ export const MODEL_CONFIG = {
     temperature: 0.3,
   },
   medium: {
-    model: process.env.OPENAI_MODEL_MEDIUM || 'gpt-4o-mini',
+    model: process.env.OPENAI_MODEL_MEDIUM || 'gpt-4o-mini', // ← تغییر به gpt-4o-mini
     maxCompletionTokens: parseInt(process.env.OPENAI_MAX_TOKENS_MEDIUM || '6000', 10),
     timeout: parseInt(process.env.OPENAI_TIMEOUT_MEDIUM || '45000', 10),
     temperature: 0.3,
@@ -36,7 +36,7 @@ export type ModelMode = keyof typeof MODEL_CONFIG;
 
 const MODE_TO_GATEWAY_ROLE: Record<ModelMode, 'primary' | 'codeFallback' | 'stableFallback'> = {
   simple: 'stableFallback',   // gpt-4o-mini
-  medium: 'codeFallback',      // gpt-4-turbo
+  medium: 'codeFallback',      // gpt-4o-mini (قبلاً gpt-4-turbo بود)
   advanced: 'primary',         // gpt-4o
 };
 
@@ -102,7 +102,7 @@ export async function callOpenAIJson<T>(
 
   const result = await callLLMJson<T>(systemPrompt, userPrompt, {
     role,
-    schema: undefined as any, // برای JSON خام، schema نمی‌دهیم
+    schema: undefined as any,
     temperature: options.temperature ?? config.temperature,
     maxTokens: options.maxCompletionTokens || config.maxCompletionTokens,
     rootRequestId: `callOpenAIJson-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
