@@ -113,7 +113,7 @@ export default function HomePage() {
 
       // ===== ساخت شیء برای SaveSnippetData (با فیلد `code`) =====
       const saveData = {
-        code: code, // 🔥 فیلد مورد نیاز برای SaveSnippetData
+        code: code,
         language,
         card_title,
         key_concept,
@@ -172,7 +172,7 @@ export default function HomePage() {
         created_at: new Date().toISOString(),
         username: saveResult.username || username || 'Developer',
         github_username: saveResult.github_username ?? githubUsername ?? undefined,
-        avatar_url: saveResult.avatar_url ?? avatarUrl ?? undefined,
+        avatar_url: avatarUrl ?? undefined, // 🔥 استفاده از avatarUrl موجود در state
         card_image_url: undefined,
         // Legacy fields
         code_walkthrough: genData.codeWalkthrough ?? undefined,
