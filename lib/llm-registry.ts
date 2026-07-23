@@ -125,15 +125,19 @@ export type AdvancedModelRole = keyof typeof ADVANCED_MODEL_ROLES;
 
 export function getModelByRole(role: AdvancedModelRole): ModelCapability {
   const key = ADVANCED_MODEL_ROLES[role];
-  const model = LLM_MODELS[key];
+  const model = getModelByKey(key);
   if (!model) {
     throw new Error(`Model "${key}" not found in registry for role "${role}"`);
   }
   return model;
 }
 
+// ✅ اصلاح شده: استفاده از type guard برای دسترسی به LLM_MODELS
 export function getModelByKey(key: string): ModelCapability | undefined {
-  return LLM_MODELS[key];
+  if (key in LLM_MODELS) {
+    return LLM_MODELS[key as keyof typeof LLM_MODELS];
+  }
+  return undefined;
 }
 
 export function getModelKeys(): string[] {
