@@ -2,7 +2,6 @@
 
 import { z } from 'zod';
 import {
-  // ===== Import از Schema اصلی =====
   AdvancedAuditResultSchema,
   AuditFindingSchema,
   AuditScorecardSchema,
@@ -32,7 +31,7 @@ import {
 } from '@/lib/analysis/schema';
 
 // ============================================================
-// 🔥 تایپ‌های اصلی (از Schema اصلی استخراج شده‌اند)
+// 🔥 تایپ‌های اصلی
 // ============================================================
 
 export type {
@@ -52,7 +51,7 @@ export type {
 };
 
 // ============================================================
-// 🔥 تایپ‌های Legacy (برای سازگاری با عقب و UI)
+// 🔥 تایپ‌های Legacy
 // ============================================================
 
 export interface LegacyScorecard {
@@ -115,7 +114,7 @@ export interface LegacyRecommendedImprovement {
 }
 
 // ============================================================
-// 🔥 Exportهای Legacy با نام‌های اصلی (برای سازگاری با UI)
+// 🔥 Exportهای Legacy
 // ============================================================
 
 export type CodeWalkthroughItem = LegacyCodeWalkthroughItem;
@@ -129,16 +128,10 @@ export type SuggestedTest = LegacySuggestedTest;
 export type ScorecardLegacy = LegacyScorecard;
 
 // ============================================================
-// 🔥 Snippet Schema (برای اعتبارسنجی داده‌های دیتابیس)
+// 🔥 Snippet Schema (بدون nullable)
 // ============================================================
 
-/**
- * Schema برای داده‌های Snippet در دیتابیس
- * این Schema برای اعتبارسنجی داده‌های خوانده‌شده از Supabase است
- * و با AdvancedAuditResultSchema یکی نیست
- */
 export const SnippetDataSchema = z.object({
-  // ===== فیلدهای اصلی =====
   id: z.string(),
   slug: z.string(),
   raw_code: z.string(),
@@ -152,52 +145,46 @@ export const SnippetDataSchema = z.object({
   is_public: z.boolean(),
   created_at: z.string(),
 
-  // ===== فیلدهای کاربر =====
-  username: z.string().nullable().optional(),
-  github_username: z.string().nullable().optional(),
-  avatar_url: z.string().nullable().optional(),
-  card_image_url: z.string().nullable().optional(),
+  username: z.string().optional(),
+  github_username: z.string().optional(),
+  avatar_url: z.string().optional(),
+  card_image_url: z.string().optional(),
 
-  // ===== Legacy فیلدها =====
-  code_walkthrough: z.any().optional().nullable(),
-  what_works_well: z.any().optional().nullable(),
-  bugs_and_risky_cases: z.any().optional().nullable(),
-  edge_cases: z.any().optional().nullable(),
-  performance_analysis: z.any().optional().nullable(),
-  security_analysis: z.any().optional().nullable(),
-  production_readiness: z.any().optional().nullable(),
-  recommended_improvements: z.any().optional().nullable(),
-  improved_code: z.string().optional(), // 🔥 تغییر: nullable حذف شد
-  suggested_tests: z.any().optional().nullable(),
-  scorecard: z.any().optional().nullable(),
-  final_verdict_summary: z.string().optional().nullable(),
-  final_verdict_approved: z.boolean().optional().nullable(),
-  final_verdict_next_steps: z.string().optional().nullable(),
-  line_explanations: z.any().optional().nullable(),
-  generated_prompt: z.string().optional().nullable(),
+  code_walkthrough: z.any().optional(),
+  what_works_well: z.any().optional(),
+  bugs_and_risky_cases: z.any().optional(),
+  edge_cases: z.any().optional(),
+  performance_analysis: z.any().optional(),
+  security_analysis: z.any().optional(),
+  production_readiness: z.any().optional(),
+  recommended_improvements: z.any().optional(),
+  improved_code: z.string().optional(),
+  suggested_tests: z.any().optional(),
+  scorecard: z.any().optional(),
+  final_verdict_summary: z.string().optional(),
+  final_verdict_approved: z.boolean().optional(),
+  final_verdict_next_steps: z.string().optional(),
+  line_explanations: z.any().optional(),
+  generated_prompt: z.string().optional(),
 
-  // ===== فیلدهای Advanced (JSONB) =====
-  findings: z.any().optional().nullable(),
-  execution_overview: z.any().optional().nullable(),
-  architectural_observations: z.any().optional().nullable(),
-  recommended_actions: z.any().optional().nullable(),
-  suggested_tests_new: z.any().optional().nullable(),
-  complexity: z.any().optional().nullable(),
-  scorecard_new: z.any().optional().nullable(),
-  verdict: z.any().optional().nullable(),
-  limitations: z.array(z.string()).optional().nullable(),
+  findings: z.any().optional(),
+  execution_overview: z.any().optional(),
+  architectural_observations: z.any().optional(),
+  recommended_actions: z.any().optional(),
+  suggested_tests_new: z.any().optional(),
+  complexity: z.any().optional(),
+  scorecard_new: z.any().optional(),
+  verdict: z.any().optional(),
+  limitations: z.array(z.string()).optional(),
 
-  // ===== audit_result (فیلد جدید) =====
-  audit_result: z.any().optional().nullable(),
-
-  // ===== Debug =====
-  debug_trace: z.any().optional().nullable(),
+  audit_result: z.any().optional(),
+  debug_trace: z.any().optional(),
 });
 
 export type Snippet = z.infer<typeof SnippetDataSchema>;
 
 // ============================================================
-// 🔥 تایپ‌های درخواست و پاسخ API
+// 🔥 تایپ‌های API
 // ============================================================
 
 export interface GenerateRequest {
@@ -216,16 +203,9 @@ export interface CreateSnippetResponse {
   error?: string;
 }
 
-/**
- * GenerateResponse (برای سازگاری با عقب)
- * این تایپ ترکیبی از Legacy و Advanced است
- */
 export interface GenerateResponse extends Partial<AdvancedAuditResult> {
-  // ===== فیلدهای اضافی برای سازگاری با UI =====
-  title?: string;                // برای استفاده در app/page.tsx
-  highLevelSummary?: string;     // برای استفاده در app/page.tsx
-
-  // ===== Legacy فیلدها =====
+  title?: string;
+  highLevelSummary?: string;
   analysis?: string;
   card_title?: string;
   key_concept?: string;
@@ -251,9 +231,6 @@ export interface GenerateResponse extends Partial<AdvancedAuditResult> {
   error?: string;
 }
 
-/**
- * Legacy ImprovedCode (برای سازگاری)
- */
 export interface LegacyImprovedCode {
   available: boolean;
   code: string;
@@ -261,7 +238,7 @@ export interface LegacyImprovedCode {
 }
 
 // ============================================================
-// 🔥 تایپ‌های Line Explanation
+// 🔥 سایر تایپ‌ها
 // ============================================================
 
 export interface LineExplanation {
@@ -269,10 +246,6 @@ export interface LineExplanation {
   code?: string;
   explanation: string;
 }
-
-// ============================================================
-// 🔥 تایپ‌های کمکی برای State Management
-// ============================================================
 
 export interface PromptInfo {
   auditType: 'simple' | 'medium' | 'advanced' | 'concurrency' | 'generic' | null;
@@ -312,10 +285,6 @@ export interface AppState {
   toastMessage: string | null;
   promptInfo: PromptInfo | null;
 }
-
-// ============================================================
-// 🔥 Export تایپ‌های مورد نیاز توسط app/page.tsx
-// ============================================================
 
 export type {
   LegacyCodeWalkthroughItem,

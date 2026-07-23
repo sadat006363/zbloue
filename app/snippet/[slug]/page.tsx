@@ -21,20 +21,18 @@ import SnippetJsonDropdown from '@/components/snippet/SnippetJsonDropdown';
 import DebugLogger from '@/components/DebugLogger';
 import {
   normalizeSnippetAudit,
-  hasFullAnalysis,
-  getFindingsCount,
   type NormalizedSnippetAudit,
 } from '@/lib/analysis/normalize-snippet-audit';
 
 // ============================================================
-// 🔥 params باید از نوع Promise باشد (Next.js 16)
+// 🔥 params (Next.js 16)
 // ============================================================
 interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
 // ============================================================
-// 🔧 Helpers: Escape HTML (امنیت در برابر XSS)
+// 🔧 Helpers
 // ============================================================
 function escapeHtml(value: string): string {
   return value
@@ -46,29 +44,7 @@ function escapeHtml(value: string): string {
 }
 
 // ============================================================
-// 🔧 Helpers: بررسی وجود محتوا در آرایه‌ها و رشته‌ها
-// ============================================================
-function hasItems<T>(value: readonly T[] | null | undefined): boolean {
-  return Array.isArray(value) && value.length > 0;
-}
-
-function hasText(value: string | null | undefined): boolean {
-  return typeof value === 'string' && value.trim().length > 0;
-}
-
-function hasExecutionOverview(value: Snippet['execution_overview']): boolean {
-  if (!value) return false;
-  return (
-    hasItems(value.entryPoints) ||
-    hasItems(value.taskSubmissionPoints) ||
-    hasItems(value.blockingWaitPoints) ||
-    hasItems(value.sharedResources) ||
-    hasItems(value.resourceLifecycle)
-  );
-}
-
-// ============================================================
-// 🔥 تابع دریافت اسنیپت با null-safe، اعتبارسنجی Zod و امنیت
+// 🔥 تابع دریافت اسنیپت
 // ============================================================
 async function getSnippet(slug: string): Promise<Snippet> {
   const normalizedSlug = slug.trim();
@@ -93,6 +69,7 @@ async function getSnippet(slug: string): Promise<Snippet> {
     return null as any;
   }
 
+  // 🔥 تبدیل تمام مقادیر null به undefined
   const candidate = {
     id: data.id ?? '',
     slug: data.slug ?? '',
@@ -107,10 +84,10 @@ async function getSnippet(slug: string): Promise<Snippet> {
     is_public: data.is_public ?? false,
     created_at: data.created_at ?? new Date().toISOString(),
 
-    username: data.username ?? null,
-    github_username: data.github_username ?? null,
-    avatar_url: data.avatar_url ?? null,
-    card_image_url: data.card_image_url ?? null,
+    username: data.username ?? undefined,
+    github_username: data.github_username ?? undefined,
+    avatar_url: data.avatar_url ?? undefined,
+    card_image_url: data.card_image_url ?? undefined,
 
     code_walkthrough: data.code_walkthrough ?? undefined,
     what_works_well: data.what_works_well ?? undefined,
@@ -120,14 +97,14 @@ async function getSnippet(slug: string): Promise<Snippet> {
     security_analysis: data.security_analysis ?? undefined,
     production_readiness: data.production_readiness ?? undefined,
     recommended_improvements: data.recommended_improvements ?? undefined,
-    improved_code: data.improved_code ?? undefined, // 🔥 تغییر: null به undefined تبدیل می‌شود
+    improved_code: data.improved_code ?? undefined,
     suggested_tests: data.suggested_tests ?? undefined,
     scorecard: data.scorecard ?? undefined,
     final_verdict_summary: data.final_verdict_summary ?? undefined,
     final_verdict_approved: data.final_verdict_approved ?? undefined,
     final_verdict_next_steps: data.final_verdict_next_steps ?? undefined,
-    line_explanations: data.line_explanations ?? null,
-    generated_prompt: data.generated_prompt ?? null,
+    line_explanations: data.line_explanations ?? undefined,
+    generated_prompt: data.generated_prompt ?? undefined,
 
     findings: data.findings ?? undefined,
     execution_overview: data.execution_overview ?? undefined,
@@ -139,6 +116,7 @@ async function getSnippet(slug: string): Promise<Snippet> {
     verdict: data.verdict ?? undefined,
     limitations: data.limitations ?? undefined,
     audit_result: data.audit_result ?? undefined,
+    debug_trace: data.debug_trace ?? undefined,
   };
 
   const validation = SnippetDataSchema.safeParse(candidate);
@@ -155,7 +133,7 @@ async function getSnippet(slug: string): Promise<Snippet> {
 }
 
 // ============================================================
-// 🔥 تابع کمکی برای هایلایت کد (امن در برابر XSS)
+// 🔥 تابع هایلایت کد
 // ============================================================
 async function highlightCode(code: string, language: string): Promise<string> {
   try {
@@ -218,28 +196,20 @@ export default async function SnippetPage({ params }: PageProps) {
       <main className="min-h-screen bg-[#f8f9fa]">
         <div className="max-w-5xl mx-auto px-4 py-6 md:py-8">
           
-          {/* ===== 🔹 جایگاه اول: هدر با دکمه کشویی JSON ===== */}
           <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
             <SnippetHeader shareUrl={shareUrl} />
             <SnippetJsonDropdown snippet={snippet} />
           </div>
 
-          {/* ===== 🔹 جایگاه دوم: اطلاعات کاربر ===== */}
           <SnippetUserInfo
             username={snippet.username || 'Anonymous'}
             githubUsername={snippet.github_username || undefined}
           />
 
-          {/* ===== 🔹 جایگاه سوم: نوار وضعیت ===== */}
           <SnippetStatusBar snippet={snippet} />
-
-          {/* ===== 🔹 جایگاه چهارم: دکمه‌های اشتراک‌گذاری ===== */}
           <SnippetShareButtons slug={snippet.slug} title={snippet.card_title} />
-
-          {/* ===== 🔹 جایگاه پنجم: لینک‌های مستقیم به تب‌ها ===== */}
           <SnippetTabLinks shareUrl={shareUrl} />
 
-          {/* ===== 🔹 جایگاه ششم: کد منبع ===== */}
           <div id="snippet-code">
             <SnippetCode
               code={snippet.raw_code}
@@ -248,7 +218,6 @@ export default async function SnippetPage({ params }: PageProps) {
             />
           </div>
 
-          {/* ===== 🔹 جایگاه هفتم: تحلیل اولیه ===== */}
           <div id="snippet-analysis">
             <SnippetAnalysis
               keyConcept={snippet.key_concept}
@@ -256,7 +225,6 @@ export default async function SnippetPage({ params }: PageProps) {
             />
           </div>
 
-          {/* ===== 🔹 جایگاه هشتم: دیباگ و بهینه‌سازی ===== */}
           <div id="snippet-debug">
             <SnippetDebug
               debugAnalysis={snippet.debug_analysis}
@@ -264,7 +232,6 @@ export default async function SnippetPage({ params }: PageProps) {
             />
           </div>
 
-          {/* ===== 🔹 جایگاه نهم: تحلیل کامل ===== */}
           <div id="snippet-full-analysis">
             {fullAnalysisExists ? (
               <SnippetFullAnalysis snippet={snippet} />
@@ -283,28 +250,24 @@ export default async function SnippetPage({ params }: PageProps) {
             )}
           </div>
 
-          {/* ===== 🔹 جایگاه دهم: خط به خط (شرطی) ===== */}
           {snippet.line_explanations && snippet.line_explanations.length > 0 && (
             <div id="snippet-line-by-line">
               <SnippetLineByLine lineExplanations={snippet.line_explanations} />
             </div>
           )}
 
-          {/* ===== 🔹 جایگاه یازدهم: پرامپت (شرطی) ===== */}
           {snippet.generated_prompt && (
             <div id="snippet-prompt">
               <SnippetPrompt generatedPrompt={snippet.generated_prompt} />
             </div>
           )}
 
-          {/* ===== 🔹 جایگاه دوازدهم: لینکدین (شرطی) ===== */}
           {snippet.linkedin_post && (
             <div id="snippet-linkedin">
               <SnippetLinkedIn linkedinPost={snippet.linkedin_post} />
             </div>
           )}
 
-          {/* ===== 🔹 جایگاه سیزدهم: فوتر ===== */}
           <SnippetFooter appUrl={baseUrl || 'https://zbloue.vercel.app'} />
         </div>
       </main>
