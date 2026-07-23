@@ -120,7 +120,7 @@ async function getSnippet(slug: string): Promise<Snippet> {
     security_analysis: data.security_analysis ?? undefined,
     production_readiness: data.production_readiness ?? undefined,
     recommended_improvements: data.recommended_improvements ?? undefined,
-    improved_code: data.improved_code ?? undefined,
+    improved_code: data.improved_code ?? undefined, // 🔥 تغییر: null به undefined تبدیل می‌شود
     suggested_tests: data.suggested_tests ?? undefined,
     scorecard: data.scorecard ?? undefined,
     final_verdict_summary: data.final_verdict_summary ?? undefined,
@@ -185,9 +185,6 @@ export default async function SnippetPage({ params }: PageProps) {
   try {
     snippet = await getSnippet(slug);
     if (snippet) {
-      // ============================================================
-      // 🔥 استفاده از normalizeSnippetAudit برای نرمالایز کردن داده‌ها
-      // ============================================================
       normalizedAudit = normalizeSnippetAudit(snippet);
     }
   } catch (err) {
@@ -203,12 +200,8 @@ export default async function SnippetPage({ params }: PageProps) {
   const shareUrl = `${baseUrl}/snippet/${snippet.slug}`;
   const highlightedHtml = await highlightCode(snippet.raw_code, snippet.language);
 
-  // ============================================================
-  // 🔥 استفاده از hasFullAnalysis از normalize-snippet-audit
-  // ============================================================
   const fullAnalysisExists = normalizedAudit ? normalizedAudit.hasFullAnalysis : false;
 
-  // داده‌های دیباگ برای ارسال به کامپوننت DebugLogger
   const debugData = {
     fullAnalysisExists,
     findings: snippet.findings,
@@ -220,7 +213,6 @@ export default async function SnippetPage({ params }: PageProps) {
 
   return (
     <>
-      {/* 🔥 کامپوننت دیباگ لاگر - فقط در محیط Development */}
       {process.env.NODE_ENV === 'development' && <DebugLogger data={debugData} />}
 
       <main className="min-h-screen bg-[#f8f9fa]">

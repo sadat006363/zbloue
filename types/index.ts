@@ -167,7 +167,7 @@ export const SnippetDataSchema = z.object({
   security_analysis: z.any().optional().nullable(),
   production_readiness: z.any().optional().nullable(),
   recommended_improvements: z.any().optional().nullable(),
-  improved_code: z.string().optional().nullable(),
+  improved_code: z.string().optional(), // 🔥 تغییر: nullable حذف شد
   suggested_tests: z.any().optional().nullable(),
   scorecard: z.any().optional().nullable(),
   final_verdict_summary: z.string().optional().nullable(),
@@ -317,8 +317,6 @@ export interface AppState {
 // 🔥 Export تایپ‌های مورد نیاز توسط app/page.tsx
 // ============================================================
 
-// این exportها برای سازگاری با صفحه اصلی اضافه شده‌اند
-// و به تایپ‌های Legacy اشاره می‌کنند
 export type {
   LegacyCodeWalkthroughItem,
   LegacyBugAndRiskyCase,
@@ -331,8 +329,6 @@ export type {
   LegacyScorecard,
 };
 
-// همچنین برای راحتی، نام‌های کوتاه‌تر را نیز صادر می‌کنیم
-// که همان تایپ‌های Legacy هستند
 export type {
   LegacyCodeWalkthroughItem as CodeWalkthroughItem,
   LegacyBugAndRiskyCase as BugAndRiskyCase,
