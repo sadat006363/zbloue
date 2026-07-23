@@ -61,13 +61,13 @@ export interface ScorecardLegacy {
 }
 
 export interface ScorecardNew {
-  correctness: number;
-  concurrencySafety: number;
-  liveness: number;
-  errorHandling: number;
-  resourceManagement: number;
-  maintainability: number;
-  productionReadiness: number;
+  correctness: { score: number; reason: string; relatedFindings: string[] };
+  concurrencySafety: { score: number; reason: string; relatedFindings: string[] };
+  liveness: { score: number; reason: string; relatedFindings: string[] };
+  errorHandling: { score: number; reason: string; relatedFindings: string[] };
+  resourceManagement: { score: number; reason: string; relatedFindings: string[] };
+  maintainability: { score: number; reason: string; relatedFindings: string[] };
+  productionReadiness: { score: number; reason: string; relatedFindings: string[] };
 }
 
 export interface VerdictNew {
@@ -290,10 +290,30 @@ function severityBadge(severity: string): string {
 // ============================================================
 
 export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProps) {
+  // ===== محاسبه Scorecard با تشخیص مقیاس خودکار =====
   const { scorecardDisplay, scorecardIsNew, scorecardMax } = useMemo(() => {
     const display = snippet.scorecard_new || snippet.scorecard;
     const isNew = !!snippet.scorecard_new;
-    const max = isNew ? 100 : 10;
+
+    let max = 10; // مقدار پیش‌فرض
+
+    if (display && typeof display === 'object') {
+      const allScores: number[] = [];
+      for (const key of Object.keys(display)) {
+        const item = (display as any)[key];
+        if (item && typeof item === 'object' && typeof item.score === 'number') {
+          allScores.push(item.score);
+        } else if (typeof item === 'number') {
+          allScores.push(item);
+        }
+      }
+
+      if (allScores.length > 0) {
+        const maxScore = Math.max(...allScores);
+        max = maxScore > 10 ? 100 : 10;
+      }
+    }
+
     return { scorecardDisplay: display, scorecardIsNew: isNew, scorecardMax: max };
   }, [snippet.scorecard_new, snippet.scorecard]);
 
@@ -345,21 +365,8 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
       snippet.limitations
     );
 
-    // ===== DEBUG LOGS (فقط در محیط توسعه) =====
     if (process.env.NODE_ENV === 'development') {
       logger.debug('[SnippetFullAnalysis] hasContent:', result);
-      logger.debug('[SnippetFullAnalysis] snippet.code_walkthrough:', snippet.code_walkthrough);
-      logger.debug('[SnippetFullAnalysis] snippet.what_works_well:', snippet.what_works_well);
-      logger.debug('[SnippetFullAnalysis] snippet.suggested_tests_new:', snippet.suggested_tests_new);
-      logger.debug('[SnippetFullAnalysis] snippet.scorecard_new:', snippet.scorecard_new);
-      logger.debug('[SnippetFullAnalysis] snippet.verdict:', snippet.verdict);
-      logger.debug('[SnippetFullAnalysis] snippet.limitations:', snippet.limitations);
-      logger.debug('[SnippetFullAnalysis] snippet.execution_overview:', snippet.execution_overview);
-      logger.debug('[SnippetFullAnalysis] snippet.findings:', snippet.findings);
-      logger.debug('[SnippetFullAnalysis] snippet.architectural_observations:', snippet.architectural_observations);
-      logger.debug('[SnippetFullAnalysis] snippet.recommended_actions:', snippet.recommended_actions);
-      logger.debug('[SnippetFullAnalysis] snippet.complexity:', snippet.complexity);
-      logger.debug('[SnippetFullAnalysis] hasFindings:', hasFindings);
     }
 
     return result;
@@ -724,14 +731,21 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
           </div>
         )}
 
+        {/* ===== Scorecard ===== */}
         {scorecardDisplay && (
           <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
             <h3 className="text-lg font-semibold text-[#89b4fa]">
-              📊 Scorecard {scorecardIsNew ? '(New)' : '(Legacy)'}
+              📊 Scorecard {scorecardIsNew && scorecardMax === 100 ? '(New)' : ''}
             </h3>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
               {Object.entries(scorecardDisplay).map(([key, value]) => {
-                const num = typeof value === 'number' ? value : 0;
+                let num = 0;
+                if (typeof value === 'number') {
+                  num = value;
+                } else if (value && typeof value === 'object' && typeof (value as any).score === 'number') {
+                  num = (value as any).score;
+                }
+
                 return (
                   <div key={key} className="bg-[#1e1e2e] p-2 rounded-md text-center border border-[#313244]">
                     <p className="text-xs text-[#6c7086] capitalize">
