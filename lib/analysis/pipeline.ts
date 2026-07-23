@@ -170,7 +170,9 @@ export async function runAdvancedPipeline(
   language: string
 ): Promise<PipelineResult> {
   const startTime = Date.now();
+  const rootRequestId = `pipeline-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const stages: { name: string; durationMs: number; data?: unknown }[] = [];
+  const pipelineDeadline = Date.now() + 180000; // ۳ دقیقه کل زمان
 
   try {
     // ===== 1. Input validation =====
@@ -266,7 +268,8 @@ export async function runAdvancedPipeline(
       schema: AdvancedAuditResultSchema,
       temperature: undefined, // GPT-5 reasoning models don't use temperature
       maxTokens: parseInt(process.env.OPENAI_ADVANCED_MAX_OUTPUT_TOKENS || '12000', 10),
-      requestId: `pipeline-${Date.now()}`,
+      rootRequestId,
+      deadline: pipelineDeadline,
       metadata: { auditType, language },
     });
 
@@ -281,19 +284,32 @@ export async function runAdvancedPipeline(
     } else {
       // Gateway failed - try legacy fallback
       logger.warn('[Pipeline] Gateway failed, falling back to legacy OpenAI call', {
+        rootRequestId,
         error: gatewayResult.error,
       });
 
       try {
-        // Legacy fallback: direct OpenAI call (will use the old path)
-        const { callOpenAI } = await import('@/lib/openaiClient');
-        rawContent = await callOpenAI(systemPrompt, prompt, {
-          mode: 'advanced',
-          responseFormat: 'text',
+        // Legacy از یک مدل مستقل با timeout کمتر و بدون fallback استفاده می‌کند
+        const legacyResult = await callLLMJson<AdvancedAuditResult>(systemPrompt, prompt, {
+          role: 'stableFallback', // فقط gpt-4o-mini
+          schema: AdvancedAuditResultSchema,
+          temperature: 0.1,
+          maxTokens: 4000,
+          rootRequestId: `${rootRequestId}-legacy`,
+          deadline: pipelineDeadline,
+          disableFallback: true, // بدون fallback
+          metadata: { auditType, language, legacy: true },
         });
-        stages.push({ name: 'ai_call_legacy_fallback', durationMs: Date.now() - stageStart4 });
+
+        if (legacyResult.success && legacyResult.data) {
+          parsed = legacyResult.data;
+          rawContent = JSON.stringify(parsed);
+          stages.push({ name: 'ai_call_legacy_success', durationMs: Date.now() - stageStart4, data: { model: legacyResult.modelUsed } });
+        } else {
+          throw new Error(legacyResult.error?.message || 'Legacy fallback failed');
+        }
       } catch (legacyError) {
-        logger.error('[Pipeline] Legacy fallback also failed:', legacyError);
+        logger.error('[Pipeline] Legacy fallback failed:', { rootRequestId, error: legacyError });
         stages.push({ name: 'ai_call_failed', durationMs: Date.now() - stageStart4, data: { error: legacyError instanceof Error ? legacyError.message : 'unknown' } });
         return {
           result: null,

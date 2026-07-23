@@ -2,16 +2,23 @@
 
 import OpenAI from 'openai';
 import { z } from 'zod';
+import { randomUUID } from 'crypto';
 import {
   LLM_MODELS,
   ADVANCED_MODEL_ROLES,
-  getModelByRole,
   getModelByKey,
   type ModelCapability,
   type AdvancedModelRole,
 } from './llm-registry';
 import logger from './logger';
-import { randomUUID } from 'crypto';
+
+// ============================================================
+// 🔥 Configuration
+// ============================================================
+
+const REQUEST_TIMEOUT_MS = parseInt(process.env.OPENAI_REQUEST_TIMEOUT_MS || '150000', 10);
+const MAX_RETRIES = parseInt(process.env.OPENAI_MAX_RETRIES || '1', 10);
+const GATEWAY_ENABLED = process.env.LLM_GATEWAY_ENABLED !== 'false';
 
 // ============================================================
 // 🔥 OpenAI Client
@@ -24,7 +31,7 @@ if (!openaiApiKey) {
 
 const openai = new OpenAI({
   apiKey: openaiApiKey,
-  timeout: parseInt(process.env.OPENAI_REQUEST_TIMEOUT_MS || '90000', 10),
+  timeout: REQUEST_TIMEOUT_MS,
 });
 
 // ============================================================
@@ -41,7 +48,10 @@ export interface GatewayRequest {
   responseFormat?: 'json_object' | 'text';
   schema?: z.ZodSchema;
   requestId?: string;
+  rootRequestId?: string;
   metadata?: Record<string, unknown>;
+  disableFallback?: boolean; // برای Legacy
+  deadline?: number; // زمان مطلق (timestamp) برای کل pipeline
 }
 
 export interface GatewayResult<T = unknown> {
@@ -63,6 +73,7 @@ export interface NormalizedLLMError {
   providerCode?: string;
   model?: string;
   requestId?: string;
+  rootRequestId?: string;
   attempt?: number;
   cause?: string;
 }
@@ -80,35 +91,46 @@ export type LLMErrorCode =
   | 'UNKNOWN';
 
 // ============================================================
-// 🔥 Configuration
+// 🔥 Error Classification (اصلاح شده)
 // ============================================================
 
-const MAX_RETRIES = parseInt(process.env.OPENAI_MAX_RETRIES || '2', 10);
-const REQUEST_TIMEOUT_MS = parseInt(process.env.OPENAI_REQUEST_TIMEOUT_MS || '90000', 10);
-const GATEWAY_ENABLED = process.env.LLM_GATEWAY_ENABLED !== 'false';
-
-// ============================================================
-// 🔥 Error Classification
-// ============================================================
-
-function classifyError(error: unknown, modelKey: string): NormalizedLLMError {
+function classifyError(error: unknown, modelKey: string, rootRequestId?: string): NormalizedLLMError {
   const defaultError: NormalizedLLMError = {
     code: 'UNKNOWN',
     message: 'An unknown error occurred',
     retryable: false,
     model: modelKey,
+    rootRequestId,
   };
 
   if (!error || typeof error !== 'object') return defaultError;
 
   const err = error as any;
-
-  // OpenAI SDK errors have a status and error property
   const status = err.status || err.statusCode;
   const providerCode = err.code || err.error?.code;
   const providerMessage = err.message || err.error?.message || '';
 
-  // Authentication errors
+  // ===== تشخیص Timeout/Abort =====
+  const isAbort = err.name === 'AbortError' ||
+    err.code === 'ABORT_ERR' ||
+    err.code === 'ETIMEDOUT' ||
+    providerMessage.toLowerCase().includes('request was aborted') ||
+    providerMessage.toLowerCase().includes('aborted') ||
+    providerMessage.toLowerCase().includes('timeout');
+
+  if (isAbort) {
+    return {
+      code: 'TIMEOUT',
+      message: 'The model request exceeded the configured timeout.',
+      retryable: true,
+      providerStatus: status || 504,
+      providerCode: 'TIMEOUT',
+      model: modelKey,
+      rootRequestId,
+    };
+  }
+
+  // ===== Authentication =====
   if (status === 401 || providerCode === 'invalid_api_key' || providerMessage.includes('API key')) {
     return {
       code: 'AUTHENTICATION_ERROR',
@@ -117,10 +139,11 @@ function classifyError(error: unknown, modelKey: string): NormalizedLLMError {
       providerStatus: status,
       providerCode,
       model: modelKey,
+      rootRequestId,
     };
   }
 
-  // Model not found / permission errors
+  // ===== Model Not Found =====
   if (status === 404 || providerCode === 'model_not_found' || providerMessage.includes('model')) {
     return {
       code: 'MODEL_UNAVAILABLE',
@@ -129,10 +152,11 @@ function classifyError(error: unknown, modelKey: string): NormalizedLLMError {
       providerStatus: status,
       providerCode,
       model: modelKey,
+      rootRequestId,
     };
   }
 
-  // Unsupported parameter errors
+  // ===== Unsupported Parameter =====
   if (providerCode === 'unsupported_parameter' || providerMessage.includes('unsupported parameter')) {
     return {
       code: 'UNSUPPORTED_PARAMETER',
@@ -141,10 +165,11 @@ function classifyError(error: unknown, modelKey: string): NormalizedLLMError {
       providerStatus: status,
       providerCode,
       model: modelKey,
+      rootRequestId,
     };
   }
 
-  // Rate limiting
+  // ===== Rate Limiting =====
   if (status === 429 || providerCode === 'rate_limit_exceeded') {
     return {
       code: 'RATE_LIMITED',
@@ -153,22 +178,11 @@ function classifyError(error: unknown, modelKey: string): NormalizedLLMError {
       providerStatus: status,
       providerCode,
       model: modelKey,
+      rootRequestId,
     };
   }
 
-  // Timeout
-  if (err.name === 'AbortError' || err.name === 'TimeoutError' || providerMessage.includes('timeout')) {
-    return {
-      code: 'TIMEOUT',
-      message: 'Request timed out.',
-      retryable: true,
-      providerStatus: status,
-      providerCode,
-      model: modelKey,
-    };
-  }
-
-  // Server errors (5xx)
+  // ===== Server Errors (5xx) =====
   if (status && status >= 500 && status < 600) {
     return {
       code: 'PROVIDER_UNAVAILABLE',
@@ -177,10 +191,11 @@ function classifyError(error: unknown, modelKey: string): NormalizedLLMError {
       providerStatus: status,
       providerCode,
       model: modelKey,
+      rootRequestId,
     };
   }
 
-  // Bad request (400) - usually not retryable
+  // ===== Bad Request =====
   if (status === 400) {
     return {
       code: 'BAD_REQUEST',
@@ -189,9 +204,11 @@ function classifyError(error: unknown, modelKey: string): NormalizedLLMError {
       providerStatus: status,
       providerCode,
       model: modelKey,
+      rootRequestId,
     };
   }
 
+  // ===== Fallback =====
   return {
     code: 'UNKNOWN',
     message: providerMessage || 'An unknown error occurred',
@@ -199,11 +216,12 @@ function classifyError(error: unknown, modelKey: string): NormalizedLLMError {
     providerStatus: status,
     providerCode,
     model: modelKey,
+    rootRequestId,
   };
 }
 
 // ============================================================
-// 🔥 Sleep helper (with jitter)
+// 🔥 Sleep with Jitter
 // ============================================================
 
 function sleep(ms: number): Promise<void> {
@@ -217,7 +235,7 @@ function getBackoffDelay(attempt: number): number {
 }
 
 // ============================================================
-// 🔥 Build payload
+// 🔥 Build Payload (بدون پارامترهای ناسازگار)
 // ============================================================
 
 function buildPayload(
@@ -246,19 +264,16 @@ function buildPayload(
   if (model.supportsTemperature && options.temperature !== undefined) {
     payload.temperature = options.temperature;
   } else if (model.supportsTemperature) {
-    // Default temperature for models that support it
     payload.temperature = 0.3;
   }
-  // If supportsTemperature is false, we do NOT send temperature
+  // اگر supportsTemperature false باشد، temperature ارسال نمی‌شود
 
   // ===== Reasoning =====
   if (model.supportsReasoning && model.reasoningEffort) {
-    payload.reasoning = {
-      effort: model.reasoningEffort,
-    };
+    payload.reasoning = { effort: model.reasoningEffort };
   }
 
-  // ===== Response format (JSON) =====
+  // ===== Response format =====
   if (options.responseFormat === 'json_object') {
     payload.response_format = { type: 'json_object' };
   }
@@ -267,7 +282,7 @@ function buildPayload(
 }
 
 // ============================================================
-// 🔥 Execute a single model call
+// 🔥 Execute Single Model Call
 // ============================================================
 
 async function executeModelCall(
@@ -279,21 +294,26 @@ async function executeModelCall(
     maxTokens?: number;
     responseFormat?: 'json_object' | 'text';
     signal?: AbortSignal;
+    timeoutMs?: number;
+    rootRequestId?: string;
   }
 ): Promise<{ content: string; model: string; api: string }> {
   const payload = buildPayload(model, systemPrompt, userPrompt, options);
+  const timeoutMs = options.timeoutMs || REQUEST_TIMEOUT_MS;
 
-  // AbortController for timeout
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  let abortedByTimeout = false;
+
+  const timer = setTimeout(() => {
+    abortedByTimeout = true;
+    controller.abort();
+  }, timeoutMs);
 
   try {
     const response = await openai.chat.completions.create(payload, {
       signal: options.signal || controller.signal,
     });
-
-    clearTimeout(timeoutId);
-
+    clearTimeout(timer);
     const content = response.choices[0]?.message?.content || '';
     return {
       content,
@@ -301,75 +321,102 @@ async function executeModelCall(
       api: 'chat-completions',
     };
   } catch (error) {
-    clearTimeout(timeoutId);
+    clearTimeout(timer);
+    if (abortedByTimeout) {
+      throw new Error('Request was aborted by internal timeout.');
+    }
     throw error;
   }
 }
 
 // ============================================================
-// 🔥 Main Gateway function
+// 🔥 Deduplicate Models
+// ============================================================
+
+function deduplicateModels(modelKeys: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const key of modelKeys) {
+    const model = getModelByKey(key);
+    if (!model) continue;
+    const signature = `${model.model}|${model.api}`;
+    if (!seen.has(signature)) {
+      seen.add(signature);
+      result.push(key);
+    }
+  }
+  return result;
+}
+
+// ============================================================
+// 🔥 Main Gateway Function
 // ============================================================
 
 export async function callLLM<T = unknown>(
   request: GatewayRequest
 ): Promise<GatewayResult<T>> {
   const startTime = Date.now();
+  const rootRequestId = request.rootRequestId || request.requestId || randomUUID();
   const requestId = request.requestId || randomUUID();
 
-  // Determine model key and capability
-  let modelKey: string;
+  // ===== Determine model keys to try =====
+  let modelKeys: string[];
+
   if (request.modelKey) {
-    modelKey = request.modelKey;
+    modelKeys = [request.modelKey];
   } else if (request.role) {
-    const roleMap: Record<AdvancedModelRole, string> = {
-      primary: 'gpt-5.4',
-      codeFallback: 'gpt-5.3-codex',
-      stableFallback: 'gpt-5.1',
+    const roleMap: Record<AdvancedModelRole, string[]> = {
+      primary: ['gpt-4o', 'gpt-4-turbo', 'gpt-4o-mini'],
+      codeFallback: ['gpt-4-turbo', 'gpt-4o-mini', 'gpt-4o'],
+      stableFallback: ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo'],
     };
-    modelKey = roleMap[request.role] || 'gpt-5.4';
+    modelKeys = roleMap[request.role] || ['gpt-4o', 'gpt-4-turbo', 'gpt-4o-mini'];
   } else {
-    modelKey = 'gpt-5.4';
+    modelKeys = ['gpt-4o', 'gpt-4-turbo', 'gpt-4o-mini'];
   }
 
-  // Fallback order for Advanced pipeline
-  const fallbackOrder: string[] = ['gpt-5.4', 'gpt-5.3-codex', 'gpt-5.1'];
+  // ===== Deduplicate =====
+  modelKeys = deduplicateModels(modelKeys);
+
+  // ===== اگر fallback غیرفعال است، فقط اولین مدل =====
+  if (request.disableFallback) {
+    modelKeys = modelKeys.slice(0, 1);
+  }
+
+  // ===== Deadline =====
+  const deadline = request.deadline || Date.now() + REQUEST_TIMEOUT_MS * 2; // 2x timeout
+  const minBudgetMs = 10000; // حداقل ۱۰ ثانیه برای هر تلاش
 
   let lastError: NormalizedLLMError | null = null;
   let attempts = 0;
+  let modelAttempts = 0;
 
-  // Determine which models to try
-  let modelsToTry: string[];
-  if (request.role) {
-    const roleMap: Record<AdvancedModelRole, string[]> = {
-      primary: ['gpt-5.4', 'gpt-5.3-codex', 'gpt-5.1'],
-      codeFallback: ['gpt-5.3-codex', 'gpt-5.1', 'gpt-5.4'],
-      stableFallback: ['gpt-5.1', 'gpt-5.4', 'gpt-5.3-codex'],
-    };
-    modelsToTry = roleMap[request.role] || fallbackOrder;
-  } else {
-    modelsToTry = [modelKey];
-  }
-
-  // Ensure we don't loop indefinitely
-  const maxAttempts = Math.min(modelsToTry.length * (MAX_RETRIES + 1), 9);
-
-  // Track which models we've already tried
-  const triedModels = new Set<string>();
-
-  for (const key of modelsToTry) {
-    if (triedModels.has(key)) continue;
-    triedModels.add(key);
-
+  for (const key of modelKeys) {
     const model = getModelByKey(key);
     if (!model) {
-      logger.warn(`[LLM Gateway] Model "${key}" not found in registry, skipping.`, { requestId });
+      logger.warn(`[LLM Gateway] Model "${key}" not found in registry, skipping.`, { rootRequestId });
       continue;
     }
 
     let retryCount = 0;
     let shouldRetry = true;
 
-    while (shouldRetry && retryCount <= MAX_RETRIES && attempts < maxAttempts) {
+    while (shouldRetry && retryCount <= MAX_RETRIES) {
+      const remainingMs = deadline - Date.now();
+      if (remainingMs < minBudgetMs) {
+        lastError = {
+          code: 'TIMEOUT',
+          message: 'Pipeline time budget exhausted',
+          retryable: false,
+          model: key,
+          rootRequestId,
+          attempt: attempts + 1,
+        };
+        break;
+      }
+
+      const attemptTimeout = Math.min(REQUEST_TIMEOUT_MS, remainingMs - 5000);
       attempts++;
 
       try {
@@ -381,10 +428,13 @@ export async function callLLM<T = unknown>(
             temperature: request.temperature,
             maxTokens: request.maxTokens,
             responseFormat: request.responseFormat || 'json_object',
+            signal: undefined,
+            timeoutMs: attemptTimeout,
+            rootRequestId,
           }
         );
 
-        // ===== Validate with Zod if schema provided =====
+        // ===== Zod Validation =====
         let parsedData: T | undefined;
         let validationError: NormalizedLLMError | null = null;
 
@@ -399,86 +449,68 @@ export async function callLLM<T = unknown>(
                 message: 'Zod validation failed',
                 retryable: false,
                 model: key,
-                requestId,
+                rootRequestId,
                 attempt: attempts,
                 cause: JSON.stringify(parsed.error.issues),
               };
             }
           } catch (parseError) {
-            // Invalid JSON - try to repair once
-            if (attempts === 1) {
-              // One repair attempt via re-parsing the raw content
+            // One repair attempt
+            const jsonMatch = result.content.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
               try {
-                // Try to extract JSON from the response
-                const jsonMatch = result.content.match(/\{[\s\S]*\}/);
-                if (jsonMatch) {
-                  const repaired = JSON.parse(jsonMatch[0]);
-                  if (request.schema.safeParse(repaired).success) {
-                    parsedData = repaired as T;
-                  } else {
-                    validationError = {
-                      code: 'INVALID_RESPONSE',
-                      message: 'Invalid JSON response after repair attempt',
-                      retryable: false,
-                      model: key,
-                      requestId,
-                      attempt: attempts,
-                    };
-                  }
+                const repaired = JSON.parse(jsonMatch[0]);
+                if (request.schema.safeParse(repaired).success) {
+                  parsedData = repaired as T;
                 } else {
                   validationError = {
                     code: 'INVALID_RESPONSE',
-                    message: 'No JSON found in response',
+                    message: 'Invalid JSON after repair',
                     retryable: false,
                     model: key,
-                    requestId,
+                    rootRequestId,
                     attempt: attempts,
                   };
                 }
               } catch {
                 validationError = {
                   code: 'INVALID_RESPONSE',
-                  message: 'Failed to parse or repair JSON response',
+                  message: 'Failed to repair JSON',
                   retryable: false,
                   model: key,
-                  requestId,
+                  rootRequestId,
                   attempt: attempts,
                 };
               }
             } else {
               validationError = {
                 code: 'INVALID_RESPONSE',
-                message: 'Invalid JSON response',
+                message: 'No JSON found in response',
                 retryable: false,
                 model: key,
-                requestId,
+                rootRequestId,
                 attempt: attempts,
               };
             }
           }
         } else {
-          // No schema validation - just use the content as a string
           parsedData = result.content as T;
         }
 
         if (validationError) {
           lastError = validationError;
-          // Try next model if validation fails (not retryable)
-          break;
+          break; // try next model
         }
 
         // ===== Success =====
         const durationMs = Date.now() - startTime;
-
-        // Safe logging (no API keys, no full source)
         logger.info('[LLM Gateway] Request successful', {
-          requestId,
+          rootRequestId,
           modelKey: key,
           model: model.model,
           api: model.api,
           attempt: attempts,
           durationMs,
-          success: true,
         });
 
         return {
@@ -491,14 +523,14 @@ export async function callLLM<T = unknown>(
           durationMs,
         };
       } catch (error) {
-        const normalized = classifyError(error, key);
+        const normalized = classifyError(error, key, rootRequestId);
 
-        // ===== Check if this error is retryable =====
-        if (normalized.retryable && retryCount < MAX_RETRIES) {
+        // ===== Retryable? =====
+        if (normalized.retryable && retryCount < MAX_RETRIES && !request.disableFallback) {
           retryCount++;
           const delay = getBackoffDelay(retryCount);
           logger.warn(`[LLM Gateway] Retryable error, retrying in ${delay}ms`, {
-            requestId,
+            rootRequestId,
             modelKey: key,
             attempt: attempts,
             retryCount,
@@ -508,37 +540,34 @@ export async function callLLM<T = unknown>(
           continue;
         }
 
-        // ===== Non-retryable or max retries exceeded =====
+        // ===== Non-retryable or max retries =====
         lastError = normalized;
 
-        // If the error is model-related (unsupported, not found), try next model
-        if (
-          normalized.code === 'MODEL_UNAVAILABLE' ||
-          normalized.code === 'UNSUPPORTED_PARAMETER'
-        ) {
+        // ===== Model-specific error → try next model =====
+        if (normalized.code === 'MODEL_UNAVAILABLE' || normalized.code === 'UNSUPPORTED_PARAMETER') {
           logger.warn(`[LLM Gateway] Model-specific error, trying next model`, {
-            requestId,
+            rootRequestId,
             modelKey: key,
             errorCode: normalized.code,
           });
-          break; // Exit retry loop, continue to next model
+          break; // exit retry loop, move to next model
         }
 
-        // Authentication error - fail immediately
+        // ===== Authentication error → fail immediately =====
         if (normalized.code === 'AUTHENTICATION_ERROR') {
           logger.error('[LLM Gateway] Authentication error, aborting', {
-            requestId,
+            rootRequestId,
             modelKey: key,
           });
           break;
         }
 
-        // Other non-retryable errors - try next model
+        // ===== Non-retryable → try next model =====
         if (!normalized.retryable) {
           break;
         }
 
-        // If we got here and retryCount exceeded, try next model
+        // ===== Retryable but max retries exceeded → try next model =====
         break;
       }
     }
@@ -550,12 +579,12 @@ export async function callLLM<T = unknown>(
     code: 'UNKNOWN',
     message: 'All models failed',
     retryable: false,
-    requestId,
+    rootRequestId,
     attempt: attempts,
   };
 
   logger.error('[LLM Gateway] All models failed', {
-    requestId,
+    rootRequestId,
     attempts,
     durationMs,
     errorCode: finalError.code,
@@ -574,7 +603,7 @@ export async function callLLM<T = unknown>(
 }
 
 // ============================================================
-// 🔥 Convenience wrapper for JSON responses with schema
+// 🔥 Convenience JSON Wrapper
 // ============================================================
 
 export async function callLLMJson<T>(
@@ -587,7 +616,10 @@ export async function callLLMJson<T>(
     temperature?: number;
     maxTokens?: number;
     requestId?: string;
+    rootRequestId?: string;
     metadata?: Record<string, unknown>;
+    disableFallback?: boolean;
+    deadline?: number;
   }
 ): Promise<GatewayResult<T>> {
   return callLLM<T>({
@@ -599,7 +631,10 @@ export async function callLLMJson<T>(
     temperature: options.temperature,
     maxTokens: options.maxTokens,
     requestId: options.requestId,
+    rootRequestId: options.rootRequestId,
     metadata: options.metadata,
+    disableFallback: options.disableFallback,
+    deadline: options.deadline,
     responseFormat: 'json_object',
   });
 }

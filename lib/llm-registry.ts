@@ -1,36 +1,9 @@
 // lib/llm-registry.ts
 
-/**
- * Centralized model registry for all OpenAI models used in Zbloue.
- * All model names, capabilities, and environment variable mappings are defined here.
- */
-
-export type ModelApi = 'chat-completions' | 'responses';
-
-export type ModelPurpose = 'advanced-analysis' | 'code-analysis' | 'fallback' | 'legacy';
-
-export type TokenParam = 'max_tokens' | 'max_completion_tokens' | 'max_output_tokens';
-
-export interface ModelCapability {
-  model: string;
-  api: ModelApi;
-  purpose: ModelPurpose;
-  supportsReasoning: boolean;
-  supportsTemperature: boolean;
-  supportsTopP: boolean;
-  supportsFrequencyPenalty: boolean;
-  supportsPresencePenalty: boolean;
-  tokenParam: TokenParam;
-  defaultMaxTokens: number;
-  reasoningEffort?: 'low' | 'medium' | 'high';
-}
-
-export interface ModelRegistry {
-  [key: string]: ModelCapability;
-}
+import { z } from 'zod';
 
 // ============================================================
-// 🔥 Environment variable helpers
+// 🔥 Environment variable helpers with validation
 // ============================================================
 
 function getEnv(key: string, fallback: string): string {
@@ -53,68 +26,75 @@ function getReasoningEffort(): 'low' | 'medium' | 'high' {
 }
 
 // ============================================================
-// 🔥 Model definitions
+// 🔥 Model Capabilities
 // ============================================================
 
-export const LLM_MODELS: ModelRegistry = {
-  // ===== GPT-5 Family (Advanced Pipeline) =====
-  'gpt-5.4': {
-    model: getEnv('OPENAI_ADVANCED_MODEL', 'gpt-5.4'),
+export type ModelApi = 'chat-completions' | 'responses';
+export type ModelPurpose = 'advanced-analysis' | 'code-analysis' | 'fallback' | 'legacy';
+export type TokenParam = 'max_tokens' | 'max_completion_tokens' | 'max_output_tokens';
+
+export interface ModelCapability {
+  model: string;
+  api: ModelApi;
+  purpose: ModelPurpose;
+  supportsReasoning: boolean;
+  supportsTemperature: boolean;
+  supportsTopP: boolean;
+  supportsFrequencyPenalty: boolean;
+  supportsPresencePenalty: boolean;
+  tokenParam: TokenParam;
+  defaultMaxTokens: number;
+  reasoningEffort?: 'low' | 'medium' | 'high';
+}
+
+// ============================================================
+// 🔥 Model Registry (با مدل‌های موجود)
+// ============================================================
+
+export const LLM_MODELS = {
+  // ===== مدل‌های موجود برای Advanced =====
+  'gpt-4o': {
+    model: getEnv('OPENAI_ADVANCED_MODEL', 'gpt-4o'),
     api: 'chat-completions',
     purpose: 'advanced-analysis',
-    supportsReasoning: true,
-    supportsTemperature: false,
-    supportsTopP: false,
-    supportsFrequencyPenalty: false,
-    supportsPresencePenalty: false,
-    tokenParam: 'max_completion_tokens',
-    defaultMaxTokens: getEnvNumber('OPENAI_ADVANCED_MAX_OUTPUT_TOKENS', 12000),
-    reasoningEffort: getReasoningEffort(),
-  },
-
-  'gpt-5.3-codex': {
-    model: getEnv('OPENAI_CODE_MODEL', 'gpt-5.3-codex'),
-    api: 'chat-completions',
-    purpose: 'code-analysis',
-    supportsReasoning: true,
-    supportsTemperature: false,
-    supportsTopP: false,
-    supportsFrequencyPenalty: false,
-    supportsPresencePenalty: false,
-    tokenParam: 'max_completion_tokens',
-    defaultMaxTokens: 12000,
-    reasoningEffort: 'medium',
-  },
-
-  'gpt-5.1': {
-    model: getEnv('OPENAI_FALLBACK_MODEL', 'gpt-5.1'),
-    api: 'chat-completions',
-    purpose: 'fallback',
-    supportsReasoning: false,
-    supportsTemperature: true,
-    supportsTopP: true,
-    supportsFrequencyPenalty: false,
-    supportsPresencePenalty: false,
-    tokenParam: 'max_completion_tokens',
-    defaultMaxTokens: 12000,
-  },
-
-  // ===== Legacy models (for Simple/Medium) =====
-  'gpt-4o': {
-    model: 'gpt-4o',
-    api: 'chat-completions',
-    purpose: 'legacy',
     supportsReasoning: false,
     supportsTemperature: true,
     supportsTopP: true,
     supportsFrequencyPenalty: true,
     supportsPresencePenalty: true,
     tokenParam: 'max_completion_tokens',
-    defaultMaxTokens: 16000,
+    defaultMaxTokens: getEnvNumber('OPENAI_ADVANCED_MAX_OUTPUT_TOKENS', 12000),
+  },
+
+  'gpt-4-turbo': {
+    model: getEnv('OPENAI_CODE_MODEL', 'gpt-4-turbo'),
+    api: 'chat-completions',
+    purpose: 'code-analysis',
+    supportsReasoning: false,
+    supportsTemperature: true,
+    supportsTopP: true,
+    supportsFrequencyPenalty: true,
+    supportsPresencePenalty: true,
+    tokenParam: 'max_completion_tokens',
+    defaultMaxTokens: 12000,
   },
 
   'gpt-4o-mini': {
-    model: 'gpt-4o-mini',
+    model: getEnv('OPENAI_FALLBACK_MODEL', 'gpt-4o-mini'),
+    api: 'chat-completions',
+    purpose: 'fallback',
+    supportsReasoning: false,
+    supportsTemperature: true,
+    supportsTopP: true,
+    supportsFrequencyPenalty: true,
+    supportsPresencePenalty: true,
+    tokenParam: 'max_completion_tokens',
+    defaultMaxTokens: 8000,
+  },
+
+  // ===== مدل Legacy (برای Fallback نهایی) =====
+  'legacy-stable': {
+    model: getEnv('OPENAI_LEGACY_MODEL', 'gpt-4o-mini'),
     api: 'chat-completions',
     purpose: 'legacy',
     supportsReasoning: false,
@@ -125,22 +105,22 @@ export const LLM_MODELS: ModelRegistry = {
     tokenParam: 'max_completion_tokens',
     defaultMaxTokens: 4000,
   },
-};
+} as const;
 
 // ============================================================
-// 🔥 Model roles for Advanced pipeline
+// 🔥 Advanced Model Roles
 // ============================================================
 
 export const ADVANCED_MODEL_ROLES = {
-  primary: 'gpt-5.4',
-  codeFallback: 'gpt-5.3-codex',
-  stableFallback: 'gpt-5.1',
+  primary: 'gpt-4o',
+  codeFallback: 'gpt-4-turbo',
+  stableFallback: 'gpt-4o-mini',
 } as const;
 
 export type AdvancedModelRole = keyof typeof ADVANCED_MODEL_ROLES;
 
 // ============================================================
-// 🔥 Helper to get model by role
+// 🔥 Helpers
 // ============================================================
 
 export function getModelByRole(role: AdvancedModelRole): ModelCapability {
@@ -152,26 +132,16 @@ export function getModelByRole(role: AdvancedModelRole): ModelCapability {
   return model;
 }
 
-// ============================================================
-// 🔥 Helper to get model by key
-// ============================================================
-
 export function getModelByKey(key: string): ModelCapability | undefined {
   return LLM_MODELS[key];
 }
 
-// ============================================================
-// 🔥 Helper to check if a model is available (by key)
-// ============================================================
-
-export function isModelAvailable(key: string): boolean {
-  return !!LLM_MODELS[key];
-}
-
-// ============================================================
-// 🔥 Helper to get all model keys
-// ============================================================
-
 export function getModelKeys(): string[] {
   return Object.keys(LLM_MODELS);
+}
+
+export function getAvailableModelKeys(): string[] {
+  // مدل‌هایی که واقعاً در دسترس هستند (برای Production)
+  // فعلاً همه مدل‌های ثبت‌شده را برمی‌گردانیم
+  return getModelKeys();
 }
