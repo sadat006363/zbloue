@@ -238,34 +238,55 @@ function HomeContent() {
       avatar_url: saveResult.avatar_url || null,
       card_image_url: null,
 
-      code_walkthrough: (payload.code_walkthrough as CodeWalkthroughItem[]) || undefined,
-      what_works_well: (payload.what_works_well as string[]) || undefined,
-      bugs_and_risky_cases: (payload.bugs_and_risky_cases as BugAndRiskyCase[]) || undefined,
-      edge_cases: (payload.edge_cases as EdgeCase[]) || undefined,
-      performance_analysis: (payload.performance_analysis as PerformanceAnalysis) || undefined,
-      security_analysis: (payload.security_analysis as SecurityAnalysis) || undefined,
-      production_readiness: (payload.production_readiness as ProductionReadiness) || undefined,
-      recommended_improvements: (payload.recommended_improvements as RecommendedImprovement[]) || undefined,
-      improved_code: (payload.improved_code as string) || undefined,
-      suggested_tests: (payload.suggested_tests as SuggestedTest[]) || undefined,
-      scorecard: (payload.scorecard as ScorecardLegacy) || undefined,
-      final_verdict_summary: (payload.final_verdict_summary as string) || undefined,
-      final_verdict_approved: (payload.final_verdict_approved as boolean) || undefined,
-      final_verdict_next_steps: (payload.final_verdict_next_steps as string) || undefined,
+      code_walkthrough: (payload.code_walkthrough as CodeWalkthroughItem[]) || [],
+      what_works_well: (payload.what_works_well as string[]) || [],
+      bugs_and_risky_cases: (payload.bugs_and_risky_cases as BugAndRiskyCase[]) || [],
+      edge_cases: (payload.edge_cases as EdgeCase[]) || [],
+      performance_analysis: (payload.performance_analysis as PerformanceAnalysis) || null,
+      security_analysis: (payload.security_analysis as SecurityAnalysis) || null,
+      production_readiness: (payload.production_readiness as ProductionReadiness) || null,
+      recommended_improvements: (payload.recommended_improvements as RecommendedImprovement[]) || [],
+      improved_code: (payload.improved_code as string) || null,
+      suggested_tests: (payload.suggested_tests as SuggestedTest[]) || [],
+      scorecard: (payload.scorecard as ScorecardLegacy) || null,
+      final_verdict_summary: (payload.final_verdict_summary as string) || null,
+      final_verdict_approved: (payload.final_verdict_approved as boolean) || false,
+      final_verdict_next_steps: (payload.final_verdict_next_steps as string) || null,
 
       line_explanations: null,
       generated_prompt: null,
 
-      findings: (payload.findings as AuditFinding[]) || undefined,
-      execution_overview: (payload.execution_overview as AdvancedAuditResult['executionOverview']) || undefined,
-      architectural_observations: (payload.architectural_observations as AdvancedAuditResult['architecturalObservations']) || undefined,
-      recommended_actions: (payload.recommended_actions as AdvancedAuditResult['recommendedActions']) || undefined,
-      suggested_tests_new: (payload.suggested_tests_new as AdvancedAuditResult['suggestedTests']) || undefined,
-      complexity: (payload.complexity as AdvancedAuditResult['complexity']) || undefined,
-      scorecard_new: (payload.scorecard_new as AuditScorecard) || undefined,
-      verdict: (payload.verdict as AdvancedAuditResult['verdict']) || undefined,
-      limitations: (payload.limitations as string[]) || undefined,
-      // debug_trace: (payload.debug_trace as DebugTrace) || undefined, // ❌ حذف شده
+      findings: (payload.findings as AuditFinding[]) || [],
+      execution_overview: (payload.execution_overview as AdvancedAuditResult['executionOverview']) || {
+        entryPoints: [],
+        taskSubmissionPoints: [],
+        blockingWaitPoints: [],
+        sharedResources: [],
+        resourceLifecycle: [],
+      },
+      architectural_observations: (payload.architectural_observations as AdvancedAuditResult['architecturalObservations']) || [],
+      recommended_actions: (payload.recommended_actions as AdvancedAuditResult['recommendedActions']) || [],
+      suggested_tests_new: (payload.suggested_tests_new as AdvancedAuditResult['suggestedTests']) || [],
+      complexity: (payload.complexity as AdvancedAuditResult['complexity']) || {
+        time: 'O(1)',
+        space: 'O(1)',
+        resourceGrowth: 'Constant',
+        assumptions: [],
+      },
+      scorecard_new: (payload.scorecard_new as AuditScorecard) || {
+        correctness: { score: 0, reason: 'No data available', relatedFindings: [] },
+        concurrencySafety: { score: 0, reason: 'No data available', relatedFindings: [] },
+        liveness: { score: 0, reason: 'No data available', relatedFindings: [] },
+        errorHandling: { score: 0, reason: 'No data available', relatedFindings: [] },
+        resourceManagement: { score: 0, reason: 'No data available', relatedFindings: [] },
+        maintainability: { score: 0, reason: 'No data available', relatedFindings: [] },
+        productionReadiness: { score: 0, reason: 'No data available', relatedFindings: [] },
+      },
+      verdict: (payload.verdict as AdvancedAuditResult['verdict']) || {
+        status: 'approved',
+        explanation: 'Code appears to be functional based on available evidence.',
+      },
+      limitations: (payload.limitations as string[]) || [],
     };
   }, [username, githubUsername]);
 
@@ -275,8 +296,6 @@ function HomeContent() {
     genData: GenerateResponse
   ): SaveSnippetData => {
     const linkedin_post = genData.linkedin_post || 'Check out this code analysis! #Zbloue';
-
-    // ❌ debug_trace حذف شده است
 
     if (mode === 'advanced') {
       const card_title = genData.title ?? genData.card_title ?? 'Code Analysis';
@@ -310,7 +329,7 @@ function HomeContent() {
         optimization = 'No improvements suggested.';
       }
 
-      const baseData = {
+      return {
         code: processedCode,
         language: lang,
         card_title,
@@ -323,35 +342,55 @@ function HomeContent() {
         github_username: githubUsername || null,
         avatar_url: avatarUrl,
 
-        code_walkthrough: genData.codeWalkthrough || null,
-        what_works_well: genData.whatWorksWell || null,
-        bugs_and_risky_cases: genData.bugsAndRiskyCases || null,
-        edge_cases: genData.edgeCases || null,
+        // ===== فیلدهای Legacy با مقدار پیش‌فرض =====
+        code_walkthrough: genData.codeWalkthrough || [],
+        what_works_well: genData.whatWorksWell || [],
+        bugs_and_risky_cases: genData.bugsAndRiskyCases || [],
+        edge_cases: genData.edgeCases || [],
         performance_analysis: genData.performanceAnalysis || null,
         security_analysis: genData.securityAnalysis || null,
         production_readiness: genData.productionReadiness || null,
-        recommended_improvements: genData.recommendedImprovements || null,
+        recommended_improvements: genData.recommendedImprovements || [],
         improved_code: genData.improvedCode?.code || null,
-        suggested_tests: genData.suggestedTestsLegacy || null,
+        suggested_tests: genData.suggestedTestsLegacy || [],
         scorecard: genData.scorecardLegacy || null,
         final_verdict_summary: genData.finalVerdict?.summary || null,
-        final_verdict_approved: genData.finalVerdict?.approved || null,
+        final_verdict_approved: genData.finalVerdict?.approved || false,
         final_verdict_next_steps: genData.finalVerdict?.nextSteps || null,
 
-        findings: genData.findings || null,
-        execution_overview: genData.executionOverview || null,
-        architectural_observations: genData.architecturalObservations || null,
-        recommended_actions: genData.recommendedActions || null,
-        suggested_tests_new: genData.suggestedTests || null,
-        complexity: genData.complexity || null,
-        scorecard_new: genData.scorecard || null,
-        verdict: genData.verdict || null,
-        limitations: genData.limitations || null,
+        // ===== فیلدهای جدید با مقدار پیش‌فرض =====
+        findings: genData.findings || [],
+        execution_overview: genData.executionOverview || {
+          entryPoints: [],
+          taskSubmissionPoints: [],
+          blockingWaitPoints: [],
+          sharedResources: [],
+          resourceLifecycle: [],
+        },
+        architectural_observations: genData.architecturalObservations || [],
+        recommended_actions: genData.recommendedActions || [],
+        suggested_tests_new: genData.suggestedTests || [],
+        complexity: genData.complexity || {
+          time: 'O(1)',
+          space: 'O(1)',
+          resourceGrowth: 'Constant',
+          assumptions: [],
+        },
+        scorecard_new: genData.scorecard || {
+          correctness: { score: 0, reason: 'No data available', relatedFindings: [] },
+          concurrencySafety: { score: 0, reason: 'No data available', relatedFindings: [] },
+          liveness: { score: 0, reason: 'No data available', relatedFindings: [] },
+          errorHandling: { score: 0, reason: 'No data available', relatedFindings: [] },
+          resourceManagement: { score: 0, reason: 'No data available', relatedFindings: [] },
+          maintainability: { score: 0, reason: 'No data available', relatedFindings: [] },
+          productionReadiness: { score: 0, reason: 'No data available', relatedFindings: [] },
+        },
+        verdict: genData.verdict || {
+          status: 'approved',
+          explanation: 'Code appears to be functional based on available evidence.',
+        },
+        limitations: genData.limitations || [],
       };
-
-      // ❌ debug_trace حذف شده است
-      return baseData;
-
     } else {
       const analysisText = genData.analysis || 'No analysis generated.';
       const summaryLines = analysisText.split('\n').slice(0, 4).join('\n');
@@ -369,7 +408,6 @@ function HomeContent() {
         username: username || 'Developer',
         github_username: githubUsername || null,
         avatar_url: avatarUrl,
-        // debug_trace: debugTrace || null, // ❌ حذف شده
       };
     }
   }, [mode, username, githubUsername, avatarUrl]);

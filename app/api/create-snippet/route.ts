@@ -9,7 +9,7 @@ import { rateLimiter, getClientIP } from '@/lib/rateLimiter';
 import { withErrorHandlerAndLog } from '@/lib/errorHandler';
 
 // ============================================================
-// 1. Zod schemas (بدون debug_trace)
+// 1. Zod schemas (همه فیلدها optional هستند)
 // ============================================================
 
 const CreateSnippetRequestSchema = z
@@ -25,6 +25,8 @@ const CreateSnippetRequestSchema = z
     username: z.string().min(1).max(100).nullable().optional(),
     github_username: z.string().min(1).max(100).nullable().optional(),
     avatar_url: z.string().url().nullable().optional(),
+
+    // ===== فیلدهای Legacy =====
     code_walkthrough: z.any().optional().nullable(),
     what_works_well: z.any().optional().nullable(),
     bugs_and_risky_cases: z.any().optional().nullable(),
@@ -39,6 +41,8 @@ const CreateSnippetRequestSchema = z
     final_verdict_summary: z.string().optional().nullable(),
     final_verdict_approved: z.boolean().optional().nullable(),
     final_verdict_next_steps: z.string().optional().nullable(),
+
+    // ===== فیلدهای جدید =====
     findings: z.any().optional().nullable(),
     execution_overview: z.any().optional().nullable(),
     architectural_observations: z.any().optional().nullable(),
@@ -48,7 +52,6 @@ const CreateSnippetRequestSchema = z
     scorecard_new: z.any().optional().nullable(),
     verdict: z.any().optional().nullable(),
     limitations: z.array(z.string().max(300)).max(20).optional().nullable(),
-    // ❌ debug_trace: z.any().nullable().optional(), // حذف شده
   })
   .strict();
 
@@ -96,7 +99,7 @@ async function generateUniqueSlug(retries = MAX_SLUG_RETRIES): Promise<string> {
 }
 
 // ============================================================
-// 3. Database mapper (بدون debug_trace)
+// 3. Database mapper (با پشتیبانی از فیلدهای جدید)
 // ============================================================
 
 type SnippetInsert = any;
@@ -121,7 +124,7 @@ function mapToDatabaseRow(body: CreateSnippetRequest, slug: string): SnippetInse
     created_at: now,
   };
 
-  // Legacy fields
+  // ===== Legacy fields =====
   if (body.code_walkthrough !== undefined) row.code_walkthrough = body.code_walkthrough;
   if (body.what_works_well !== undefined) row.what_works_well = body.what_works_well;
   if (body.bugs_and_risky_cases !== undefined) row.bugs_and_risky_cases = body.bugs_and_risky_cases;
@@ -137,7 +140,7 @@ function mapToDatabaseRow(body: CreateSnippetRequest, slug: string): SnippetInse
   if (body.final_verdict_approved !== undefined) row.final_verdict_approved = body.final_verdict_approved;
   if (body.final_verdict_next_steps !== undefined) row.final_verdict_next_steps = body.final_verdict_next_steps;
 
-  // New fields
+  // ===== New fields =====
   if (body.findings !== undefined) row.findings = body.findings;
   if (body.execution_overview !== undefined) row.execution_overview = body.execution_overview;
   if (body.architectural_observations !== undefined) row.architectural_observations = body.architectural_observations;
@@ -147,9 +150,6 @@ function mapToDatabaseRow(body: CreateSnippetRequest, slug: string): SnippetInse
   if (body.scorecard_new !== undefined) row.scorecard_new = body.scorecard_new;
   if (body.verdict !== undefined) row.verdict = body.verdict;
   if (body.limitations !== undefined) row.limitations = body.limitations;
-
-  // ❌ debug_trace حذف شده
-  // if (body.debug_trace !== undefined) row.debug_trace = body.debug_trace;
 
   return row;
 }
