@@ -6,6 +6,7 @@ import type {
   AuditScorecard,
   ScoreItem,
   ImprovedCode,
+  VerdictStatus,
 } from './schema';
 import {
   SeveritySchema,
@@ -71,12 +72,7 @@ function normalizeScore(value: unknown, fallback: number = 0): number {
   return fallback;
 }
 
-/**
- * ✅ نرمالایز کردن ScoreItem به ساختار Object (score, reason, relatedFindings)
- * این تابع هم ورودی عددی (Legacy) و هم ورودی Object را پشتیبانی می‌کند
- */
 function normalizeScoreItem(value: unknown, fallback: number = 0): ScoreItem {
-  // ===== اگر ورودی Object است =====
   if (isObject(value)) {
     const score = normalizeScore(value.score, fallback);
     const reason = typeof value.reason === 'string' ? value.reason.trim() : '';
@@ -86,7 +82,6 @@ function normalizeScoreItem(value: unknown, fallback: number = 0): ScoreItem {
     return { score, reason, relatedFindings };
   }
 
-  // ===== اگر ورودی عددی است (Legacy 0-10 یا 0-100) =====
   const score = normalizeScore(value, fallback);
   return {
     score,
@@ -95,10 +90,6 @@ function normalizeScoreItem(value: unknown, fallback: number = 0): ScoreItem {
   };
 }
 
-/**
- * ✅ نرمالایز کردن کل Scorecard
- * تبدیل Legacy 0-10 یا 0-100 عددی به ساختار Object
- */
 function normalizeScorecard(source: unknown): AuditScorecard {
   const input = getSafeObject(source);
 
@@ -126,9 +117,7 @@ function normalizeImprovedCode(source: unknown): ImprovedCode {
     : null;
   const notes = typeof input.notes === 'string' ? input.notes.trim() : '';
 
-  // ===== اعمال قوانین ImprovedCode =====
   if (available && !code) {
-    // اگر available === true ولی code خالی است، آن را اصلاح می‌کنیم
     return {
       available: false,
       code: null,
@@ -137,7 +126,6 @@ function normalizeImprovedCode(source: unknown): ImprovedCode {
   }
 
   if (!available && code) {
-    // اگر available === false ولی code وجود دارد، آن را اصلاح می‌کنیم
     return {
       available: false,
       code: null,
@@ -153,10 +141,10 @@ function normalizeImprovedCode(source: unknown): ImprovedCode {
 }
 
 // ============================================================
-// Verdict Normalization (✅ ۶ وضعیت)
+// Verdict Normalization (✅ با تایپ صحیح)
 // ============================================================
 
-function normalizeVerdict(source: unknown): { status: string; explanation: string } {
+function normalizeVerdict(source: unknown): { status: VerdictStatus; explanation: string } {
   const input = getSafeObject(source);
 
   const status = sanitizeEnum(
@@ -296,7 +284,7 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
     resourceLifecycle: getStringArray(overviewSource.resourceLifecycle) || [],
   };
 
-  // ===== 3. Scorecard (✅ ساختار Object) =====
+  // ===== 3. Scorecard =====
   const scorecardSource = getSafeObject(
     input.scorecard_new ??
     input.scorecard ??
@@ -305,7 +293,7 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
   );
   const scorecard = normalizeScorecard(scorecardSource);
 
-  // ===== 4. Verdict (✅ ۶ وضعیت) =====
+  // ===== 4. Verdict =====
   const verdictSource = getSafeObject(input.verdict, getSafeObject(input.finalVerdict, {}));
   const verdict = normalizeVerdict(verdictSource);
 
@@ -318,7 +306,7 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
     assumptions: getStringArray(complexitySource.assumptions) || [],
   };
 
-  // ===== 6. ImprovedCode (✅ ساختار کامل) =====
+  // ===== 6. ImprovedCode =====
   const improvedCodeSource = getSafeObject(
     input.improvedCode ??
     input.improved_code ??
@@ -416,7 +404,6 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
     linkedin_post: linkedinPost,
   };
 
-  // ===== اضافه کردن responseLanguage در صورت وجود =====
   if (responseLanguage) {
     (result as any).responseLanguage = responseLanguage;
   }
