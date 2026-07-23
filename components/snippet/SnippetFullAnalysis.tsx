@@ -60,14 +60,17 @@ export interface ScorecardLegacy {
   overall?: number;
 }
 
+// ===== ScorecardNew: support both primitive numbers and rich objects =====
+export type ScoreItemValue = number | { score: number; reason: string; relatedFindings: string[] };
+
 export interface ScorecardNew {
-  correctness: { score: number; reason: string; relatedFindings: string[] };
-  concurrencySafety: { score: number; reason: string; relatedFindings: string[] };
-  liveness: { score: number; reason: string; relatedFindings: string[] };
-  errorHandling: { score: number; reason: string; relatedFindings: string[] };
-  resourceManagement: { score: number; reason: string; relatedFindings: string[] };
-  maintainability: { score: number; reason: string; relatedFindings: string[] };
-  productionReadiness: { score: number; reason: string; relatedFindings: string[] };
+  correctness: ScoreItemValue;
+  concurrencySafety: ScoreItemValue;
+  liveness: ScoreItemValue;
+  errorHandling: ScoreItemValue;
+  resourceManagement: ScoreItemValue;
+  maintainability: ScoreItemValue;
+  productionReadiness: ScoreItemValue;
 }
 
 export interface VerdictNew {
