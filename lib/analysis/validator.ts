@@ -15,7 +15,7 @@ import { getLineCount, isValidLineRange, getLineContent } from './numberedCode';
 import logger from '@/lib/logger';
 
 // ============================================================
-// 🔥 تابع تشابه (Levenshtein Distance ساده‌شده)
+// 🔥 Similarity Function (Levenshtein)
 // ============================================================
 
 function levenshteinDistance(a: string, b: string): number {
@@ -56,7 +56,6 @@ function similarityScore(a: string, b: string): number {
 }
 
 function isSimilarEnough(a: string, b: string, threshold: number = 0.7): boolean {
-  // حذف فاصله‌ها و کاراکترهای اضافی برای مقایسه بهتر
   const normalize = (s: string) => s.replace(/\s+/g, ' ').trim();
   const normA = normalize(a);
   const normB = normalize(b);
@@ -66,7 +65,7 @@ function isSimilarEnough(a: string, b: string, threshold: number = 0.7): boolean
 }
 
 // ============================================================
-// VALIDATION: Evidence lines (اصلاح‌شده با تشابه)
+// VALIDATION: Evidence lines
 // ============================================================
 
 function validateEvidenceLines(
@@ -121,11 +120,10 @@ function validateEvidenceLines(
       const actualCode = getLineContent(code, startLine, endLine);
       const evidenceCode = ev?.code ?? '';
       if (actualCode && evidenceCode.trim()) {
-        // 🔥 استفاده از تشابه به جای تطابق دقیق
         if (!isSimilarEnough(actualCode, evidenceCode, 0.7)) {
           issues.push({
             code: 'EVIDENCE_CODE_MISMATCH',
-            severity: 'warning', // کاهش severity به warning
+            severity: 'warning',
             message: `Evidence code does not appear to match the actual source at lines ${startLine}-${endLine}. Similarity score: ${Math.round(similarityScore(actualCode, evidenceCode) * 100)}%`,
             relatedLines: [startLine, endLine],
             expectedCoverage: 'Evidence code should be a snippet from the source (with tolerance)',
@@ -243,7 +241,7 @@ function validateRelatedIds(result: unknown): ValidationIssue[] {
     }
   }
 
-  // Scorecard relatedFindings
+  // ===== Scorecard relatedFindings (✅ ساختار Object) =====
   const scorecard = (result as any).scorecard;
   if (scorecard && typeof scorecard === 'object') {
     for (const category of Object.values(scorecard)) {
@@ -267,11 +265,32 @@ function validateRelatedIds(result: unknown): ValidationIssue[] {
     }
   }
 
+  // ===== SuggestedTests relatedFindingIds =====
+  const suggestedTests = (result as any).suggestedTests ?? [];
+  if (Array.isArray(suggestedTests)) {
+    for (const test of suggestedTests) {
+      const relatedIds = test?.relatedFindingIds ?? [];
+      if (!Array.isArray(relatedIds)) continue;
+      for (const id of relatedIds) {
+        if (typeof id !== 'string') continue;
+        if (!allIds.has(id)) {
+          issues.push({
+            code: 'RELATED_ID_NOT_FOUND',
+            severity: 'warning',
+            message: `Suggested test references non-existent finding ID: ${id}`,
+            relatedLines: [],
+            expectedCoverage: 'All relatedFindingIds must reference existing findings',
+          });
+        }
+      }
+    }
+  }
+
   return issues;
 }
 
 // ============================================================
-// VALIDATION: Scorecard ranges
+// VALIDATION: Scorecard ranges (✅ ساختار Object)
 // ============================================================
 
 function validateScorecard(result: unknown): ValidationIssue[] {
@@ -310,7 +329,7 @@ function validateScorecard(result: unknown): ValidationIssue[] {
 }
 
 // ============================================================
-// VALIDATION: Verdict consistency
+// VALIDATION: Verdict consistency (✅ ۶ وضعیت)
 // ============================================================
 
 function validateVerdictConsistency(result: unknown): ValidationIssue[] {
@@ -331,7 +350,7 @@ function validateVerdictConsistency(result: unknown): ValidationIssue[] {
       issues.push({
         code: 'VERDICT_INCONSISTENT',
         severity: 'warning',
-        message: 'Critical findings present but verdict is not requires-major-changes',
+        message: 'Critical findings present but verdict is not requires-major-changes or requires-changes',
         relatedLines: [],
         expectedCoverage: 'Critical findings should downgrade production readiness verdict',
       });
@@ -369,11 +388,20 @@ function validateLinkedInPost(result: unknown): ValidationIssue[] {
         expectedCoverage: 'linkedin_post must be at most 300 characters',
       });
     }
+    if (post.trim().length === 0) {
+      issues.push({
+        code: 'LINKEDIN_POST_EMPTY',
+        severity: 'error',
+        message: 'linkedin_post is empty after trimming',
+        relatedLines: [],
+        expectedCoverage: 'linkedin_post must be a non-empty string',
+      });
+    }
   } else {
     issues.push({
       code: 'LINKEDIN_POST_MISSING',
       severity: 'error',
-      message: 'linkedin_post is required but missing',
+      message: 'linkedin_post is required but missing or not a string',
       relatedLines: [],
       expectedCoverage: 'linkedin_post must be a non-empty string',
     });

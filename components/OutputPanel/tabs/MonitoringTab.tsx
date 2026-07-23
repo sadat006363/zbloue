@@ -18,7 +18,7 @@ export default function MonitoringTab() {
 
   useEffect(() => {
     fetchMetrics();
-    const interval = setInterval(fetchMetrics, 30000); // هر ۳۰ ثانیه به‌روزرسانی
+    const interval = setInterval(fetchMetrics, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -64,7 +64,7 @@ export default function MonitoringTab() {
     );
   }
 
-  // ===== گروه‌بندی متریک‌ها =====
+  // ===== Group metrics =====
   const llmCalls = metrics.filter((m) => m.name === 'llm.call.count');
   const llmDurations = metrics.filter((m) => m.name === 'llm.call.duration');
   const tokensInput = metrics.filter((m) => m.name === 'llm.tokens.input');
@@ -74,6 +74,7 @@ export default function MonitoringTab() {
   const cacheMisses = metrics.filter((m) => m.name === 'cache.miss');
   const pipelineStatus = metrics.filter((m) => m.name === 'pipeline.status');
   const pipelineDurations = metrics.filter((m) => m.name === 'pipeline.duration');
+  const repairAttempts = metrics.filter((m) => m.name === 'repair.attempt');
 
   const totalCalls = llmCalls.reduce((sum, m) => sum + m.value, 0);
   const totalCost = costs.reduce((sum, m) => sum + m.value, 0);
@@ -93,6 +94,8 @@ export default function MonitoringTab() {
   const successRate = pipelineStatus.length > 0
     ? Math.round((pipelineSuccess.length / pipelineStatus.length) * 100)
     : 0;
+
+  const repairCount = repairAttempts.reduce((sum, m) => sum + m.value, 0);
 
   return (
     <div className="space-y-6">
@@ -141,21 +144,27 @@ export default function MonitoringTab() {
         </div>
       </div>
 
-      {/* ===== Pipeline Status ===== */}
-      <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
-        <p className="text-sm font-medium text-[#1a1a2e] mb-2">Pipeline Status</p>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 bg-[#43a047] rounded-full" />
-            <span className="text-sm text-[#4a4a6a]">Success: {pipelineSuccess.length}</span>
+      {/* ===== Pipeline & Repair Stats ===== */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
+          <p className="text-sm font-medium text-[#1a1a2e] mb-2">Pipeline Status</p>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 bg-[#43a047] rounded-full" />
+              <span className="text-sm text-[#4a4a6a]">Success: {pipelineSuccess.length}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 bg-[#e53935] rounded-full" />
+              <span className="text-sm text-[#4a4a6a]">Failed: {pipelineFailed.length}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-[#1a1a2e]">Rate: {successRate}%</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 bg-[#e53935] rounded-full" />
-            <span className="text-sm text-[#4a4a6a]">Failed: {pipelineFailed.length}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-[#1a1a2e]">Success Rate: {successRate}%</span>
-          </div>
+        </div>
+        <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
+          <p className="text-sm font-medium text-[#1a1a2e] mb-2">🔄 Repair Attempts</p>
+          <p className="text-2xl font-bold text-[#1a1a2e]">{repairCount}</p>
         </div>
       </div>
 
@@ -192,7 +201,7 @@ export default function MonitoringTab() {
         </div>
       </div>
 
-      {/* ===== Full Report (toggle) ===== */}
+      {/* ===== Full Report ===== */}
       <details className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
         <summary className="cursor-pointer text-sm font-medium text-[#1a1a2e]">
           📄 View Full Report

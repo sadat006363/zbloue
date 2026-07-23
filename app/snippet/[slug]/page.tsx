@@ -19,6 +19,12 @@ import SnippetPrompt from '@/components/snippet/SnippetPrompt';
 import SnippetStatusBar from '@/components/snippet/SnippetStatusBar';
 import SnippetJsonDropdown from '@/components/snippet/SnippetJsonDropdown';
 import DebugLogger from '@/components/DebugLogger';
+import {
+  normalizeSnippetAudit,
+  hasFullAnalysis,
+  getFindingsCount,
+  type NormalizedSnippetAudit,
+} from '@/lib/analysis/normalize-snippet-audit';
 
 // ============================================================
 // 🔥 params باید از نوع Promise باشد (Next.js 16)
@@ -132,6 +138,7 @@ async function getSnippet(slug: string): Promise<Snippet> {
     scorecard_new: data.scorecard_new ?? undefined,
     verdict: data.verdict ?? undefined,
     limitations: data.limitations ?? undefined,
+    audit_result: data.audit_result ?? undefined,
   };
 
   const validation = SnippetDataSchema.safeParse(candidate);
@@ -166,48 +173,6 @@ async function highlightCode(code: string, language: string): Promise<string> {
 }
 
 // ============================================================
-// 🔥 تابع بررسی وجود Full Report - نسخه ساده و قابل اعتماد
-// ============================================================
-function hasFullAnalysis(snippet: Snippet): boolean {
-  // بررسی مستقیم فیلدهای جدید (اولویت اول)
-  const hasNewFields = !!(
-    snippet.findings ||
-    snippet.scorecard_new ||
-    snippet.verdict ||
-    snippet.execution_overview ||
-    snippet.architectural_observations ||
-    snippet.recommended_actions ||
-    snippet.suggested_tests_new ||
-    snippet.complexity ||
-    snippet.limitations
-  );
-
-  if (hasNewFields) {
-    console.log('[hasFullAnalysis] ✅ New fields detected → true');
-    return true;
-  }
-
-  // اگر فیلدهای جدید نبودند، فیلدهای Legacy را بررسی کن
-  const hasLegacyFields = !!(
-    snippet.code_walkthrough ||
-    snippet.what_works_well ||
-    snippet.bugs_and_risky_cases ||
-    snippet.edge_cases ||
-    snippet.performance_analysis ||
-    snippet.security_analysis ||
-    snippet.production_readiness ||
-    snippet.recommended_improvements ||
-    snippet.improved_code ||
-    snippet.suggested_tests ||
-    snippet.scorecard ||
-    snippet.final_verdict_summary
-  );
-
-  console.log('[hasFullAnalysis] 🔍 Legacy fields:', hasLegacyFields);
-  return hasLegacyFields;
-}
-
-// ============================================================
 // 🏠 صفحه اصلی
 // ============================================================
 export default async function SnippetPage({ params }: PageProps) {
@@ -215,9 +180,16 @@ export default async function SnippetPage({ params }: PageProps) {
 
   let snippet: Snippet | null = null;
   let error: Error | null = null;
+  let normalizedAudit: NormalizedSnippetAudit | null = null;
 
   try {
     snippet = await getSnippet(slug);
+    if (snippet) {
+      // ============================================================
+      // 🔥 استفاده از normalizeSnippetAudit برای نرمالایز کردن داده‌ها
+      // ============================================================
+      normalizedAudit = normalizeSnippetAudit(snippet);
+    }
   } catch (err) {
     error = err as Error;
     console.error('[SnippetPage] Error loading snippet:', error);
@@ -230,7 +202,11 @@ export default async function SnippetPage({ params }: PageProps) {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || '';
   const shareUrl = `${baseUrl}/snippet/${snippet.slug}`;
   const highlightedHtml = await highlightCode(snippet.raw_code, snippet.language);
-  const fullAnalysisExists = hasFullAnalysis(snippet);
+
+  // ============================================================
+  // 🔥 استفاده از hasFullAnalysis از normalize-snippet-audit
+  // ============================================================
+  const fullAnalysisExists = normalizedAudit ? normalizedAudit.hasFullAnalysis : false;
 
   // داده‌های دیباگ برای ارسال به کامپوننت DebugLogger
   const debugData = {
@@ -239,6 +215,7 @@ export default async function SnippetPage({ params }: PageProps) {
     scorecard_new: snippet.scorecard_new,
     verdict: snippet.verdict,
     execution_overview: snippet.execution_overview,
+    normalizedAudit,
   };
 
   return (

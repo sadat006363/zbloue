@@ -52,6 +52,10 @@ export const AuditStatusSchema = z.enum([
   'failed_validation',
 ]);
 
+/**
+ * ✅ Verdict Enum واحد (۶ وضعیت)
+ * - برای Audit و Repair یکسان است
+ */
 export const VerdictStatusSchema = z.enum([
   'not-production-ready',
   'requires-major-changes',
@@ -62,7 +66,7 @@ export const VerdictStatusSchema = z.enum([
 ]);
 
 // ============================================================
-// REUSABLE ID SCHEMA (MISSING PREVIOUSLY)
+// REUSABLE ID SCHEMA
 // ============================================================
 
 export const FindingIdSchema = z.string().regex(/^F-\d{3,}$/, 'Finding ID must match F-XXX');
@@ -102,7 +106,7 @@ export const AuditFindingSchema = z.object({
 });
 
 // ============================================================
-// SCORECARD
+// SCORECARD (✅ ساختار Object با ۰-۱۰۰)
 // ============================================================
 
 export const ScoreItemSchema = z.object({
@@ -122,7 +126,7 @@ export const AuditScorecardSchema = z.object({
 });
 
 // ============================================================
-// IMPROVED CODE
+// IMPROVED CODE (✅ ساختار کامل)
 // ============================================================
 
 export const ImprovedCodeSchema = z.object({
@@ -131,8 +135,11 @@ export const ImprovedCodeSchema = z.object({
   notes: z.string().optional(),
 }).refine((data) => {
   if (data.available && !data.code) return false;
+  if (!data.available && data.code && data.code.trim().length > 0) return false;
   return true;
-}, { message: 'available must be true only when code is non-empty' });
+}, {
+  message: 'available must be true only when code is non-empty, and false when code is null',
+});
 
 // ============================================================
 // RECOMMENDED ACTION
@@ -147,16 +154,31 @@ export const RecommendedActionSchema = z.object({
 });
 
 // ============================================================
-// TOP-LEVEL CANONICAL SCHEMA
+// TOP-LEVEL CANONICAL SCHEMA (✅ منبع واحد حقیقت)
 // ============================================================
 
 export const AdvancedAuditResultSchema = z.object({
+  // ===== شناسه و متادیتا =====
   schemaVersion: z.literal('1.0'),
   auditType: AuditTypeSchema,
   status: AuditStatusSchema,
+  
+  // ===== زبان‌ها =====
+  /**
+   * زبان برنامه‌نویسی کد منبع (مثلاً 'javascript', 'python', 'java')
+   * این فیلد همیشه زبان برنامه‌نویسی است، نه زبان پاسخ
+   */
   language: z.string().min(1, 'Language must not be empty'),
+  
+  /**
+   * (اختیاری) زبان پاسخ (برای پرامپت‌هایی که از آن استفاده می‌کنند)
+   * برای سازگاری با داده‌های قدیمی، اختیاری است
+   */
+  responseLanguage: z.enum(['English', 'Persian']).optional(),
+
   summary: z.string().min(1, 'Summary must not be empty'),
 
+  // ===== Execution Overview =====
   executionOverview: z.object({
     entryPoints: z.array(z.string()).default([]),
     taskSubmissionPoints: z.array(z.string()).default([]),
@@ -165,8 +187,10 @@ export const AdvancedAuditResultSchema = z.object({
     resourceLifecycle: z.array(z.string()).default([]),
   }),
 
+  // ===== Findings =====
   findings: z.array(AuditFindingSchema).default([]),
 
+  // ===== Architectural Observations =====
   architecturalObservations: z.array(
     z.object({
       title: z.string().min(1),
@@ -175,8 +199,10 @@ export const AdvancedAuditResultSchema = z.object({
     })
   ).default([]),
 
+  // ===== Recommended Actions =====
   recommendedActions: z.array(RecommendedActionSchema).default([]),
 
+  // ===== Suggested Tests =====
   suggestedTests: z.array(
     z.object({
       title: z.string().min(1),
@@ -184,9 +210,15 @@ export const AdvancedAuditResultSchema = z.object({
       setup: z.array(z.string()).default([]),
       steps: z.array(z.string()).min(1),
       expectedResult: z.string().min(1),
+      /**
+       * (اختیاری) ارجاع به Findingهای مرتبط
+       * برای هماهنگی با سایر بخش‌ها اضافه شده است
+       */
+      relatedFindingIds: z.array(z.string()).default([]),
     })
   ).default([]),
 
+  // ===== Complexity =====
   complexity: z.object({
     time: z.string().min(1),
     space: z.string().min(1),
@@ -194,22 +226,27 @@ export const AdvancedAuditResultSchema = z.object({
     assumptions: z.array(z.string()).default([]),
   }),
 
+  // ===== Scorecard (✅ ۰-۱۰۰ Object) =====
   scorecard: AuditScorecardSchema,
 
+  // ===== Verdict (✅ ۶ وضعیت) =====
   verdict: z.object({
     status: VerdictStatusSchema,
     explanation: z.string().min(1, 'Verdict explanation must not be empty'),
   }),
 
+  // ===== Limitations =====
   limitations: z.array(z.string().min(1)).default([]),
 
+  // ===== Improved Code (✅ ساختار کامل) =====
   improvedCode: ImprovedCodeSchema,
 
+  // ===== LinkedIn Post (✅ اجباری، ۱-۳۰۰ کاراکتر) =====
   linkedin_post: z.string().trim().min(1, 'LinkedIn post must not be empty').max(300, 'LinkedIn post must be at most 300 characters'),
 }).strict();
 
 // ============================================================
-// INFERRED TYPE
+// INFERRED TYPE (✅ تنها منبع حقیقت)
 // ============================================================
 
 export type AdvancedAuditResult = z.infer<typeof AdvancedAuditResultSchema>;

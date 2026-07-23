@@ -16,6 +16,7 @@ import type { DetectorResult, AuditValidationResult } from './types';
 import { ANALYSIS_CONFIG } from './analysis.config';
 import { callOpenAI } from '@/lib/openaiClient';
 import { normalizeAnalysisOutput } from './normalizer';
+import { type PromptContext } from './prompt-context';
 import logger from '@/lib/logger';
 import { z } from 'zod';
 import fs from 'fs';
@@ -26,7 +27,7 @@ import path from 'path';
 // ============================================================
 
 const MAX_REPAIR_ATTEMPTS = ANALYSIS_CONFIG.maxRepairPasses;
-const PIPELINE_DEADLINE_MS = parseInt(process.env.PIPELINE_DEADLINE_MS || '180000', 10); // 3 دقیقه
+const PIPELINE_DEADLINE_MS = parseInt(process.env.PIPELINE_DEADLINE_MS || '180000', 10);
 
 // ============================================================
 // HELPER: SAFE JSON EXTRACTION
@@ -113,7 +114,6 @@ async function attemptRepairWithBudget(
     return null;
   }
 
-  // ===== بررسی Deadline =====
   if (Date.now() > deadline) {
     logger.warn('[Pipeline] Deadline reached during repair');
     return null;
@@ -151,7 +151,7 @@ async function attemptRepairWithBudget(
 }
 
 // ============================================================
-// MAIN PIPELINE (با Deadline)
+// MAIN PIPELINE
 // ============================================================
 
 export interface PipelineResult {
@@ -198,7 +198,6 @@ export async function runAdvancedPipeline(
     }
     stages.push({ name: 'input_validation', durationMs: Date.now() - stageStart });
 
-    // ===== بررسی Deadline =====
     if (Date.now() > deadline) {
       logger.warn('[Pipeline] Deadline reached at input validation');
       return {
@@ -226,17 +225,25 @@ export async function runAdvancedPipeline(
       };
     }
 
-    // ===== 3. Select audit strategy =====
+    // ===== 3. Build Prompt Context =====
+    const promptContext: PromptContext = {
+      sourceLanguage: language,
+      responseLanguage: 'English',
+      numberedCode,
+      rawCode: code,
+    };
+
+    // ===== 4. Select audit strategy =====
     const stageStart3 = Date.now();
     let auditType: AuditType;
     let prompt: string;
 
     if (detectorResult.requiresConcurrencyAudit) {
-      prompt = buildConcurrencyAuditPrompt(numberedCode, language);
+      prompt = buildConcurrencyAuditPrompt(promptContext);
       auditType = 'concurrency';
       logger.info('[Pipeline] Concurrency audit selected');
     } else {
-      prompt = buildGenericAdvancedPrompt(numberedCode, language);
+      prompt = buildGenericAdvancedPrompt(promptContext);
       auditType = 'generic';
       logger.info('[Pipeline] Generic audit selected');
     }
@@ -295,13 +302,12 @@ export async function runAdvancedPipeline(
       };
     }
 
-    // ===== 4. First AI call =====
+    // ===== 5. First AI call =====
     const stageStart4 = Date.now();
     const systemPrompt = 'You are an expert code auditor. Return ONLY valid JSON. Do not use Markdown fences. Do not include any text before or after the JSON.';
 
     let rawContent: string;
     try {
-      // ===== ارسال deadline به callOpenAI =====
       const remainingMs = deadline - Date.now();
       rawContent = await callOpenAI(systemPrompt, prompt, {
         mode: 'advanced',
@@ -356,7 +362,7 @@ export async function runAdvancedPipeline(
       };
     }
 
-    // ===== 5. Normalize =====
+    // ===== 6. Normalize =====
     let normalizedData: AdvancedAuditResult | null = null;
     let normalizationError: string | null = null;
     let jsonString: string | null = null;
@@ -368,6 +374,7 @@ export async function runAdvancedPipeline(
       }
 
       const parsed = JSON.parse(jsonString);
+      // ✅ استفاده از Normalizer جدید (با پشتیبانی از ساختار Object)
       normalizedData = normalizeAnalysisOutput(parsed);
     } catch (normError) {
       normalizationError = normError instanceof Error ? normError.message : 'Normalization failed';
@@ -384,12 +391,13 @@ export async function runAdvancedPipeline(
       };
     }
 
-    // ===== 6. Validation & Repair =====
+    // ===== 7. Validation & Repair =====
     if (normalizedData) {
       const zodResult = AdvancedAuditResultSchema.safeParse(normalizedData);
       if (zodResult.success) {
         stages.push({ name: 'normalization_success', durationMs: Date.now() - stageStart4 });
 
+        // ✅ استفاده از Validator جدید (با پشتیبانی از ساختار Object)
         let initialValidation = validateSemanticCompleteness(zodResult.data, detectorResult, code);
 
         let lastCandidate = zodResult.data;
@@ -419,6 +427,7 @@ export async function runAdvancedPipeline(
           );
 
           if (repaired) {
+            // ✅ اعتبارسنجی مجدد با Validator جدید
             const revalidation = validateSemanticCompleteness(repaired, detectorResult, code);
             if (revalidation.structurallyValid && !revalidation.repairRequired) {
               finalCandidate = repaired;
@@ -512,7 +521,7 @@ export async function runAdvancedPipeline(
       }
     }
 
-    // ===== 7. Final fallback =====
+    // ===== 8. Final fallback =====
     if (MAX_REPAIR_ATTEMPTS > 0 && jsonString && Date.now() < deadline) {
       try {
         const parsed = JSON.parse(jsonString);
@@ -552,7 +561,7 @@ export async function runAdvancedPipeline(
       }
     }
 
-    // ===== 8. All failed =====
+    // ===== 9. All failed =====
     logger.error('[Pipeline] Failed to obtain valid audit result');
     return {
       result: null,

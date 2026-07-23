@@ -3,7 +3,7 @@
 import logger from './logger';
 
 // ============================================================
-// 🔥 Metrics جمع‌آوری ساده
+// 🔥 Types
 // ============================================================
 
 interface Metric {
@@ -15,6 +15,10 @@ interface Metric {
 
 const metrics: Metric[] = [];
 const MAX_METRICS = 1000;
+
+// ============================================================
+// 🔥 Core functions
+// ============================================================
 
 export function recordMetric(name: string, value: number, tags?: Record<string, string>): void {
   const metric: Metric = {
@@ -39,7 +43,7 @@ export function clearMetrics(): void {
 }
 
 // ============================================================
-// 🔥 گزارش‌گیری ساده
+// 🔥 Report generation
 // ============================================================
 
 export function generateReport(): string {
@@ -84,7 +88,7 @@ export function generateReport(): string {
 }
 
 // ============================================================
-// 🔥 توابع ثبت Metrics اختصاصی
+// 🔥 Specialized metrics
 // ============================================================
 
 export function recordLLMCall(
@@ -99,7 +103,6 @@ export function recordLLMCall(
   recordMetric('llm.tokens.input', tokens.input, { provider, model });
   recordMetric('llm.tokens.output', tokens.output, { provider, model });
 
-  // هزینه تقریبی (قابل تنظیم)
   const costPerInputToken = provider === 'openai' ? 0.000005 : 0.000008;
   const costPerOutputToken = provider === 'openai' ? 0.000015 : 0.000024;
   const cost = tokens.input * costPerInputToken + tokens.output * costPerOutputToken;
@@ -114,9 +117,17 @@ export function recordCacheMiss(mode: string): void {
   recordMetric('cache.miss', 1, { mode });
 }
 
-export function recordPipelineStatus(status: string, durationMs: number): void {
-  recordMetric('pipeline.status', 1, { status });
-  recordMetric('pipeline.duration', durationMs, { status });
+export function recordPipelineStatus(
+  status: 'complete' | 'repaired' | 'failed_validation',
+  durationMs: number,
+  auditType?: string,
+  schemaVersion?: string
+): void {
+  const tags: Record<string, string> = { status };
+  if (auditType) tags.auditType = auditType;
+  if (schemaVersion) tags.schemaVersion = schemaVersion;
+  recordMetric('pipeline.status', 1, tags);
+  recordMetric('pipeline.duration', durationMs, tags);
 }
 
 export function recordValidationResult(valid: boolean, issues: number): void {
@@ -124,4 +135,8 @@ export function recordValidationResult(valid: boolean, issues: number): void {
   if (issues > 0) {
     recordMetric('validation.issues', issues);
   }
+}
+
+export function recordRepairAttempt(attempt: number, success: boolean): void {
+  recordMetric('repair.attempt', 1, { attempt: String(attempt), success: String(success) });
 }

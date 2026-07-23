@@ -17,6 +17,7 @@ export type Database = {
       snippets: {
         Row: {
           architectural_observations: Json | null
+          audit_result: Json | null
           avatar_url: string | null
           bugs_and_risky_cases: Json | null
           card_image_url: string | null
@@ -24,8 +25,9 @@ export type Database = {
           code: string | null
           code_walkthrough: Json | null
           complexity: Json | null
-          created_at: string | null
+          created_at: string
           debug_analysis: string
+          debug_trace: Json | null
           edge_cases: Json | null
           execution_overview: Json | null
           final_verdict_approved: boolean | null
@@ -36,7 +38,8 @@ export type Database = {
           github_username: string | null
           id: string
           improved_code: string | null
-          is_public: boolean | null
+          improved_code_jsonb: Json | null
+          is_public: boolean
           key_concept: string
           language: string
           limitations: string[] | null
@@ -48,6 +51,7 @@ export type Database = {
           raw_code: string
           recommended_actions: Json | null
           recommended_improvements: Json | null
+          schema_version: string | null
           scorecard: Json | null
           scorecard_new: Json | null
           security_analysis: Json | null
@@ -62,6 +66,7 @@ export type Database = {
         }
         Insert: {
           architectural_observations?: Json | null
+          audit_result?: Json | null
           avatar_url?: string | null
           bugs_and_risky_cases?: Json | null
           card_image_url?: string | null
@@ -69,8 +74,9 @@ export type Database = {
           code?: string | null
           code_walkthrough?: Json | null
           complexity?: Json | null
-          created_at?: string | null
+          created_at?: string
           debug_analysis: string
+          debug_trace?: Json | null
           edge_cases?: Json | null
           execution_overview?: Json | null
           final_verdict_approved?: boolean | null
@@ -81,7 +87,8 @@ export type Database = {
           github_username?: string | null
           id?: string
           improved_code?: string | null
-          is_public?: boolean | null
+          improved_code_jsonb?: Json | null
+          is_public?: boolean
           key_concept: string
           language: string
           limitations?: string[] | null
@@ -93,6 +100,7 @@ export type Database = {
           raw_code: string
           recommended_actions?: Json | null
           recommended_improvements?: Json | null
+          schema_version?: string | null
           scorecard?: Json | null
           scorecard_new?: Json | null
           security_analysis?: Json | null
@@ -107,6 +115,7 @@ export type Database = {
         }
         Update: {
           architectural_observations?: Json | null
+          audit_result?: Json | null
           avatar_url?: string | null
           bugs_and_risky_cases?: Json | null
           card_image_url?: string | null
@@ -114,8 +123,9 @@ export type Database = {
           code?: string | null
           code_walkthrough?: Json | null
           complexity?: Json | null
-          created_at?: string | null
+          created_at?: string
           debug_analysis?: string
+          debug_trace?: Json | null
           edge_cases?: Json | null
           execution_overview?: Json | null
           final_verdict_approved?: boolean | null
@@ -126,7 +136,8 @@ export type Database = {
           github_username?: string | null
           id?: string
           improved_code?: string | null
-          is_public?: boolean | null
+          improved_code_jsonb?: Json | null
+          is_public?: boolean
           key_concept?: string
           language?: string
           limitations?: string[] | null
@@ -138,6 +149,7 @@ export type Database = {
           raw_code?: string
           recommended_actions?: Json | null
           recommended_improvements?: Json | null
+          schema_version?: string | null
           scorecard?: Json | null
           scorecard_new?: Json | null
           security_analysis?: Json | null

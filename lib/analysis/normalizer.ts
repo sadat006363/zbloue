@@ -1,6 +1,12 @@
 // lib/analysis/normalizer.ts
 
-import type { AdvancedAuditResult, AuditFinding, AuditScorecard, ScoreItem } from './schema';
+import type {
+  AdvancedAuditResult,
+  AuditFinding,
+  AuditScorecard,
+  ScoreItem,
+  ImprovedCode,
+} from './schema';
 import {
   SeveritySchema,
   ConfidenceSchema,
@@ -49,7 +55,7 @@ function sanitizeEnum<T extends string>(
 }
 
 // ============================================================
-// Score normalization
+// Score Normalization (0-100 Object)
 // ============================================================
 
 function normalizeScore(value: unknown, fallback: number = 0): number {
@@ -65,7 +71,12 @@ function normalizeScore(value: unknown, fallback: number = 0): number {
   return fallback;
 }
 
+/**
+ * ✅ نرمالایز کردن ScoreItem به ساختار Object (score, reason, relatedFindings)
+ * این تابع هم ورودی عددی (Legacy) و هم ورودی Object را پشتیبانی می‌کند
+ */
 function normalizeScoreItem(value: unknown, fallback: number = 0): ScoreItem {
+  // ===== اگر ورودی Object است =====
   if (isObject(value)) {
     const score = normalizeScore(value.score, fallback);
     const reason = typeof value.reason === 'string' ? value.reason.trim() : '';
@@ -74,15 +85,109 @@ function normalizeScoreItem(value: unknown, fallback: number = 0): ScoreItem {
       : [];
     return { score, reason, relatedFindings };
   }
+
+  // ===== اگر ورودی عددی است (Legacy 0-10 یا 0-100) =====
+  const score = normalizeScore(value, fallback);
   return {
-    score: normalizeScore(value, fallback),
+    score,
     reason: '',
     relatedFindings: [],
   };
 }
 
+/**
+ * ✅ نرمالایز کردن کل Scorecard
+ * تبدیل Legacy 0-10 یا 0-100 عددی به ساختار Object
+ */
+function normalizeScorecard(source: unknown): AuditScorecard {
+  const input = getSafeObject(source);
+
+  return {
+    correctness: normalizeScoreItem(input.correctness, 0),
+    concurrencySafety: normalizeScoreItem(input.concurrencySafety, 0),
+    liveness: normalizeScoreItem(input.liveness, 0),
+    errorHandling: normalizeScoreItem(input.errorHandling, 0),
+    resourceManagement: normalizeScoreItem(input.resourceManagement, 0),
+    maintainability: normalizeScoreItem(input.maintainability, 0),
+    productionReadiness: normalizeScoreItem(input.productionReadiness, 0),
+  };
+}
+
 // ============================================================
-// Main Normalizer (با لاگ‌گیری)
+// ImprovedCode Normalization
+// ============================================================
+
+function normalizeImprovedCode(source: unknown): ImprovedCode {
+  const input = getSafeObject(source);
+
+  const available = typeof input.available === 'boolean' ? input.available : false;
+  const code = typeof input.code === 'string' && input.code.trim().length > 0
+    ? input.code
+    : null;
+  const notes = typeof input.notes === 'string' ? input.notes.trim() : '';
+
+  // ===== اعمال قوانین ImprovedCode =====
+  if (available && !code) {
+    // اگر available === true ولی code خالی است، آن را اصلاح می‌کنیم
+    return {
+      available: false,
+      code: null,
+      notes: notes || 'Code was expected but not provided.',
+    };
+  }
+
+  if (!available && code) {
+    // اگر available === false ولی code وجود دارد، آن را اصلاح می‌کنیم
+    return {
+      available: false,
+      code: null,
+      notes: notes || 'Code was provided but marked as unavailable.',
+    };
+  }
+
+  return {
+    available,
+    code,
+    notes: notes || (available ? 'Code patch provided.' : 'No safe patch available from context.'),
+  };
+}
+
+// ============================================================
+// Verdict Normalization (✅ ۶ وضعیت)
+// ============================================================
+
+function normalizeVerdict(source: unknown): { status: string; explanation: string } {
+  const input = getSafeObject(source);
+
+  const status = sanitizeEnum(
+    input.status,
+    VerdictStatusSchema.options,
+    'requires-changes'
+  );
+
+  const explanation = getSafeString(input.explanation, 'Verdict explanation not provided.');
+
+  return { status, explanation };
+}
+
+// ============================================================
+// Language Normalization
+// ============================================================
+
+function normalizeLanguage(source: unknown): string {
+  return getSafeString(source, 'unknown');
+}
+
+function normalizeResponseLanguage(source: unknown): 'English' | 'Persian' | undefined {
+  const value = getSafeString(source);
+  if (value === 'English' || value === 'Persian') {
+    return value;
+  }
+  return undefined;
+}
+
+// ============================================================
+// Main Normalizer
 // ============================================================
 
 export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
@@ -91,7 +196,7 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
 
   const input = getSafeObject(raw);
 
-  // --- 1. Findings ---
+  // ===== 1. Findings =====
   const findingsSource =
     input.findings ??
     input.issues ??
@@ -181,7 +286,7 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
     })
     .filter((finding) => finding.title.trim().length > 0 || finding.evidence.length > 0);
 
-  // --- 2. Execution Overview ---
+  // ===== 2. Execution Overview =====
   const overviewSource = getSafeObject(input.executionOverview, getSafeObject(input.overview, {}));
   const executionOverview = {
     entryPoints: getStringArray(overviewSource.entryPoints) || [],
@@ -191,33 +296,20 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
     resourceLifecycle: getStringArray(overviewSource.resourceLifecycle) || [],
   };
 
-  // --- 3. Scorecard ---
+  // ===== 3. Scorecard (✅ ساختار Object) =====
   const scorecardSource = getSafeObject(
-    input.scorecard_new ?? input.scorecardLegacy ?? input.scorecard ?? {}
+    input.scorecard_new ??
+    input.scorecard ??
+    input.scorecardLegacy ??
+    {}
   );
+  const scorecard = normalizeScorecard(scorecardSource);
 
-  const scorecard: AuditScorecard = {
-    correctness: normalizeScoreItem(scorecardSource.correctness, 0),
-    concurrencySafety: normalizeScoreItem(scorecardSource.concurrencySafety, 0),
-    liveness: normalizeScoreItem(scorecardSource.liveness, 0),
-    errorHandling: normalizeScoreItem(scorecardSource.errorHandling, 0),
-    resourceManagement: normalizeScoreItem(scorecardSource.resourceManagement, 0),
-    maintainability: normalizeScoreItem(scorecardSource.maintainability, 0),
-    productionReadiness: normalizeScoreItem(scorecardSource.productionReadiness, 0),
-  };
-
-  // --- 4. Verdict ---
+  // ===== 4. Verdict (✅ ۶ وضعیت) =====
   const verdictSource = getSafeObject(input.verdict, getSafeObject(input.finalVerdict, {}));
-  const verdict = {
-    status: sanitizeEnum(
-      verdictSource.status,
-      VerdictStatusSchema.options,
-      'requires-major-changes'
-    ),
-    explanation: getSafeString(verdictSource.explanation, getSafeString(verdictSource.summary, '')),
-  };
+  const verdict = normalizeVerdict(verdictSource);
 
-  // --- 5. Complexity ---
+  // ===== 5. Complexity =====
   const complexitySource = getSafeObject(input.complexity, {});
   const complexity = {
     time: getSafeString(complexitySource.time, 'unknown'),
@@ -226,7 +318,15 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
     assumptions: getStringArray(complexitySource.assumptions) || [],
   };
 
-  // --- 6. linkedin_post ---
+  // ===== 6. ImprovedCode (✅ ساختار کامل) =====
+  const improvedCodeSource = getSafeObject(
+    input.improvedCode ??
+    input.improved_code ??
+    {}
+  );
+  const improvedCode = normalizeImprovedCode(improvedCodeSource);
+
+  // ===== 7. linkedin_post =====
   let linkedinPost =
     typeof input.linkedin_post === 'string'
       ? input.linkedin_post.trim()
@@ -238,7 +338,11 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
     linkedinPost = 'Check out this code analysis! #Zbloue';
   }
 
-  // --- 7. Other arrays ---
+  // ===== 8. Language =====
+  const language = normalizeLanguage(input.language);
+  const responseLanguage = normalizeResponseLanguage(input.responseLanguage);
+
+  // ===== 9. Other arrays =====
   const architecturalObservations = getSafeArray<unknown>(input.architecturalObservations, [])
     .map((obs: unknown) => {
       const o = getSafeObject(obs);
@@ -266,7 +370,10 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
     .map((act, index) => ({ ...act, priority: index + 1 }));
 
   const suggestedTests = getSafeArray<unknown>(
-    input.suggestedTests ?? input.suggestedTestsLegacy,
+    input.suggestedTests ??
+    input.suggested_tests ??
+    input.suggestedTestsNew ??
+    input.suggested_tests_new ??
     []
   )
     .map((test: unknown) => {
@@ -276,26 +383,19 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
       const setup = getStringArray(t.setup) || [];
       const steps = getStringArray(t.steps) || [];
       const expectedResult = getSafeString(t.expectedResult, getSafeString(t.expectedOutput, ''));
-      return { title, purpose, setup, steps, expectedResult };
+      const allFindingIds = new Set(normalizedFindings.map((f) => f.id));
+      const relatedFindingIds = getStringArray(t.relatedFindingIds).filter((id) => allFindingIds.has(id));
+      return { title, purpose, setup, steps, expectedResult, relatedFindingIds };
     })
     .filter((test) => test.title.length > 0 || test.purpose.length > 0);
 
   const limitations = getStringArray(input.limitations) || [];
 
-  // --- 8. Build final result ---
-  const status: 'complete' = 'complete';
-
+  // ===== 10. Build final result =====
+  const status = sanitizeEnum(input.status, AuditStatusSchema.options, 'complete');
   const auditType = sanitizeEnum(input.auditType, AuditTypeSchema.options, 'generic');
-  const language = getSafeString(input.language, 'unknown');
-  const summary = getSafeString(input.summary, getSafeString(input.highLevelSummary, ''));
+  const summary = getSafeString(input.summary, getSafeString(input.highLevelSummary, 'No summary provided.'));
   const schemaVersion: '1.0' = '1.0';
-
-  const improvedCodeSource = getSafeObject(input.improvedCode, {});
-  const improvedCode = {
-    available: typeof improvedCodeSource.available === 'boolean' ? improvedCodeSource.available : false,
-    code: typeof improvedCodeSource.code === 'string' ? improvedCodeSource.code : null,
-    notes: typeof improvedCodeSource.notes === 'string' ? improvedCodeSource.notes : '',
-  };
 
   const result: AdvancedAuditResult = {
     schemaVersion,
@@ -315,6 +415,11 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
     improvedCode,
     linkedin_post: linkedinPost,
   };
+
+  // ===== اضافه کردن responseLanguage در صورت وجود =====
+  if (responseLanguage) {
+    (result as any).responseLanguage = responseLanguage;
+  }
 
   const duration = Date.now() - startTime;
   logger.debug('[Normalizer] Completed in', duration, 'ms, findings:', normalizedFindings.length);
