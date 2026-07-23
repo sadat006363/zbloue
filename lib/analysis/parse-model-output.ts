@@ -25,9 +25,6 @@ export interface ParseError {
 
 /**
  * استخراج JSON از پاسخ مدل
- * - ابتدا سعی می‌کند کل پاسخ را به عنوان JSON parse کند
- * - در غیر این صورت، اولین `{` تا آخرین `}` را استخراج می‌کند
- * - اگر هیچ JSONی پیدا نشود، خطا برمی‌گرداند
  */
 export function extractJSONFromResponse(rawContent: string): { success: boolean; json?: string; error?: string } {
   if (!rawContent || rawContent.trim().length === 0) {
@@ -76,14 +73,7 @@ export function parseModelOutput<T>(
   rawContent: string,
   schema: z.ZodSchema<T>,
   options?: {
-    /**
-     * آیا در صورت شکست، لاگ خطا ثبت شود؟
-     * @default true
-     */
     logErrors?: boolean;
-    /**
-     * شناسه درخواست برای لاگ‌گیری
-     */
     requestId?: string;
   }
 ): ParseResult<T> {
@@ -91,7 +81,7 @@ export function parseModelOutput<T>(
 
   // 1. استخراج JSON
   const extraction = extractJSONFromResponse(rawContent);
-  if (!extraction.success) {
+  if (!extraction.success || !extraction.json) {
     const error: ParseError = {
       code: 'NO_JSON_FOUND',
       message: extraction.error || 'No JSON found in model response',
@@ -194,15 +184,10 @@ export async function parseModelOutputWithRetry<T>(
 
     lastResult = result;
 
-    // در صورت وجود JSON ناقص، ممکن است بخواهیم یک بار تلاش به تعمیر کنیم
     if (attempt < maxRetries && result.extractedJson) {
-      // می‌توانیم یک تلاش تعمیر ساده اضافه کنیم
-      // فعلاً فقط لاگ می‌کنیم
       logger.debug('[ParseModelOutput] Retry attempt', { attempt, requestId });
-      // در اینجا می‌توانیم JSON را با regex تعمیر کنیم (برای آینده)
     }
 
-    // اگر نتیجه موفق نبود و دیگر تلاشی وجود ندارد، خطا را برگردان
     if (attempt === maxRetries) {
       return result;
     }
@@ -211,7 +196,7 @@ export async function parseModelOutputWithRetry<T>(
   return lastResult || {
     success: false,
     error: {
-      code: 'UNKNOWN',
+      code: 'EMPTY_RESPONSE',
       message: 'All parse attempts failed',
     },
     rawContent: currentContent,
