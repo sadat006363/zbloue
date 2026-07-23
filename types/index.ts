@@ -31,7 +31,7 @@ import {
 } from '@/lib/analysis/schema';
 
 // ============================================================
-// 🔥 تایپ‌های اصلی
+// 🔥 تایپ‌های اصلی (از Schema اصلی استخراج شده‌اند)
 // ============================================================
 
 export type {
@@ -51,7 +51,7 @@ export type {
 };
 
 // ============================================================
-// 🔥 تایپ‌های Legacy
+// 🔥 تایپ‌های Legacy (برای سازگاری با عقب و UI)
 // ============================================================
 
 export interface LegacyScorecard {
@@ -114,7 +114,7 @@ export interface LegacyRecommendedImprovement {
 }
 
 // ============================================================
-// 🔥 Exportهای Legacy
+// 🔥 Exportهای Legacy با نام‌های اصلی (برای سازگاری با UI)
 // ============================================================
 
 export type CodeWalkthroughItem = LegacyCodeWalkthroughItem;
@@ -128,7 +128,7 @@ export type SuggestedTest = LegacySuggestedTest;
 export type ScorecardLegacy = LegacyScorecard;
 
 // ============================================================
-// 🔥 Snippet Schema (بدون nullable)
+// 🔥 Snippet Schema (برای اعتبارسنجی داده‌های دیتابیس)
 // ============================================================
 
 export const SnippetDataSchema = z.object({
@@ -184,7 +184,7 @@ export const SnippetDataSchema = z.object({
 export type Snippet = z.infer<typeof SnippetDataSchema>;
 
 // ============================================================
-// 🔥 تایپ‌های API
+// 🔥 تایپ‌های درخواست و پاسخ API
 // ============================================================
 
 export interface GenerateRequest {
@@ -285,27 +285,3 @@ export interface AppState {
   toastMessage: string | null;
   promptInfo: PromptInfo | null;
 }
-
-export type {
-  LegacyCodeWalkthroughItem,
-  LegacyBugAndRiskyCase,
-  LegacyEdgeCase,
-  LegacyPerformanceAnalysis,
-  LegacySecurityAnalysis,
-  LegacyProductionReadiness,
-  LegacyRecommendedImprovement,
-  LegacySuggestedTest,
-  LegacyScorecard,
-};
-
-export type {
-  LegacyCodeWalkthroughItem as CodeWalkthroughItem,
-  LegacyBugAndRiskyCase as BugAndRiskyCase,
-  LegacyEdgeCase as EdgeCase,
-  LegacyPerformanceAnalysis as PerformanceAnalysis,
-  LegacySecurityAnalysis as SecurityAnalysis,
-  LegacyProductionReadiness as ProductionReadiness,
-  LegacyRecommendedImprovement as RecommendedImprovement,
-  LegacySuggestedTest as SuggestedTest,
-  LegacyScorecard as ScorecardLegacy,
-};
