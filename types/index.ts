@@ -315,6 +315,7 @@ export const LegacyGenerateResponseSchema = z.object({
     approved: z.boolean(),
     nextSteps: z.string().optional(),
   }).optional(),
+  linkedin_post: z.string().optional(), // 🔥 اضافه شد
   error: z.string().optional(),
 });
 
@@ -328,11 +329,7 @@ export const LegacyGenerateResponseSchema = z.object({
  * - performanceAnalysis, securityAnalysis, productionReadiness
  * - recommendedImprovements, improvedCode
  * - suggestedTests, scorecard
- * - finalVerdict, error
- *
- * Note: `improvedCode` is strictly a legacy shape with `available`, `code`, `notes`.
- * Canonical `ImprovedCode` is not included – mapping between canonical and legacy
- * representations must be handled by a dedicated normalizer/mapper at the service boundary.
+ * - linkedin_post, finalVerdict, error
  */
 export type LegacyGenerateResponse = z.infer<typeof LegacyGenerateResponseSchema>;
 
