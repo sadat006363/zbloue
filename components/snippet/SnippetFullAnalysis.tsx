@@ -17,10 +17,20 @@ import { php } from '@codemirror/lang-php';
 import { EditorView } from '@codemirror/view';
 import type { Extension } from '@codemirror/state';
 import logger from '@/lib/logger';
-import { type Snippet } from '@/types'; // 🔥 استفاده از تایپ اصلی Snippet
+import {
+  LegacyCodeWalkthroughItem,
+  LegacyBugAndRiskyCase,
+  LegacyEdgeCase,
+  LegacyPerformanceAnalysis,
+  LegacySecurityAnalysis,
+  LegacyProductionReadiness,
+  LegacyRecommendedImprovement,
+  LegacySuggestedTest,
+  LegacyScorecard,
+} from '@/types';
 
 // ============================================================
-// Types (فقط تایپ‌های داخلی که در Snippet وجود ندارند)
+// Types
 // ============================================================
 
 export interface Evidence {
@@ -93,11 +103,11 @@ export interface UnifiedTest {
 }
 
 // ============================================================
-// Component Props – استفاده از تایپ اصلی Snippet
+// Component Props
 // ============================================================
 
 export interface SnippetFullAnalysisProps {
-  snippet: Snippet; // 🔥 تغییر از SnippetData به Snippet
+  snippet: any; // 🔥 موقتاً any به دلیل SnippetDataSchema: z.unknown()
 }
 
 // ============================================================
@@ -144,9 +154,9 @@ function renderValue(value: unknown): React.ReactNode {
     if (typeof firstItem === 'object' && firstItem !== null) {
       return (
         <ul className="space-y-2 text-[#cdd6f4]">
-          {value.map((item, idx) => (
+          {value.map((item: any, idx: number) => (
             <li key={idx} className="border-b border-[#313244] pb-2 last:border-0">
-              {Object.entries(item).map(([k, v]) => {
+              {Object.entries(item).map(([k, v]: [string, any]) => {
                 const display = typeof v === 'string' ? v : JSON.stringify(v);
                 return (
                   <div key={k} className="text-sm">
@@ -163,7 +173,7 @@ function renderValue(value: unknown): React.ReactNode {
 
     return (
       <ul className="list-disc list-inside space-y-1 text-[#cdd6f4]">
-        {value.map((item, idx) => (
+        {value.map((item: any, idx: number) => (
           <li key={idx}>{String(item)}</li>
         ))}
       </ul>
@@ -173,7 +183,7 @@ function renderValue(value: unknown): React.ReactNode {
   if (typeof value === 'object' && value !== null) {
     return (
       <div className="text-sm text-[#cdd6f4] space-y-1">
-        {Object.entries(value).map(([key, val]) => {
+        {Object.entries(value).map(([key, val]: [string, any]) => {
           const display = typeof val === 'string' ? val : JSON.stringify(val);
           return (
             <div key={key}>
@@ -193,7 +203,7 @@ function normalizeTests(
   testsLegacy: any[] | undefined
 ): UnifiedTest[] {
   if (testsNew && testsNew.length > 0) {
-    return testsNew.map((t) => ({
+    return testsNew.map((t: any) => ({
       title: t.title || 'Test',
       purpose: t.purpose || '',
       setup: t.setup || [],
@@ -204,7 +214,7 @@ function normalizeTests(
   }
 
   if (testsLegacy && testsLegacy.length > 0) {
-    return testsLegacy.map((t) => ({
+    return testsLegacy.map((t: any) => ({
       title: t.name || 'Test',
       purpose: t.input || '',
       setup: [],
@@ -362,7 +372,7 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
           <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
             <h3 className="text-lg font-semibold text-[#89b4fa]">🧩 Code Walkthrough</h3>
             <div className="space-y-2 mt-2">
-              {snippet.code_walkthrough.map((item, idx) => (
+              {snippet.code_walkthrough.map((item: LegacyCodeWalkthroughItem, idx: number) => (
                 <div key={idx} className="border-b border-[#313244] pb-2 last:border-0">
                   <p className="font-medium text-[#89b4fa]">{item.section}</p>
                   <p className="text-sm text-[#cdd6f4]">{item.explanation}</p>
@@ -376,7 +386,7 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
           <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
             <h3 className="text-lg font-semibold text-[#a6e3a1]">✅ What Works Well</h3>
             <ul className="list-disc list-inside space-y-1 text-[#cdd6f4]">
-              {snippet.what_works_well.map((item, idx) => (
+              {snippet.what_works_well.map((item: string, idx: number) => (
                 <li key={idx}>{item}</li>
               ))}
             </ul>
@@ -388,7 +398,7 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
             {snippet.bugs_and_risky_cases && snippet.bugs_and_risky_cases.length > 0 && (
               <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
                 <h3 className="text-lg font-semibold text-[#f38ba8]">🐛 Bugs and Risky Cases</h3>
-                {snippet.bugs_and_risky_cases.map((item, idx) => (
+                {snippet.bugs_and_risky_cases.map((item: LegacyBugAndRiskyCase, idx: number) => (
                   <div key={idx} className="mt-2 border-b border-[#313244] pb-2 last:border-0">
                     <p className="font-medium text-[#f38ba8]">{item.issue}</p>
                     <p className="text-sm text-[#cdd6f4]">Impact: {item.impact}</p>
@@ -401,7 +411,7 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
             {snippet.edge_cases && snippet.edge_cases.length > 0 && (
               <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
                 <h3 className="text-lg font-semibold text-[#89b4fa]">🧪 Edge Cases</h3>
-                {snippet.edge_cases.map((item, idx) => (
+                {snippet.edge_cases.map((item: LegacyEdgeCase, idx: number) => (
                   <div key={idx} className="mt-2 border-b border-[#313244] pb-2 last:border-0">
                     <p className="font-medium text-[#89b4fa]">{item.case}</p>
                     <p className="text-sm text-[#cdd6f4]">Current: {item.currentBehavior}</p>
@@ -418,7 +428,7 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
           <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
             <h3 className="text-lg font-semibold text-[#89b4fa]">🔍 Findings</h3>
             <div className="space-y-4 mt-2">
-              {snippet.findings!.map((finding) => (
+              {snippet.findings!.map((finding: any) => (
                 <div key={finding.id} className="bg-[#1e1e2e] p-3 rounded-md border border-[#313244]">
                   <div className="flex items-start justify-between gap-2">
                     <span className="text-sm font-semibold text-[#89b4fa]">{finding.id}</span>
@@ -431,7 +441,7 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
 
                   {finding.evidence && finding.evidence.length > 0 && (
                     <div className="mt-2 text-xs text-[#6c7086]">
-                      <span>Evidence: lines {finding.evidence.map((e) => `${e.startLine}-${e.endLine}`).join(', ')}</span>
+                      <span>Evidence: lines {finding.evidence.map((e: any) => `${e.startLine}-${e.endLine}`).join(', ')}</span>
                       <pre className="mt-1 text-[#cdd6f4] bg-[#11111b] p-2 rounded border border-[#313244] overflow-x-auto whitespace-pre-wrap max-h-[150px]">
                         {finding.evidence[0].code}
                       </pre>
@@ -475,7 +485,7 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
               <div>
                 <span className="text-[#6c7086]">Entry Points:</span>
                 <ul className="list-disc list-inside text-[#cdd6f4]">
-                  {(snippet.execution_overview.entryPoints ?? []).map((p, i) => (
+                  {(snippet.execution_overview.entryPoints ?? []).map((p: string, i: number) => (
                     <li key={i}>{p}</li>
                   ))}
                 </ul>
@@ -483,7 +493,7 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
               <div>
                 <span className="text-[#6c7086]">Task Submission Points:</span>
                 <ul className="list-disc list-inside text-[#cdd6f4]">
-                  {(snippet.execution_overview.taskSubmissionPoints ?? []).map((p, i) => (
+                  {(snippet.execution_overview.taskSubmissionPoints ?? []).map((p: string, i: number) => (
                     <li key={i}>{p}</li>
                   ))}
                 </ul>
@@ -491,7 +501,7 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
               <div>
                 <span className="text-[#6c7086]">Blocking Wait Points:</span>
                 <ul className="list-disc list-inside text-[#cdd6f4]">
-                  {(snippet.execution_overview.blockingWaitPoints ?? []).map((p, i) => (
+                  {(snippet.execution_overview.blockingWaitPoints ?? []).map((p: string, i: number) => (
                     <li key={i}>{p}</li>
                   ))}
                 </ul>
@@ -499,7 +509,7 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
               <div>
                 <span className="text-[#6c7086]">Shared Resources:</span>
                 <ul className="list-disc list-inside text-[#cdd6f4]">
-                  {(snippet.execution_overview.sharedResources ?? []).map((p, i) => (
+                  {(snippet.execution_overview.sharedResources ?? []).map((p: string, i: number) => (
                     <li key={i}>{p}</li>
                   ))}
                 </ul>
@@ -507,7 +517,7 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
               <div className="md:col-span-2">
                 <span className="text-[#6c7086]">Resource Lifecycle:</span>
                 <ul className="list-disc list-inside text-[#cdd6f4]">
-                  {(snippet.execution_overview.resourceLifecycle ?? []).map((p, i) => (
+                  {(snippet.execution_overview.resourceLifecycle ?? []).map((p: string, i: number) => (
                     <li key={i}>{p}</li>
                   ))}
                 </ul>
@@ -520,7 +530,7 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
           <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
             <h3 className="text-lg font-semibold text-[#89b4fa]">🏗️ Architectural Observations</h3>
             <div className="space-y-2 mt-2">
-              {snippet.architectural_observations.map((obs, idx) => (
+              {snippet.architectural_observations.map((obs: any, idx: number) => (
                 <div key={idx} className="border-b border-[#313244] pb-2 last:border-0">
                   <p className="font-medium text-[#89b4fa]">{obs.title}</p>
                   <p className="text-sm text-[#cdd6f4]">{obs.explanation}</p>
@@ -537,7 +547,7 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
           <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
             <h3 className="text-lg font-semibold text-[#a6e3a1]">🔧 Recommended Actions</h3>
             <div className="space-y-2 mt-2">
-              {snippet.recommended_actions.map((action, idx) => (
+              {snippet.recommended_actions.map((action: any, idx: number) => (
                 <div key={idx} className="flex items-start gap-2 border-b border-[#313244] pb-2 last:border-0">
                   <span className="text-xs text-[#6c7086] min-w-[24px]">#{action.priority}</span>
                   <div className="flex-1">
@@ -562,7 +572,6 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
           <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
             <h3 className="text-lg font-semibold text-[#89b4fa]">📈 Complexity</h3>
             <div className="grid grid-cols-2 gap-2 mt-2 text-sm">
-              {/* ===== شناسایی نوع complexity ===== */}
               {'time' in snippet.complexity ? (
                 // Legacy shape
                 <>
@@ -582,7 +591,7 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
                     <div className="col-span-2">
                       <span className="text-[#6c7086]">Assumptions:</span>
                       <ul className="list-disc list-inside text-[#cdd6f4]">
-                        {snippet.complexity.assumptions.map((a, i) => <li key={i}>{a}</li>)}
+                        {snippet.complexity.assumptions.map((a: string, i: number) => <li key={i}>{a}</li>)}
                       </ul>
                     </div>
                   )}
@@ -602,7 +611,7 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
                     <div className="col-span-2">
                       <span className="text-[#6c7086]">Variables:</span>
                       <ul className="list-disc list-inside text-[#cdd6f4]">
-                        {snippet.complexity.variables.map((v, i) => (
+                        {snippet.complexity.variables.map((v: any, i: number) => (
                           <li key={i}>{v.symbol}: {v.definition}</li>
                         ))}
                       </ul>
@@ -612,7 +621,7 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
                     <div className="col-span-2">
                       <span className="text-[#6c7086]">Assumptions:</span>
                       <ul className="list-disc list-inside text-[#cdd6f4]">
-                        {snippet.complexity.assumptions.map((a, i) => <li key={i}>{a}</li>)}
+                        {snippet.complexity.assumptions.map((a: string, i: number) => <li key={i}>{a}</li>)}
                       </ul>
                     </div>
                   )}
@@ -647,7 +656,7 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
           <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
             <h3 className="text-lg font-semibold text-[#a6e3a1]">🔧 Recommended Improvements</h3>
             <ul className="list-disc list-inside space-y-1 text-[#cdd6f4]">
-              {snippet.recommended_improvements.map((item, idx) => (
+              {snippet.recommended_improvements.map((item: any, idx: number) => (
                 <li key={idx}>
                   <span className="font-medium text-[#a6e3a1]">{item.improvement}</span>
                   <span className="text-xs text-[#6c7086] ml-2">({item.priority})</span>
@@ -685,7 +694,7 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
           <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
             <h3 className="text-lg font-semibold text-[#89b4fa]">🧪 Suggested Tests</h3>
             <div className="space-y-2 mt-2">
-              {suggestedTests.map((test, idx) => (
+              {suggestedTests.map((test: any, idx: number) => (
                 <div key={idx} className="border-b border-[#313244] pb-2 last:border-0">
                   <p className="font-medium text-[#89b4fa]">{test.title}</p>
                   {test.purpose && <p className="text-sm text-[#cdd6f4]">{test.purpose}</p>}
@@ -721,7 +730,7 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
               📊 Scorecard {scorecardIsNew && scorecardMax === 100 ? '(New)' : ''}
             </h3>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
-              {Object.entries(scorecardDisplay).map(([key, value]) => {
+              {Object.entries(scorecardDisplay).map(([key, value]: [string, any]) => {
                 let num = 0;
                 if (typeof value === 'number') {
                   num = value;
