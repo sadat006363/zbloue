@@ -16,7 +16,7 @@ import { type PromptContext } from './prompt-context';
 import logger from '@/lib/logger';
 
 // ============================================================
-// Type aliases from schemas
+// Type aliases derived from schemas
 // ============================================================
 
 type CompletionStatus = z.infer<typeof CompletionStatusSchema>;
@@ -34,7 +34,7 @@ function extractJSON(text: string): string {
 }
 
 // ============================================================
-// MAIN REPAIR FUNCTION (UPDATED FOR CANONICAL SCHEMA)
+// MAIN REPAIR FUNCTION
 // ============================================================
 
 export async function repairAudit(
@@ -48,7 +48,6 @@ export async function repairAudit(
   logger.debug('[Repair] Starting repair attempt');
 
   try {
-    // ===== 1. Prepare repair context =====
     const issues = validationResult.issues;
     const missingCoverage: string[] = [];
     for (const issue of issues) {
@@ -57,7 +56,6 @@ export async function repairAudit(
       }
     }
 
-    // ===== 2. Build PromptContext =====
     const promptContext: PromptContext = {
       sourceLanguage: language,
       responseLanguage: 'English',
@@ -65,7 +63,6 @@ export async function repairAudit(
       rawCode: numberedCode,
     };
 
-    // ===== 3. Build repair prompt =====
     const prompt = buildRepairPrompt(
       promptContext,
       previousAudit,
@@ -73,7 +70,6 @@ export async function repairAudit(
       missingCoverage
     );
 
-    // ===== 4. Call AI =====
     const systemPrompt = 'You are an expert code auditor. Return only valid JSON. Do not use Markdown fences or any text outside the JSON.';
 
     const rawContent = await callOpenAI(systemPrompt, prompt, {
@@ -81,7 +77,6 @@ export async function repairAudit(
       responseFormat: 'text',
     });
 
-    // ===== 5. Parse and validate =====
     const parseResult = parseModelOutput(rawContent, AdvancedAuditResultSchema, {
       requestId: `repair-${Date.now()}`,
       logErrors: true,
@@ -94,14 +89,12 @@ export async function repairAudit(
 
     const repaired = parseResult.data;
 
-    // ===== 6. Semantic validation =====
     const semanticResult = validateSemanticIntegrity(repaired);
     if (!semanticResult.isValid) {
       logger.warn('[Repair] Semantic validation failed:', semanticResult.errors);
       return null;
     }
 
-    // ===== 7. Ensure canonical fields are correctly set =====
     const canonicalRepaired: AdvancedAuditResult = {
       ...repaired,
       schemaVersion: '1.0',
@@ -114,12 +107,10 @@ export async function repairAudit(
       language: language,
     };
 
-    // Ensure analysisCoverage is present
     if (!canonicalRepaired.analysisCoverage || canonicalRepaired.analysisCoverage.length === 0) {
       logger.warn('[Repair] analysisCoverage missing in repaired output; will be filled by normalizer');
     }
 
-    // ===== 8. Final validation with Zod =====
     const finalValidation = AdvancedAuditResultSchema.safeParse(canonicalRepaired);
     if (!finalValidation.success) {
       logger.error('[Repair] Final validation failed:', finalValidation.error.issues);
@@ -136,10 +127,6 @@ export async function repairAudit(
   }
 }
 
-/**
- * نسخه ساده‌شده Repair با try-catch و لاگ‌گیری
- * برای استفاده در Pipeline
- */
 export async function repairAuditSafe(
   numberedCode: string,
   previousAudit: string,
@@ -161,10 +148,6 @@ export async function repairAuditSafe(
   }
 }
 
-/**
- * تعمیر خروجی با تمرکز بر ساختار (بدون تغییر معنا)
- * این تابع برای مواردی استفاده می‌شود که خروجی Structurally Invalid است
- */
 export async function repairStructureOnly(
   numberedCode: string,
   previousAudit: string,
@@ -176,7 +159,6 @@ export async function repairStructureOnly(
   logger.debug('[Repair] Starting structural repair attempt');
 
   try {
-    // ===== 1. Build minimal repair context =====
     const promptContext: PromptContext = {
       sourceLanguage: language,
       responseLanguage: 'English',
@@ -184,11 +166,9 @@ export async function repairStructureOnly(
       rawCode: numberedCode,
     };
 
-    // ===== 2. Create a simpler repair prompt focusing on structure =====
     const missingCoverage: string[] = [];
     const issues: any[] = [];
 
-    // ===== 3. Build repair prompt =====
     const prompt = buildRepairPrompt(
       promptContext,
       previousAudit,
@@ -196,7 +176,6 @@ export async function repairStructureOnly(
       missingCoverage
     );
 
-    // ===== 4. Call AI =====
     const systemPrompt = 'You are an expert code auditor. Return only valid JSON that matches the canonical schema. Do not use Markdown fences or any text outside the JSON.';
 
     const rawContent = await callOpenAI(systemPrompt, prompt, {
@@ -204,7 +183,6 @@ export async function repairStructureOnly(
       responseFormat: 'text',
     });
 
-    // ===== 5. Parse =====
     const parseResult = parseModelOutput(rawContent, AdvancedAuditResultSchema, {
       requestId: `repair-structural-${Date.now()}`,
       logErrors: true,
@@ -217,7 +195,6 @@ export async function repairStructureOnly(
 
     const repaired = parseResult.data;
 
-    // ===== 6. Ensure canonical fields =====
     const canonicalRepaired: AdvancedAuditResult = {
       ...repaired,
       schemaVersion: '1.0',
@@ -230,7 +207,6 @@ export async function repairStructureOnly(
       language: language,
     };
 
-    // ===== 7. Final validation =====
     const finalValidation = AdvancedAuditResultSchema.safeParse(canonicalRepaired);
     if (!finalValidation.success) {
       logger.error('[Repair] Structural repair final validation failed:', finalValidation.error.issues);
