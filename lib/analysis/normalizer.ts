@@ -1,7 +1,18 @@
 // lib/analysis/normalizer.ts
 
+import { z } from 'zod';
 import {
   AdvancedAuditResultSchema,
+  SeveritySchema,
+  ConfidenceSchema,
+  BroadCategorySchema,
+  VerdictSchema,
+  VerdictStatusSchema,
+  ComplexitySchema,
+  ImprovedCodeSchema,
+  CompletionStatusSchema,
+  SpecializationSchema,
+  AnalysisCoverageItemSchema,
   type AdvancedAuditResult,
   type AuditFinding,
   type AuditScorecard,
@@ -13,23 +24,16 @@ import {
   type ArchitecturalObservation,
   type SuggestedTest,
   type ExecutionOverview,
-  type CompletionStatus,
-  type AnalysisCoverage,
-  type AppliedSpecialization,
-  type NonEmptyText,
-} from '@/lib/analysis/schema';
-
-import {
-  SeveritySchema,
-  ConfidenceSchema,
-  BroadCategorySchema,
-  VerdictSchema,
-  VerdictStatusSchema,
-  ComplexitySchema,
-  ImprovedCodeSchema,
 } from '@/lib/analysis/schema';
 
 import logger from '@/lib/logger';
+
+// ============================================================
+// Type aliases for inferred types
+// ============================================================
+
+type CompletionStatus = z.infer<typeof CompletionStatusSchema>;
+type AppliedSpecialization = z.infer<typeof SpecializationSchema>;
 
 // ============================================================
 // Constants
@@ -152,7 +156,6 @@ function normalizeAnalysisCoverage(source: unknown): AnalysisCoverageItem[] {
   const input = getSafeObject(source);
   const coverageMap: Record<string, { status: string; summary: string; limitation: string | null }> = {};
 
-  // Try to parse from input if it's an array
   if (Array.isArray(source)) {
     for (const item of source) {
       if (isObject(item)) {
@@ -167,7 +170,6 @@ function normalizeAnalysisCoverage(source: unknown): AnalysisCoverageItem[] {
       }
     }
   } else if (isObject(source)) {
-    // If it's an object with dimension keys
     for (const key of ALL_DIMENSIONS) {
       const value = input[key];
       if (isObject(value)) {
@@ -180,7 +182,6 @@ function normalizeAnalysisCoverage(source: unknown): AnalysisCoverageItem[] {
     }
   }
 
-  // Ensure all dimensions are covered
   const result: AnalysisCoverageItem[] = [];
   for (const dim of ALL_DIMENSIONS) {
     const existing = coverageMap[dim];
@@ -203,7 +204,6 @@ function normalizeAnalysisCoverage(source: unknown): AnalysisCoverageItem[] {
 
 function normalizeScore(value: unknown, fallback: number = 0): number {
   if (typeof value === 'number' && isFinite(value)) {
-    // If value is in 0-10 range (legacy), scale to 0-100
     if (value <= 10 && value >= 0) {
       return Math.max(0, Math.min(100, Math.round(value * 10)));
     }
@@ -245,10 +245,6 @@ function normalizeScoreItem(
 
 function normalizeScorecard(source: unknown): AuditScorecard {
   const input = getSafeObject(source);
-  const legacyScale = isObject(input.correctness) && typeof (input.correctness as any).score === 'number'
-    ? 100
-    : 10;
-
   return {
     correctness: normalizeScoreItem(input.correctness, 0, 'Correctness assessment.'),
     concurrencySafety: normalizeScoreItem(input.concurrencySafety ?? input.concurrency, 0, 'Concurrency safety assessment.'),
@@ -267,12 +263,11 @@ function normalizeScorecard(source: unknown): AuditScorecard {
 function normalizeComplexity(source: unknown): Complexity {
   const input = getSafeObject(source);
 
-  // If already in canonical shape
   if (isObject(input) && 'applicable' in input) {
     try {
       return ComplexitySchema.parse(input);
     } catch {
-      // Fall through to legacy handling
+      // fall through
     }
   }
 
@@ -293,7 +288,6 @@ function normalizeComplexity(source: unknown): Complexity {
   const variables = Array.isArray(input.variables) ? input.variables : [];
   const assumptions = getStringArray(input.assumptions);
 
-  // Try to extract variables from expression if not provided
   const parsedVariables = variables.length > 0 ? variables : extractVariables(expression);
 
   return {
@@ -332,12 +326,11 @@ function extractVariables(expression: string): Array<{ symbol: string; definitio
 function normalizeVerdict(source: unknown): { status: VerdictStatus; explanation: string } {
   const input = getSafeObject(source);
 
-  // If already in canonical shape
   if (isObject(input) && 'status' in input && 'explanation' in input) {
     try {
       return VerdictSchema.parse(input);
     } catch {
-      // Fall through to legacy handling
+      // fall through
     }
   }
 
@@ -362,12 +355,11 @@ function normalizeVerdict(source: unknown): { status: VerdictStatus; explanation
 function normalizeImprovedCode(source: unknown): ImprovedCode {
   const input = getSafeObject(source);
 
-  // If already in canonical shape (discriminated union)
   if (isObject(input) && 'available' in input) {
     try {
       return ImprovedCodeSchema.parse(input);
     } catch {
-      // Fall through to legacy handling
+      // fall through
     }
   }
 
@@ -390,7 +382,7 @@ function normalizeImprovedCode(source: unknown): ImprovedCode {
 }
 
 // ============================================================
-// Finding Normalization (with new taxonomy)
+// Finding Normalization
 // ============================================================
 
 function normalizeFinding(finding: unknown, index: number, usedIds: Set<string>): AuditFinding {
@@ -427,7 +419,6 @@ function normalizeFinding(finding: unknown, index: number, usedIds: Set<string>)
     }
   }
 
-  // Generate unique ID
   let id = getSafeString(f.id, `F-${String(index + 1).padStart(3, '0')}`);
   if (!/^F-\d{3,}$/.test(id)) {
     id = `F-${String(index + 1).padStart(3, '0')}`;
@@ -442,11 +433,8 @@ function normalizeFinding(finding: unknown, index: number, usedIds: Set<string>)
   }
   usedIds.add(finalId);
 
-  // Map legacy category to new broad category
   const legacyCategory = getSafeString(f.category ?? f.type, 'other');
   const broadCategory = mapToBroadCategory(legacyCategory);
-
-  // Extract mechanisms
   const mechanisms = extractMechanisms(f);
 
   return {
@@ -475,7 +463,7 @@ function normalizeFinding(finding: unknown, index: number, usedIds: Set<string>)
   };
 }
 
-function mapToBroadCategory(legacy: string): 'correctness' | 'concurrency' | 'security' | 'reliability' | 'error-handling' | 'resource-management' | 'performance' | 'data-integrity' | 'input-validation' | 'api-design' | 'configuration' | 'architecture' | 'maintainability' | 'testability' | 'observability' | 'compatibility' | 'other' {
+function mapToBroadCategory(legacy: string): AuditFinding['category'] {
   const mapping: Record<string, any> = {
     'liveness': 'concurrency',
     'thread-starvation': 'concurrency',
@@ -531,7 +519,6 @@ function extractMechanisms(finding: Record<string, unknown>): string[] {
   const fromCategory = mechanismMapping[legacyCategory] || [];
   mechanisms.push(...fromCategory);
 
-  // Also check if finding has explicit mechanisms field
   const explicit = getSafeArray(finding.mechanisms, []);
   for (const m of explicit) {
     if (typeof m === 'string' && !mechanisms.includes(m)) {
@@ -644,18 +631,12 @@ function normalizeResponseLanguage(source: unknown): 'English' | 'Persian' | nul
 // Main Normalizer
 // ============================================================
 
-/**
- * Normalizes any incoming analysis result (Legacy or Partial) into a
- * strict Canonical AdvancedAuditResult.
- * This acts as an Anti-Corruption Layer for the application.
- */
 export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
   const startTime = Date.now();
   logger.debug('[Normalizer] Starting normalization');
 
   const input = getSafeObject(raw);
 
-  // ===== 1. Core Identification & Metadata =====
   const summary = getSafeString(input.summary, getSafeString(input.highLevelSummary, 'No summary provided.'));
   const title = normalizeTitle(input.title, summary);
   const completionStatus = normalizeCompletionStatus(input.status ?? input.completionStatus);
@@ -664,11 +645,9 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
     input.appliedSpecializations ?? input.specializations ?? []
   );
 
-  // ===== 2. Language =====
   const language = normalizeLanguage(input.language);
   const responseLanguage = normalizeResponseLanguage(input.responseLanguage);
 
-  // ===== 3. Findings =====
   const findingsSource =
     input.findings ??
     input.issues ??
@@ -685,7 +664,6 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
 
   const findingIds = new Set(normalizedFindings.map((f) => f.id));
 
-  // ===== 4. Scorecard =====
   const scorecardSource = getSafeObject(
     input.scorecard ??
     input.scorecard_new ??
@@ -694,15 +672,12 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
   );
   const scorecard = normalizeScorecard(scorecardSource);
 
-  // ===== 5. Verdict =====
   const verdictSource = getSafeObject(input.verdict ?? input.finalVerdict ?? {});
   const verdict = normalizeVerdict(verdictSource);
 
-  // ===== 6. Complexity =====
   const complexitySource = getSafeObject(input.complexity ?? {});
   const complexity = normalizeComplexity(complexitySource);
 
-  // ===== 7. ImprovedCode =====
   const improvedCodeSource = getSafeObject(
     input.improvedCode ??
     input.improved_code ??
@@ -710,7 +685,6 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
   );
   const improvedCode = normalizeImprovedCode(improvedCodeSource);
 
-  // ===== 8. Execution Overview =====
   const executionOverviewSource = getSafeObject(
     input.executionOverview ??
     input.execution_overview ??
@@ -719,19 +693,16 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
   );
   const executionOverview = normalizeExecutionOverview(executionOverviewSource);
 
-  // ===== 9. Architectural Observations =====
   const architecturalObservations = normalizeArchitecturalObservations(
     input.architecturalObservations ?? input.architectural_observations,
     findingIds
   );
 
-  // ===== 10. Recommended Actions =====
   const recommendedActions = normalizeRecommendedActions(
     input.recommendedActions ?? input.recommended_actions,
     findingIds
   );
 
-  // ===== 11. Suggested Tests =====
   const suggestedTests = normalizeSuggestedTests(
     input.suggestedTests ??
     input.suggested_tests ??
@@ -740,10 +711,8 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
     findingIds
   );
 
-  // ===== 12. Limitations =====
   const limitations = getStringArray(input.limitations);
 
-  // ===== 13. linkedin_post =====
   let linkedinPost =
     typeof input.linkedin_post === 'string'
       ? input.linkedin_post.trim()
@@ -755,14 +724,11 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
     linkedinPost = DEFAULT_LINKEDIN_POST;
   }
 
-  // ===== 14. Analysis Coverage =====
   const analysisCoverage = normalizeAnalysisCoverage(
     input.analysisCoverage ?? input.coverage ?? {}
   );
 
-  // ===== 15. Build Final Result =====
   const result: AdvancedAuditResult = {
-    // Metadata
     schemaVersion: '1.0',
     auditType: 'comprehensive',
     appliedSpecializations,
@@ -786,7 +752,6 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
     linkedin_post: linkedinPost,
   };
 
-  // ===== 16. Validate with Canonical Schema =====
   try {
     const validated = AdvancedAuditResultSchema.parse(result);
     const duration = Date.now() - startTime;
@@ -794,7 +759,6 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
     return validated;
   } catch (error) {
     logger.error('[Normalizer] Schema validation failed:', error);
-    // Return the best-effort result anyway; upstream should handle validation errors
     return result;
   }
 }
