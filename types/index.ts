@@ -171,7 +171,51 @@ const LegacyScorecardSchema = z.object({
 });
 
 // ============================================================
-// 8. SnippetDataSchema – persistence contract
+// 8. Union Schemas for Legacy ↔ Canonical compatibility
+// ============================================================
+
+// ===== Verdict Union =====
+const LegacyVerdictSchema = z.object({
+  status: z.enum(['approved', 'requires-changes', 'not-production-ready']),
+  explanation: z.string(),
+});
+
+export const VerdictSchemaUnion = z.union([
+  CanonicalVerdictSchema,
+  LegacyVerdictSchema,
+]);
+
+// ===== Complexity Union =====
+const LegacyComplexitySchema = z.object({
+  time: z.string(),
+  space: z.string(),
+  resourceGrowth: z.string(),
+  assumptions: z.array(z.string()),
+});
+
+export const ComplexitySchemaUnion = z.union([
+  ComplexitySchema,
+  LegacyComplexitySchema,
+]);
+
+// ===== Scorecard Union =====
+const LegacyScorecardSchemaForUnion = z.object({
+  correctness: z.number().min(0).max(10),
+  readability: z.number().min(0).max(10),
+  performance: z.number().min(0).max(10),
+  maintainability: z.number().min(0).max(10),
+  productionReadiness: z.number().min(0).max(10),
+  security: z.number().min(0).max(10).optional(),
+  overall: z.number().min(0).max(10).optional(),
+});
+
+export const ScorecardSchemaUnion = z.union([
+  AuditScorecardSchema,
+  LegacyScorecardSchemaForUnion,
+]);
+
+// ============================================================
+// 9. SnippetDataSchema – persistence contract
 // ============================================================
 
 export const SnippetDataSchema = z.object({
@@ -211,15 +255,15 @@ export const SnippetDataSchema = z.object({
   line_explanations: z.unknown().optional(),
   generated_prompt: z.string().optional(),
 
-  // Canonical fields – temporarily `any` to support both legacy and canonical shapes
+  // Canonical fields (using unions for backward compatibility)
   findings: z.array(AuditFindingSchema).optional(),
   execution_overview: ExecutionOverviewSchema.optional(),
   architectural_observations: z.array(ArchitecturalObservationSchema).optional(),
   recommended_actions: z.array(RecommendedActionSchema).optional(),
   suggested_tests_new: z.array(SuggestedTestSchema).optional(),
-  complexity: z.any().optional(),          // 🔥 temporary
-  scorecard_new: z.any().optional(),       // 🔥 temporary – avoid type conflict
-  verdict: CanonicalVerdictSchema.optional(),
+  complexity: ComplexitySchemaUnion.optional(),
+  scorecard_new: ScorecardSchemaUnion.optional(),
+  verdict: VerdictSchemaUnion.optional(),
   limitations: z.array(z.string()).optional(),
 
   audit_result: AdvancedAuditResultSchema.optional(),
@@ -231,7 +275,7 @@ export type Snippet = PersistedSnippetRow;
 export type SnippetData = Snippet;
 
 // ============================================================
-// 9. Legacy generate response (historical API shape)
+// 10. Legacy generate response (historical API shape)
 // ============================================================
 
 export const LegacyGenerateResponseSchema = z.object({
@@ -264,7 +308,7 @@ export const LegacyGenerateResponseSchema = z.object({
   linkedin_post: z.string().optional(),
   error: z.string().optional(),
 
-  // Canonical fields (for advanced mode)
+  // Canonical fields (for advanced mode, passthrough)
   findings: z.any().optional(),
   executionOverview: z.any().optional(),
   architecturalObservations: z.any().optional(),
@@ -286,7 +330,7 @@ export const LegacyGenerateResponseSchema = z.object({
 export type LegacyGenerateResponse = z.infer<typeof LegacyGenerateResponseSchema>;
 
 // ============================================================
-// 10. CreateSnippetResponse (discriminated union)
+// 11. CreateSnippetResponse (discriminated union)
 // ============================================================
 
 export type CreateSnippetResponse =
@@ -304,7 +348,7 @@ export type CreateSnippetResponse =
     };
 
 // ============================================================
-// 11. Legacy types (exported for historical data access)
+// 12. Legacy types (exported for historical data access)
 // ============================================================
 
 export type LegacyCodeWalkthroughItem = z.infer<typeof LegacyCodeWalkthroughItemSchema>;
@@ -323,7 +367,7 @@ export interface LegacyImprovedCode {
 }
 
 // ============================================================
-// 12. UI State
+// 13. UI State
 // ============================================================
 
 export interface LineExplanation {
@@ -366,7 +410,7 @@ export interface AppState {
 }
 
 // ============================================================
-// 13. Future canonical API contract
+// 14. Future canonical API contract
 // ============================================================
 
 export type CanonicalGenerateResponse =
