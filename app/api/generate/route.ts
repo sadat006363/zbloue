@@ -57,6 +57,7 @@ function setCacheResult(key: string, result: LegacyGenerateResponse, pipelineTra
     timestamp: Date.now(),
     pipelineTrace,
   });
+  // جلوگیری از رشد بی‌نهایت کش (حداکثر ۱۰۰۰ آیتم)
   if (cache.size > 1000) {
     const keys = Array.from(cache.keys());
     const toDelete = keys.slice(0, cache.size - 1000);
@@ -102,7 +103,8 @@ function normalizeLanguage(lang: string): string {
 
 function isSupportedLanguage(lang: string): boolean {
   const normalized = normalizeLanguage(lang);
-  return new Set(SUPPORTED_LANGUAGES).has(normalized);
+  // 🔥 استفاده از includes به‌جای Set برای جلوگیری از خطای TypeScript
+  return SUPPORTED_LANGUAGES.includes(normalized as any);
 }
 
 function validateResponse(result: unknown): LegacyGenerateResponse {
@@ -112,9 +114,6 @@ function validateResponse(result: unknown): LegacyGenerateResponse {
     ...(result as Record<string, unknown>),
     linkedin_post: (result as Record<string, unknown>)?.linkedin_post || 'Check out this code analysis! #Zbloue',
   };
-  // We don't have a Zod schema for LegacyGenerateResponse in this file,
-  // but we can use the one from types.
-  // Actually, we can rely on the type; but we could parse if needed.
   return withDefault as LegacyGenerateResponse;
 }
 
