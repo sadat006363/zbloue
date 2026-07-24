@@ -263,14 +263,13 @@ export const LegacyGenerateResponseSchema = z.object({
   linkedin_post: z.string().optional(),
   error: z.string().optional(),
 
-  // Canonical fields (for advanced mode)
+  // ===== Canonical fields (for advanced mode – without duplicates) =====
   findings: z.any().optional(),
   executionOverview: z.any().optional(),
   architecturalObservations: z.any().optional(),
   recommendedActions: z.any().optional(),
-  suggestedTests: z.any().optional(),
+  // 🔥 suggestedTests and scorecard already defined above; do not duplicate
   complexity: z.any().optional(),
-  scorecard: z.any().optional(),
   verdict: z.any().optional(),
   limitations: z.any().optional(),
   analysisCoverage: z.any().optional(),
