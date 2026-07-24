@@ -1,18 +1,26 @@
 // lib/analysis/repair.ts
 
+import { z } from 'zod';
 import { callOpenAI } from '@/lib/openaiClient';
 import { buildRepairPrompt } from './prompts/repair';
 import {
   AdvancedAuditResultSchema,
+  CompletionStatusSchema,
+  SpecializationSchema,
   type AdvancedAuditResult,
-  type CompletionStatus,
-  type AppliedSpecialization,
 } from './schema';
 import type { AuditValidationResult } from './types';
 import { validateSemanticIntegrity } from './semantic-validator';
 import { parseModelOutput } from './parse-model-output';
 import { type PromptContext } from './prompt-context';
 import logger from '@/lib/logger';
+
+// ============================================================
+// Type aliases from schemas
+// ============================================================
+
+type CompletionStatus = z.infer<typeof CompletionStatusSchema>;
+type AppliedSpecialization = z.infer<typeof SpecializationSchema>;
 
 // ============================================================
 // HELPER: EXTRACT JSON (Fallback)
@@ -94,15 +102,12 @@ export async function repairAudit(
     }
 
     // ===== 7. Ensure canonical fields are correctly set =====
-    // Override with pipeline metadata
     const canonicalRepaired: AdvancedAuditResult = {
       ...repaired,
       schemaVersion: '1.0',
       auditType: 'comprehensive',
       completionStatus: 'complete',
       repairApplied: true,
-      // Preserve appliedSpecializations from the repaired output if present
-      // or set based on auditType
       appliedSpecializations: repaired.appliedSpecializations && repaired.appliedSpecializations.length > 0
         ? repaired.appliedSpecializations
         : (auditType === 'concurrency' ? ['concurrency'] : []),
@@ -111,7 +116,6 @@ export async function repairAudit(
 
     // Ensure analysisCoverage is present
     if (!canonicalRepaired.analysisCoverage || canonicalRepaired.analysisCoverage.length === 0) {
-      // This shouldn't happen if normalizer worked, but just in case
       logger.warn('[Repair] analysisCoverage missing in repaired output; will be filled by normalizer');
     }
 
