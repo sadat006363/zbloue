@@ -1,10 +1,9 @@
+// lib/utils.ts
+
 // ============================================================
-// 📁 فایل: lib/utils.ts
+// توابع موجود
 // ============================================================
 
-/**
- * تبدیل هر مقدار به رشته برای نمایش JSON
- */
 export function renderJsonValue(value: any): string {
   if (value === null || value === undefined) return '';
   if (typeof value === 'string') return value;
@@ -16,9 +15,6 @@ export function renderJsonValue(value: any): string {
   }
 }
 
-/**
- * تبدیل ایمن هر مقدار به رشته (جلوگیری از خطای نمایش)
- */
 export function safeString(value: any): string {
   if (value === null || value === undefined) return '';
   if (typeof value === 'string') return value;
@@ -34,11 +30,8 @@ export function safeString(value: any): string {
  * حذف کامنت‌ها از کد بر اساس زبان
  */
 export function removeComments(code: string, language: string): string {
-  // پیاده‌سازی ساده برای زبان‌های مختلف
   if (['javascript', 'typescript', 'java', 'c', 'cpp', 'csharp', 'go', 'rust'].includes(language)) {
-    // حذف کامنت‌های خطی //
     let result = code.replace(/\/\/.*$/gm, '');
-    // حذف کامنت‌های چندخطی /* ... */
     result = result.replace(/\/\*[\s\S]*?\*\//g, '');
     return result;
   }
@@ -62,7 +55,6 @@ export function isCodeLike(text: string): boolean {
   const lines = text.split('\n').filter(line => line.trim().length > 0);
   if (lines.length === 0) return false;
   
-  // الگوهای رایج کد
   const codePatterns = [
     /\bfunction\b/,
     /\bclass\b/,
@@ -113,4 +105,28 @@ export function isCodeLike(text: string): boolean {
   }
   
   return false;
+}
+
+// ============================================================
+// 🔥 تابع جدید: تمیزکاری کد قبل از تحلیل
+// ============================================================
+
+/**
+ * حذف کامنت‌ها و فاصله‌های اضافی از کد برای ارسال به API
+ * کد اصلی در ادیتور تغییری نمی‌کند
+ */
+export function cleanCodeForAnalysis(code: string, language: string): string {
+  if (!code || code.trim().length === 0) return code;
+
+  // 1. حذف کامنت‌ها بر اساس زبان
+  let cleaned = removeComments(code, language);
+
+  // 2. حذف فاصله‌های اضافی
+  cleaned = cleaned
+    .split('\n')
+    .map(line => line.trim())        // حذف فاصله‌های ابتدا و انتهای هر خط
+    .filter(line => line.length > 0) // حذف خطوط خالی
+    .join('\n');
+
+  return cleaned;
 }
