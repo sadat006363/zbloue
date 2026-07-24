@@ -24,7 +24,7 @@ interface AnalysisTabProps {
   onDownloadFullAnalysis?: () => void;
 }
 
-// ===== Helper: detect JSON and extract readable text (improved) =====
+// ===== Helper: detect JSON and extract readable text (enhanced) =====
 function formatText(text: string): string {
   if (!text) return '';
   const trimmed = text.trim();
@@ -32,23 +32,24 @@ function formatText(text: string): string {
     try {
       const parsed = JSON.parse(trimmed);
       if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
-        // لیست کلیدهای احتمالی برای استخراج متن
+        // Comprehensive list of possible keys that might contain the answer
         const possibleKeys = [
           'analysis', 'summary', 'explanation', 'text',
           'response', 'output', 'result', 'content', 'message',
-          'description', 'details', 'answer'
+          'description', 'details', 'answer', 'review',
+          'feedback', 'comment', 'body', 'value'
         ];
         for (const key of possibleKeys) {
           if (parsed[key] && typeof parsed[key] === 'string') {
             return parsed[key];
           }
         }
-        // اگر فقط یک کلید داشت و مقدارش رشته بود
+        // If only one key exists and it's a string, return it
         const keys = Object.keys(parsed);
         if (keys.length === 1 && typeof parsed[keys[0]] === 'string') {
           return parsed[keys[0]];
         }
-        // در غیر این صورت، JSON را pretty-print می‌کنیم
+        // Otherwise, return a pretty-printed JSON as a fallback
         return `<pre class="bg-[#1a1a2e] text-[#cdd6f4] p-4 rounded-md overflow-x-auto text-sm font-mono">${JSON.stringify(parsed, null, 2)}</pre>`;
       }
       return `<pre class="bg-[#1a1a2e] text-[#cdd6f4] p-4 rounded-md overflow-x-auto text-sm font-mono">${JSON.stringify(parsed, null, 2)}</pre>`;

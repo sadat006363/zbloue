@@ -22,7 +22,7 @@ Focus on:
 Code (${language}):
 ${code}
 
-Return your analysis as plain text (not JSON).
+Return your analysis as plain text (not JSON). Do not wrap it in Markdown code blocks.
 `;
 }
 
@@ -40,7 +40,7 @@ Include:
 Code (${language}):
 ${code}
 
-Return your analysis as plain text (not JSON).
+Return your analysis as plain text (not JSON). Do not wrap it in Markdown code blocks.
 `;
 }
 
@@ -59,7 +59,7 @@ Return valid JSON that matches the AdvancedAuditResult schema.
 }
 
 // ============================================================
-// 2. Helper: safe slice (to avoid "slice is not a function")
+// 2. Helper: safe slice
 // ============================================================
 
 function safeSlice(value: unknown, start: number, end?: number): string {
@@ -70,7 +70,7 @@ function safeSlice(value: unknown, start: number, end?: number): string {
 }
 
 // ============================================================
-// 3. Helper: extract text from possible JSON response (improved)
+// 3. Helper: extract text from possible JSON response (enhanced)
 // ============================================================
 
 function extractTextFromResponse(content: unknown): string {
@@ -79,37 +79,39 @@ function extractTextFromResponse(content: unknown): string {
   }
   const trimmed = content.trim();
 
-  // اگر با { یا [ شروع شد، سعی می‌کنیم JSON را parse کنیم
+  // If it looks like JSON, try to parse it
   if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
     try {
       const parsed = JSON.parse(trimmed);
 
-      // اگر یک آبجکت بود
+      // If it's an object, try to find a text field
       if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
-        // لیست کلیدهای احتمالی برای استخراج متن
-        const possibleKeys = ['analysis', 'summary', 'explanation', 'text', 'response', 'output', 'result', 'content', 'message'];
-
-        // کلید اولی که پیدا شد و مقدارش رشته است را برمی‌گردانیم
+        // Comprehensive list of possible keys that might contain the answer
+        const possibleKeys = [
+          'analysis', 'summary', 'explanation', 'text',
+          'response', 'output', 'result', 'content', 'message',
+          'description', 'details', 'answer', 'review',
+          'feedback', 'comment', 'body', 'value'
+        ];
         for (const key of possibleKeys) {
           if (parsed[key] && typeof parsed[key] === 'string') {
             return parsed[key];
           }
         }
-
-        // اگر آبجکت فقط یک کلید داشت و مقدارش رشته بود، آن را برمی‌گردانیم
+        // If only one key exists and it's a string, return it
         const keys = Object.keys(parsed);
         if (keys.length === 1 && typeof parsed[keys[0]] === 'string') {
           return parsed[keys[0]];
         }
-
-        // در غیر این صورت، برای دیباگ، JSON را به‌صورت خوانا نشان می‌دهیم
+        // Otherwise, return a readable representation of the object
+        // (this should rarely happen, but fallback to pretty-print)
         return `[Analysis Result]\n${JSON.stringify(parsed, null, 2)}`;
       }
 
-      // اگر آرایه بود یا هر چیز دیگری، pretty-print می‌کنیم
+      // If it's an array or other, pretty-print
       return JSON.stringify(parsed, null, 2);
     } catch {
-      // اگر JSON معتبر نبود، همان متن را برگردان
+      // Not valid JSON, return as is
       return content;
     }
   }
@@ -143,8 +145,10 @@ export async function generateEducationalContent(
 
   try {
     if (mode === 'simple' || mode === 'medium') {
+      // 🔥 Pass the mode explicitly so that the correct model is used
       const content = await callOpenAI(systemPrompt, userPrompt, {
         responseFormat: 'text',
+        mode: mode, // 'simple' or 'medium'
       });
       const text = extractTextFromResponse(content);
 
@@ -161,6 +165,7 @@ export async function generateEducationalContent(
       // advanced: JSON response
       const content = await callOpenAIJson<any>(systemPrompt, userPrompt, {
         responseFormat: 'json_object',
+        mode: 'advanced',
       });
       const parsed = typeof content === 'string' ? JSON.parse(content) : content;
 
