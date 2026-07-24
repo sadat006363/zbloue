@@ -1,44 +1,35 @@
 // components/snippet/SnippetDebug.tsx
-
 'use client';
 
-import logger from '@/lib/logger';
-
 interface SnippetDebugProps {
-  debugAnalysis: string;
-  optimization: string;
+  debugAnalysis?: string;
+  optimization?: string;
 }
 
 export default function SnippetDebug({ debugAnalysis, optimization }: SnippetDebugProps) {
-  // فقط در محیط توسعه لاگ بزن
-  if (process.env.NODE_ENV === 'development') {
-    logger.debug('[SnippetDebug] debugAnalysis:', debugAnalysis);
-    logger.debug('[SnippetDebug] optimization:', optimization);
-  }
+  const hasContent = debugAnalysis || optimization;
 
-  if ((!debugAnalysis || debugAnalysis === '-') && (!optimization || optimization === '-')) {
+  if (!hasContent) {
     return null;
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-[#313244]">
-      {debugAnalysis && debugAnalysis !== '-' && (
-        <div className="space-y-2">
-          <h3 className="text-lg font-semibold text-[#f38ba8]">🐛 Debug Analysis</h3>
-          <p className="text-[#a6adc8] text-sm leading-relaxed whitespace-pre-wrap">
-            {debugAnalysis}
-          </p>
-        </div>
-      )}
+    <div className="mt-6">
+      <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244] space-y-3">
+        {debugAnalysis && debugAnalysis !== '-' && (
+          <div>
+            <h3 className="text-sm font-semibold text-[#f38ba8]">🐛 Debug Analysis</h3>
+            <p className="text-sm text-[#cdd6f4] mt-1 whitespace-pre-wrap">{debugAnalysis}</p>
+          </div>
+        )}
 
-      {optimization && optimization !== '-' && (
-        <div className="space-y-2">
-          <h3 className="text-lg font-semibold text-[#a6e3a1]">⚡ Optimization</h3>
-          <p className="text-[#a6adc8] text-sm leading-relaxed whitespace-pre-wrap">
-            {optimization}
-          </p>
-        </div>
-      )}
+        {optimization && optimization !== '-' && (
+          <div className={debugAnalysis && debugAnalysis !== '-' ? 'pt-3 border-t border-[#313244]' : ''}>
+            <h3 className="text-sm font-semibold text-[#a6e3a1]">⚡ Optimization</h3>
+            <p className="text-sm text-[#cdd6f4] mt-1 whitespace-pre-wrap">{optimization}</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

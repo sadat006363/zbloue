@@ -3,8 +3,77 @@
 'use client';
 
 import { safeString } from '@/lib/utils';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import logger from '@/lib/logger';
+
+// ============================================================
+// Types
+// ============================================================
+
+interface Evidence {
+  startLine: number;
+  endLine: number;
+  code: string;
+  explanation: string;
+}
+
+interface Finding {
+  id: string;
+  title: string;
+  category: string;
+  severity: 'critical' | 'high' | 'medium' | 'low' | 'info';
+  confidence: 'definite' | 'likely' | 'conditional';
+  evidence: Evidence[];
+  executionPath: string[];
+  triggerConditions: string[];
+  consequence: string;
+  technicalExplanation: string;
+  remediation: string;
+  relatedSymbols: string[];
+  testToReproduce: {
+    title: string;
+    setup: string[];
+    steps: string[];
+    expectedResult: string;
+  } | null;
+}
+
+interface Complexity {
+  time: string;
+  space: string;
+  resourceGrowth?: string;
+  assumptions?: string[];
+  // Canonical shape
+  applicable?: boolean;
+  expression?: string;
+  explanation?: string;
+  variables?: Array<{ symbol: string; definition: string }>;
+}
+
+interface Verdict {
+  status: string;
+  explanation: string;
+}
+
+interface FullAnalysis {
+  title?: string;
+  summary?: string;
+  highLevelSummary?: string;
+  findings?: unknown;
+  complexity?: unknown;
+  verdict?: unknown;
+  limitations?: string[];
+  card_title?: string;
+  key_concept?: string;
+  analysis?: string;
+  debug_analysis?: string;
+  optimization?: string;
+  [key: string]: unknown;
+}
+
+// ============================================================
+// Component Props
+// ============================================================
 
 interface ExplanationTabProps {
   snippet: any;
@@ -15,8 +84,92 @@ interface ExplanationTabProps {
   optimization: string;
   keyConcept: string;
   cardTitle: string;
-  fullAnalysis?: any;
+  fullAnalysis?: FullAnalysis | null;
 }
+
+// ============================================================
+// Helper Functions
+// ============================================================
+
+/**
+ * تشخیص اینکه آیا fullAnalysis ساختار Canonical دارد یا Legacy
+ */
+function isCanonicalAnalysis(analysis: FullAnalysis | null | undefined): boolean {
+  if (!analysis) return false;
+  return !!(analysis.findings || analysis.complexity || analysis.verdict);
+}
+
+/**
+ * استخراج عنوان از fullAnalysis
+ */
+function getTitle(analysis: FullAnalysis | null | undefined, fallback: string): string {
+  if (!analysis) return fallback;
+  return safeString(analysis.title || analysis.card_title || fallback);
+}
+
+/**
+ * استخراج خلاصه از fullAnalysis
+ */
+function getSummary(analysis: FullAnalysis | null | undefined): string | null {
+  if (!analysis) return null;
+  return safeString(analysis.summary || analysis.highLevelSummary || null);
+}
+
+/**
+ * 🔥 نرمالایز کردن Findings (پذیرش any به جای unknown)
+ */
+function normalizeFindings(findings: unknown): Finding[] {
+  if (!Array.isArray(findings)) return [];
+  return findings.filter((f): f is Finding => {
+    if (!f || typeof f !== 'object') return false;
+    const obj = f as Record<string, unknown>;
+    return typeof obj.id === 'string' && typeof obj.title === 'string';
+  });
+}
+
+/**
+ * نرمالایز کردن Complexity
+ */
+function normalizeComplexity(complexity: unknown): Complexity | null {
+  if (!complexity || typeof complexity !== 'object') return null;
+  const c = complexity as Record<string, unknown>;
+
+  if ('time' in c && typeof c.time === 'string') {
+    return {
+      time: c.time,
+      space: typeof c.space === 'string' ? c.space : 'unknown',
+      resourceGrowth: typeof c.resourceGrowth === 'string' ? c.resourceGrowth : undefined,
+      assumptions: Array.isArray(c.assumptions) ? (c.assumptions as string[]) : undefined,
+    };
+  }
+
+  if ('applicable' in c && c.applicable === true) {
+    return {
+      time: typeof c.expression === 'string' ? c.expression : 'unknown',
+      space: 'unknown',
+      resourceGrowth: typeof c.explanation === 'string' ? c.explanation : undefined,
+      assumptions: Array.isArray(c.assumptions) ? (c.assumptions as string[]) : undefined,
+    };
+  }
+
+  return null;
+}
+
+/**
+ * نرمالایز کردن Verdict
+ */
+function normalizeVerdict(verdict: unknown): Verdict | null {
+  if (!verdict || typeof verdict !== 'object') return null;
+  const v = verdict as Record<string, unknown>;
+  if (typeof v.status === 'string' && typeof v.explanation === 'string') {
+    return { status: v.status, explanation: v.explanation };
+  }
+  return null;
+}
+
+// ============================================================
+// Main Component
+// ============================================================
 
 export default function ExplanationTab({
   snippet,
@@ -31,40 +184,87 @@ export default function ExplanationTab({
 }: ExplanationTabProps) {
   const [copySuccess, setCopySuccess] = useState(false);
 
+  const isCanonical = useMemo(() => isCanonicalAnalysis(fullAnalysis), [fullAnalysis]);
+
+  const normalizedFindings = useMemo(() => {
+    if (!fullAnalysis) return [];
+    return normalizeFindings(fullAnalysis.findings);
+  }, [fullAnalysis]);
+
+  const normalizedComplexity = useMemo(() => {
+    if (!fullAnalysis) return null;
+    return normalizeComplexity(fullAnalysis.complexity);
+  }, [fullAnalysis]);
+
+  const normalizedVerdict = useMemo(() => {
+    if (!fullAnalysis) return null;
+    return normalizeVerdict(fullAnalysis.verdict);
+  }, [fullAnalysis]);
+
+  const title = useMemo(() => getTitle(fullAnalysis, cardTitle), [fullAnalysis, cardTitle]);
+  const summary = useMemo(() => getSummary(fullAnalysis), [fullAnalysis]);
+
   if (process.env.NODE_ENV === 'development') {
     logger.debug('[ExplanationTab] fullAnalysis:', fullAnalysis);
     logger.debug('[ExplanationTab] isAdvanced:', isAdvanced);
     logger.debug('[ExplanationTab] quickAnalysisText:', quickAnalysisText);
+    logger.debug('[ExplanationTab] isCanonical:', isCanonical);
+    logger.debug('[ExplanationTab] normalizedFindings:', normalizedFindings.length);
   }
 
-  const getFullContent = () => {
+  // ============================================================
+  // Get Full Content for Copy/Download
+  // ============================================================
+
+  const getFullContent = (): string => {
     let content = '';
 
     if (isAdvanced && fullAnalysis) {
-      content += `📌 ${safeString(fullAnalysis.title || cardTitle)}\n\n`;
-      if (fullAnalysis.summary || fullAnalysis.highLevelSummary) {
-        content += `💡 Summary:\n${safeString(fullAnalysis.summary || fullAnalysis.highLevelSummary)}\n\n`;
+      content += `📌 ${safeString(title)}\n\n`;
+
+      if (summary) {
+        content += `💡 Summary:\n${summary}\n\n`;
       }
-      if (fullAnalysis.findings && fullAnalysis.findings.length > 0) {
+
+      if (normalizedFindings.length > 0) {
         content += `🔍 Findings:\n`;
-        fullAnalysis.findings.forEach((f: any) => {
+        normalizedFindings.forEach((f) => {
           content += `  • ${safeString(f.title)} [${safeString(f.severity)}] (${safeString(f.confidence)})\n`;
           content += `    ${safeString(f.consequence)}\n`;
+          if (f.remediation) content += `    Fix: ${safeString(f.remediation)}\n`;
         });
         content += '\n';
       }
-      if (fullAnalysis.complexity) {
-        content += `⚡ Complexity: Time ${safeString(fullAnalysis.complexity.time)} | Space ${safeString(fullAnalysis.complexity.space)}\n\n`;
+
+      if (normalizedComplexity) {
+        content += `⚡ Complexity: Time ${safeString(normalizedComplexity.time)} | Space ${safeString(normalizedComplexity.space)}\n`;
+        if (normalizedComplexity.resourceGrowth) {
+          content += `   Resource Growth: ${safeString(normalizedComplexity.resourceGrowth)}\n`;
+        }
+        content += '\n';
       }
-      if (fullAnalysis.verdict) {
-        content += `🏁 Verdict: ${safeString(fullAnalysis.verdict.status)} - ${safeString(fullAnalysis.verdict.explanation)}\n\n`;
+
+      if (normalizedVerdict) {
+        content += `🏁 Verdict: ${safeString(normalizedVerdict.status)} - ${safeString(normalizedVerdict.explanation)}\n\n`;
+      }
+
+      if (fullAnalysis.limitations && fullAnalysis.limitations.length > 0) {
+        content += `⚠️ Limitations:\n`;
+        fullAnalysis.limitations.forEach((lim: string) => {
+          content += `  • ${safeString(lim)}\n`;
+        });
+        content += '\n';
       }
     } else if (isAdvanced) {
       content += `📌 ${safeString(cardTitle)}\n\n`;
       content += `💡 Key Concept:\n${safeString(keyConcept)}\n\n`;
       content += `🔍 What This Code Does:\n${safeString(analysisText)}\n\n`;
-      content += `🐛 Debug Analysis:\n${safeString(debugAnalysis)}\n\n`;
-      content += `⚡ Optimization:\n${safeString(optimization)}\n\n`;
+      if (debugAnalysis && debugAnalysis !== '-') {
+        content += `🐛 Debug Analysis:\n${safeString(debugAnalysis)}\n\n`;
+      }
+      if (optimization && optimization !== '-') {
+        content += `⚡ Optimization:\n${safeString(optimization)}\n\n`;
+      }
     } else {
       content += `📌 ${safeString(cardTitle)}\n\n`;
       content += `📝 Summary:\n${safeString(keyConcept)}\n\n`;
@@ -78,7 +278,11 @@ export default function ExplanationTab({
 
   const fullContent = getFullContent();
 
-  const handleCopy = async () => {
+  // ============================================================
+  // Handlers
+  // ============================================================
+
+  const handleCopy = async (): Promise<void> => {
     try {
       await navigator.clipboard.writeText(fullContent);
       setCopySuccess(true);
@@ -88,7 +292,7 @@ export default function ExplanationTab({
     }
   };
 
-  const handleDownload = () => {
+  const handleDownload = (): void => {
     const blob = new Blob([fullContent], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -98,15 +302,19 @@ export default function ExplanationTab({
     URL.revokeObjectURL(url);
   };
 
-  const cleanDuplicateIcons = (text: string) => {
+  // ============================================================
+  // Render Helpers
+  // ============================================================
+
+  const cleanDuplicateIcons = (text: string): string => {
     if (!text) return '';
-    const iconPattern = /^[📝🐛⚡💡🔍🔧✅🧪🔒💼🖼️📊📌⭐🔬🚨🛡️✨📈🧩🏗️🔧🧪⚠️🏁]\\s*/;
+    const iconPattern = /^[📝🐛⚡💡🔍🔧✅🧪🔒💼🖼️📊📌⭐🔬🚨🛡️✨📈🧩🏗️🔧🧪⚠️🏁]\s*/;
     return text.replace(iconPattern, '');
   };
 
-  const formatText = (text: string) => {
+  const formatText = (text: string): string => {
     if (!text) return '';
-    let formatted = text.replace(/^###\\s*/gm, '');
+    let formatted = text.replace(/^###\s*/gm, '');
     const lines = formatted.split('\n');
     const cleanedLines = lines.map((line) => cleanDuplicateIcons(line));
     formatted = cleanedLines.join('\n');
@@ -128,6 +336,7 @@ export default function ExplanationTab({
       findings: '🔍',
       verdict: '🏁',
       complexity: '⚡',
+      limitations: '⚠️',
     };
 
     const lowerTitle = title.toLowerCase();
@@ -164,13 +373,13 @@ export default function ExplanationTab({
 
     for (const line of lines) {
       const trimmed = line.trim();
-      if (trimmed.startsWith('###') || trimmed.match(/^[📝🐛⚡💡🔍🔧✅🧪🔒💼🖼️📊📌⭐🔬🚨🛡️✨📈🧩🏗️🔧🧪⚠️🏁]\\s/)) {
+      if (trimmed.startsWith('###') || trimmed.match(/^[📝🐛⚡💡🔍🔧✅🧪🔒💼🖼️📊📌⭐🔬🚨🛡️✨📈🧩🏗️🔧🧪⚠️🏁]\s/)) {
         if (currentTitle && currentContent.length > 0) {
           sections.push({ title: currentTitle, content: currentContent.join('\n') });
         }
         currentTitle = trimmed
-          .replace(/^###\\s*/, '')
-          .replace(/^[📝🐛⚡💡🔍🔧✅🧪🔒💼🖼️📊📌⭐🔬🚨🛡️✨📈🧩🏗️🔧🧪⚠️🏁]\\s*/, '')
+          .replace(/^###\s*/, '')
+          .replace(/^[📝🐛⚡💡🔍🔧✅🧪🔒💼🖼️📊📌⭐🔬🚨🛡️✨📈🧩🏗️🔧🧪⚠️🏁]\s*/, '')
           .trim();
         currentContent = [];
       } else if (currentTitle) {
@@ -185,12 +394,12 @@ export default function ExplanationTab({
     return sections.length > 0 ? sections : null;
   };
 
-  const renderFindings = (findings: any[]) => {
+  const renderFindings = (findings: Finding[]) => {
     if (!findings || findings.length === 0) return null;
     return (
       <div className="mt-4 space-y-3">
         <h3 className="font-semibold text-[#4a86f7] flex items-center gap-2">🔍 Findings</h3>
-        {findings.map((f: any, idx: number) => (
+        {findings.map((f, idx) => (
           <div key={idx} className="bg-[#f8f9fa] p-3 rounded-lg border border-[#d0d0d8]">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-medium text-[#1a1a2e]">{safeString(f.title)}</span>
@@ -206,7 +415,7 @@ export default function ExplanationTab({
             </div>
             {f.evidence && f.evidence.length > 0 && (
               <div className="mt-1 text-xs text-[#6c7086]">
-                Lines: {f.evidence.map((e: any) => `${e.startLine}-${e.endLine}`).join(', ')}
+                Lines: {f.evidence.map((e) => `${e.startLine}-${e.endLine}`).join(', ')}
               </div>
             )}
             <p className="text-sm text-[#4a4a6a] mt-1">{safeString(f.consequence)}</p>
@@ -219,7 +428,7 @@ export default function ExplanationTab({
     );
   };
 
-  const renderComplexity = (complexity: any) => {
+  const renderComplexity = (complexity: Complexity | null) => {
     if (!complexity) return null;
     return (
       <div className="mt-4 bg-[#f8f9fa] p-3 rounded-lg border border-[#d0d0d8]">
@@ -230,17 +439,23 @@ export default function ExplanationTab({
           {complexity.resourceGrowth && (
             <div><span className="font-medium">Resource Growth:</span> {safeString(complexity.resourceGrowth)}</div>
           )}
+          {complexity.assumptions && complexity.assumptions.length > 0 && (
+            <div><span className="font-medium">Assumptions:</span> {complexity.assumptions.join('; ')}</div>
+          )}
         </div>
       </div>
     );
   };
 
-  const renderVerdict = (verdict: any) => {
+  const renderVerdict = (verdict: Verdict | null) => {
     if (!verdict) return null;
     const statusColors: Record<string, string> = {
       'not-production-ready': 'bg-red-100 text-red-700',
       'requires-major-changes': 'bg-orange-100 text-orange-700',
+      'requires-changes': 'bg-orange-100 text-orange-700',
       'requires-minor-changes': 'bg-yellow-100 text-yellow-700',
+      'approved-with-suggestions': 'bg-green-100 text-green-700',
+      'approved': 'bg-green-100 text-green-700',
       'production-ready-with-monitoring': 'bg-green-100 text-green-700',
     };
     return (
@@ -256,8 +471,27 @@ export default function ExplanationTab({
     );
   };
 
+  const renderLimitations = (limitations: string[] | undefined) => {
+    if (!limitations || limitations.length === 0) return null;
+    return (
+      <div className="mt-4 bg-[#f8f9fa] p-3 rounded-lg border border-[#d0d0d8]">
+        <h3 className="font-semibold text-[#4a86f7] flex items-center gap-2">⚠️ Limitations</h3>
+        <ul className="list-disc list-inside text-sm text-[#4a4a6a] mt-1">
+          {limitations.map((item, idx) => (
+            <li key={idx}>{safeString(item)}</li>
+          ))}
+        </ul>
+      </div>
+    );
+  };
+
+  // ============================================================
+  // Render
+  // ============================================================
+
   return (
     <div className="space-y-4">
+      {/* Header with Copy/Download */}
       <div className="flex justify-end items-center gap-3 pb-2 border-b-2 border-[#e8e8f0]">
         <button
           onClick={handleCopy}
@@ -281,46 +515,37 @@ export default function ExplanationTab({
         </button>
       </div>
 
-      {isAdvanced && fullAnalysis ? (
+      {/* Advanced + Canonical */}
+      {isAdvanced && fullAnalysis && isCanonical ? (
         <div className="space-y-4">
           <h2 className="text-xl md:text-2xl font-bold text-[#1a1a2e] flex items-center gap-2">
-            <span>📌</span> {safeString(fullAnalysis.title || cardTitle)}
+            <span>📌</span> {safeString(title)}
           </h2>
 
-          {fullAnalysis.summary || fullAnalysis.highLevelSummary ? (
+          {summary && (
             <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-              <p className="text-[#1a1a2e] text-sm leading-relaxed">
-                {safeString(fullAnalysis.summary || fullAnalysis.highLevelSummary)}
-              </p>
-            </div>
-          ) : null}
-
-          {renderFindings(fullAnalysis.findings)}
-          {renderComplexity(fullAnalysis.complexity)}
-          {renderVerdict(fullAnalysis.verdict)}
-
-          {fullAnalysis.limitations && fullAnalysis.limitations.length > 0 && (
-            <div className="mt-4 bg-[#f8f9fa] p-3 rounded-lg border border-[#d0d0d8]">
-              <h3 className="font-semibold text-[#4a86f7] flex items-center gap-2">⚠️ Limitations</h3>
-              <ul className="list-disc list-inside text-sm text-[#4a4a6a] mt-1">
-                {fullAnalysis.limitations.map((item: string, idx: number) => (
-                  <li key={idx}>{safeString(item)}</li>
-                ))}
-              </ul>
+              <p className="text-[#1a1a2e] text-sm leading-relaxed">{summary}</p>
             </div>
           )}
+
+          {renderFindings(normalizedFindings)}
+          {renderComplexity(normalizedComplexity)}
+          {renderVerdict(normalizedVerdict)}
+          {renderLimitations(fullAnalysis.limitations)}
         </div>
       ) : isAdvanced ? (
+        // Advanced + Legacy (fallback)
         <div className="space-y-6">
           <h2 className="text-xl md:text-2xl font-bold text-[#1a1a2e] flex items-center gap-2">
             <span>📌</span> {safeString(cardTitle)}
           </h2>
           {renderSection('💡 Key Concept', keyConcept)}
           {renderSection('🔍 What This Code Does', analysisText)}
-          {renderSection('🐛 Debug Analysis', debugAnalysis)}
-          {renderSection('⚡ Optimization', optimization)}
+          {debugAnalysis && debugAnalysis !== '-' && renderSection('🐛 Debug Analysis', debugAnalysis)}
+          {optimization && optimization !== '-' && renderSection('⚡ Optimization', optimization)}
         </div>
       ) : (
+        // Simple / Medium
         <div className="space-y-6">
           <h2 className="text-xl md:text-2xl font-bold text-[#1a1a2e] flex items-center gap-2">
             <span>📌</span> {safeString(cardTitle)}

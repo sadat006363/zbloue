@@ -1,29 +1,34 @@
+// components/snippet/SnippetAnalysis.tsx
 'use client';
 
 interface SnippetAnalysisProps {
-  keyConcept: string;
-  whatItDoes: string;
+  keyConcept?: string;
+  whatItDoes?: string;
 }
 
 export default function SnippetAnalysis({ keyConcept, whatItDoes }: SnippetAnalysisProps) {
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-[#313244]">
-      <div className="space-y-2">
-        <h3 className="text-lg font-semibold text-[#89b4fa] flex items-center gap-2">
-          💡 Key Concept
-        </h3>
-        <p className="text-[#a6adc8] text-sm leading-relaxed whitespace-pre-wrap">
-          {keyConcept || 'No key concept provided.'}
-        </p>
-      </div>
+  const hasContent = keyConcept || whatItDoes;
 
-      <div className="space-y-2">
-        <h3 className="text-lg font-semibold text-[#89b4fa] flex items-center gap-2">
-          🔍 What This Code Does
-        </h3>
-        <p className="text-[#a6adc8] text-sm leading-relaxed whitespace-pre-wrap">
-          {whatItDoes || 'No description available.'}
-        </p>
+  if (!hasContent) {
+    return null;
+  }
+
+  return (
+    <div className="mt-6">
+      <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244] space-y-3">
+        {keyConcept && (
+          <div>
+            <h3 className="text-sm font-semibold text-[#89b4fa]">💡 Key Concept</h3>
+            <p className="text-sm text-[#cdd6f4] mt-1">{keyConcept}</p>
+          </div>
+        )}
+
+        {whatItDoes && (
+          <div className={keyConcept ? 'pt-3 border-t border-[#313244]' : ''}>
+            <h3 className="text-sm font-semibold text-[#89b4fa]">📖 What This Code Does</h3>
+            <p className="text-sm text-[#cdd6f4] mt-1 whitespace-pre-wrap">{whatItDoes}</p>
+          </div>
+        )}
       </div>
     </div>
   );
