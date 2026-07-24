@@ -7,6 +7,7 @@ import OutputPanel from '@/components/OutputPanel/OutputPanel';
 import { useAppContext } from '@/context';
 import { analysisService } from '@/services/analysisService';
 import { snippetService } from '@/services/snippetService';
+import { cleanCodeForAnalysis } from '@/lib/utils'; // 🔥 اضافه شده
 import {
   type LegacyGenerateResponse,
   type Snippet,
@@ -29,7 +30,7 @@ import {
 export const dynamic = 'force-dynamic';
 
 // ============================================================
-// 🔥 Helper: safe slice (to avoid "slice is not a function")
+// 🔥 Helper: safe slice
 // ============================================================
 function safeSlice(value: unknown, start: number, end?: number): string {
   if (typeof value === 'string') {
@@ -39,7 +40,7 @@ function safeSlice(value: unknown, start: number, end?: number): string {
 }
 
 // ============================================================
-// 🔥 Helper: extract text from possible JSON response (enhanced)
+// 🔥 Helper: extract text from possible JSON response
 // ============================================================
 function extractTextFromAnalysis(value: unknown): string {
   if (typeof value !== 'string') {
@@ -50,7 +51,6 @@ function extractTextFromAnalysis(value: unknown): string {
     try {
       const parsed = JSON.parse(trimmed);
       if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
-        // Comprehensive list of possible keys that might contain the answer
         const possibleKeys = [
           'analysis', 'summary', 'explanation', 'text',
           'response', 'output', 'result', 'content', 'message',
@@ -62,12 +62,10 @@ function extractTextFromAnalysis(value: unknown): string {
             return parsed[key];
           }
         }
-        // If only one key exists and it's a string, return it
         const keys = Object.keys(parsed);
         if (keys.length === 1 && typeof parsed[keys[0]] === 'string') {
           return parsed[keys[0]];
         }
-        // Otherwise, return a readable representation
         return `[Analysis Result]\n${JSON.stringify(parsed, null, 2)}`;
       }
       return JSON.stringify(parsed, null, 2);
@@ -192,8 +190,17 @@ export default function HomePage() {
     dispatch({ type: 'SET_LOADING', payload: true });
 
     try {
+      // 🔥 ۱. تمیز کردن کد (حذف کامنت‌ها و فاصله‌های اضافی)
+      const cleanedCode = cleanCodeForAnalysis(code, language);
+
+      // 🔥 ۲. به‌روزرسانی ادیتور با کد تمیز شده
+      if (cleanedCode !== code) {
+        dispatch({ type: 'SET_CODE', payload: cleanedCode });
+      }
+
+      // 🔥 ۳. ارسال کد تمیز شده به API
       const response = await analysisService.generate({
-        code,
+        code: cleanedCode,
         language,
         mode,
       });
@@ -212,7 +219,7 @@ export default function HomePage() {
 
       // ===== Build save data =====
       const saveData = {
-        code: code,
+        code: cleanedCode, // کد تمیز شده ذخیره می‌شود
         language,
         card_title: normalized.card_title,
         key_concept: normalized.key_concept,
@@ -250,7 +257,7 @@ export default function HomePage() {
       const snippetData: Snippet = {
         id: saveResult.id,
         slug: saveResult.slug,
-        raw_code: code,
+        raw_code: cleanedCode, // کد تمیز شده ذخیره می‌شود
         language,
         card_title: normalized.card_title,
         key_concept: normalized.key_concept,
