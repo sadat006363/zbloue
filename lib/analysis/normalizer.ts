@@ -6,6 +6,7 @@ import {
   SeveritySchema,
   ConfidenceSchema,
   BroadCategorySchema,
+  MechanismSchema,
   VerdictSchema,
   VerdictStatusSchema,
   ComplexitySchema,
@@ -24,6 +25,7 @@ import {
   type ArchitecturalObservation,
   type SuggestedTest,
   type ExecutionOverview,
+  type Mechanism,
 } from '@/lib/analysis/schema';
 
 import logger from '@/lib/logger';
@@ -226,7 +228,6 @@ function normalizeScoreItem(
   fallback: number = 0,
   defaultReason: string = ''
 ): ScoreItem {
-  // If value is an object with score/reason/relatedFindings
   if (isObject(value)) {
     const score = normalizeScore(value.score, fallback);
     const reason = typeof value.reason === 'string' ? value.reason.trim() : defaultReason;
@@ -234,8 +235,6 @@ function normalizeScoreItem(
       ? value.relatedFindings.filter((id): id is string => typeof id === 'string')
       : [];
 
-    // If score is a valid number (not NaN and > 0), mark as applicable
-    // Otherwise mark as not applicable
     if (typeof score === 'number' && !isNaN(score) && score >= 0) {
       return {
         applicable: true,
@@ -253,7 +252,6 @@ function normalizeScoreItem(
     }
   }
 
-  // If value is a raw number
   const score = normalizeScore(value, fallback);
   if (typeof score === 'number' && !isNaN(score) && score >= 0) {
     return {
@@ -411,7 +409,7 @@ function normalizeImprovedCode(source: unknown): ImprovedCode {
 }
 
 // ============================================================
-// Finding Normalization
+// Finding Normalization (with validated mechanisms)
 // ============================================================
 
 function normalizeFinding(finding: unknown, index: number, usedIds: Set<string>): AuditFinding {
@@ -464,13 +462,20 @@ function normalizeFinding(finding: unknown, index: number, usedIds: Set<string>)
 
   const legacyCategory = getSafeString(f.category ?? f.type, 'other');
   const broadCategory = mapToBroadCategory(legacyCategory);
-  const mechanisms = extractMechanisms(f);
+  
+  // 🔥 Extract and validate mechanisms
+  const rawMechanisms = extractMechanisms(f);
+  const validMechanisms: Mechanism[] = rawMechanisms
+    .filter((m): m is Mechanism => {
+      const result = MechanismSchema.safeParse(m);
+      return result.success;
+    });
 
   return {
     id: finalId,
     title: getSafeString(f.title, getSafeString(f.name, 'Untitled Finding')),
     category: broadCategory,
-    mechanisms,
+    mechanisms: validMechanisms,
     severity: sanitizeEnum(
       f.severity ?? f.priority,
       SeveritySchema.options,
@@ -522,6 +527,9 @@ function mapToBroadCategory(legacy: string): AuditFinding['category'] {
   return mapping[legacy] || 'other';
 }
 
+/**
+ * Extract mechanism strings from a finding, then filter to only those valid.
+ */
 function extractMechanisms(finding: Record<string, unknown>): string[] {
   const mechanisms: string[] = [];
   const legacyCategory = getSafeString(finding.category ?? finding.type);
