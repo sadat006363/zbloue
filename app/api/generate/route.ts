@@ -57,7 +57,6 @@ function setCacheResult(key: string, result: LegacyGenerateResponse, pipelineTra
     timestamp: Date.now(),
     pipelineTrace,
   });
-  // جلوگیری از رشد بی‌نهایت کش (حداکثر ۱۰۰۰ آیتم)
   if (cache.size > 1000) {
     const keys = Array.from(cache.keys());
     const toDelete = keys.slice(0, cache.size - 1000);
@@ -103,13 +102,10 @@ function normalizeLanguage(lang: string): string {
 
 function isSupportedLanguage(lang: string): boolean {
   const normalized = normalizeLanguage(lang);
-  // 🔥 استفاده از includes به‌جای Set برای جلوگیری از خطای TypeScript
   return SUPPORTED_LANGUAGES.includes(normalized as any);
 }
 
 function validateResponse(result: unknown): LegacyGenerateResponse {
-  // For now, we just ensure linkedin_post exists (legacy).
-  // In future, we'll migrate to canonical response.
   const withDefault = {
     ...(result as Record<string, unknown>),
     linkedin_post: (result as Record<string, unknown>)?.linkedin_post || 'Check out this code analysis! #Zbloue',
@@ -118,11 +114,12 @@ function validateResponse(result: unknown): LegacyGenerateResponse {
 }
 
 /**
- * Maps a canonical AdvancedAuditResult to the legacy response shape.
- * This is a temporary adapter until the UI consumes canonical directly.
+ * Maps a canonical AdvancedAuditResult to the legacy response shape,
+ * while also preserving all canonical fields for storage and UI.
  */
 function mapCanonicalToLegacy(canonical: any): LegacyGenerateResponse {
-  return {
+  // فیلدهای Legacy اصلی
+  const legacy: LegacyGenerateResponse = {
     analysis: canonical.summary || '',
     card_title: canonical.title || 'Code Analysis',
     key_concept: canonical.summary?.slice(0, 2000) || '',
@@ -132,7 +129,6 @@ function mapCanonicalToLegacy(canonical: any): LegacyGenerateResponse {
       ? canonical.recommendedActions.map((a: any) => a.title).join('; ')
       : '-',
     linkedin_post: canonical.linkedin_post || 'Check out this code analysis! #Zbloue',
-    // Legacy fields may be empty; we can fill from canonical if needed.
     codeWalkthrough: [],
     whatWorksWell: [],
     bugsAndRiskyCases: [],
@@ -158,6 +154,28 @@ function mapCanonicalToLegacy(canonical: any): LegacyGenerateResponse {
         }
       : undefined,
     error: undefined,
+  };
+
+  // 🔥 اضافه کردن فیلدهای کانونیکال (برای ذخیره‌سازی در دیتابیس و نمایش Full Analysis)
+  return {
+    ...legacy,
+    // فیلدهای Advanced (کانونیکال)
+    findings: canonical.findings || [],
+    executionOverview: canonical.executionOverview || null,
+    architecturalObservations: canonical.architecturalObservations || [],
+    recommendedActions: canonical.recommendedActions || [],
+    suggestedTests: canonical.suggestedTests || [],
+    complexity: canonical.complexity || null,
+    scorecard: canonical.scorecard || null,
+    verdict: canonical.verdict || null,
+    limitations: canonical.limitations || [],
+    analysisCoverage: canonical.analysisCoverage || [],
+    completionStatus: canonical.completionStatus || 'complete',
+    repairApplied: canonical.repairApplied || false,
+    appliedSpecializations: canonical.appliedSpecializations || [],
+    title: canonical.title || 'Code Analysis',
+    summary: canonical.summary || '',
+    debug_trace: canonical.debug_trace || undefined,
   };
 }
 
