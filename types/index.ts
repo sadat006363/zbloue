@@ -108,11 +108,10 @@ const LegacyCodeWalkthroughItemSchema = z.object({
   explanation: z.string(),
 });
 
-// 🔥 اصلاح: example به‌جای optional با default('') تبدیل شد تا تطابق با کامپوننت‌ها داشته باشد
 const LegacyBugAndRiskyCaseSchema = z.object({
   issue: z.string(),
   impact: z.string(),
-  example: z.string().default(''), // همیشه رشته خواهد بود
+  example: z.string().default(''), // 🔥 همیشه رشته
 });
 
 const LegacyEdgeCaseSchema = z.object({
@@ -218,7 +217,8 @@ export const SnippetDataSchema = z.object({
   architectural_observations: z.array(ArchitecturalObservationSchema).optional(),
   recommended_actions: z.array(RecommendedActionSchema).optional(),
   suggested_tests_new: z.array(SuggestedTestSchema).optional(),
-  complexity: ComplexitySchema.optional(),
+  // 🔥 complexity: به‌صورت موقت `any` تا تطابق با کامپوننت‌های Legacy
+  complexity: z.any().optional(),
   scorecard_new: AuditScorecardSchema.optional(),
   verdict: CanonicalVerdictSchema.optional(),
   limitations: z.array(z.string()).optional(),
