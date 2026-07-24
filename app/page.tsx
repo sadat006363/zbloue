@@ -81,7 +81,6 @@ function buildPromptInfo(
   data: LegacyGenerateResponse,
   pipelineStatus: 'completed' | 'failed' | 'fallback' = 'completed'
 ): PromptInfo {
-  // Try to detect if concurrency was applied using legacy fields
   const hasConcurrency = data.analysis?.toLowerCase().includes('concurrency') ||
     data.bugsAndRiskyCases?.some((b: any) => 
       b.issue?.toLowerCase().includes('thread') || 
@@ -188,7 +187,6 @@ export default function HomePage() {
       // ===== Save to database =====
       const saveResult = await snippetService.save(saveData);
 
-      // ===== Check save success =====
       if (!saveResult.success) {
         throw new Error(saveResult.error || 'Failed to save snippet');
       }
@@ -209,7 +207,7 @@ export default function HomePage() {
         created_at: new Date().toISOString(),
         username: saveResult.username || normalizedUsername,
         github_username: saveResult.github_username ?? normalizedGithubUsername,
-        avatar_url: normalizedAvatarUrl, // 🔥 استفاده از مقدار نرمالایز شده
+        avatar_url: normalizedAvatarUrl,
         card_image_url: undefined,
         code_walkthrough: normalized.codeWalkthrough,
         what_works_well: normalized.whatWorksWell,
@@ -243,15 +241,15 @@ export default function HomePage() {
       // ===== Update outputs =====
       const modeKey = mode as 'simple' | 'medium' | 'advanced';
 
+      // 🔥 Fixed: Use the correct payload shape for SET_OUTPUTS
       dispatch({
         type: 'SET_OUTPUTS',
         payload: {
-          [modeKey]: {
-            snippet: snippetData,
-            fullAnalysis: genData,
-            lineExplanations: [],
-            generatedPrompt: '',
-          },
+          mode: modeKey,
+          snippet: snippetData,
+          fullAnalysis: genData,
+          lineExplanations: [],
+          generatedPrompt: '',
         },
       });
 
@@ -288,14 +286,15 @@ export default function HomePage() {
       const explanations = await analysisService.explainLineByLine(code, language);
       const modeKey = mode as 'simple' | 'medium' | 'advanced';
 
-      const currentOutput = outputs[modeKey] || { snippet: null, fullAnalysis: null, lineExplanations: [], generatedPrompt: '' };
+      // 🔥 Fixed: Use the correct payload shape for SET_OUTPUTS
       dispatch({
         type: 'SET_OUTPUTS',
         payload: {
-          [modeKey]: {
-            ...currentOutput,
-            lineExplanations: explanations,
-          },
+          mode: modeKey,
+          snippet: outputs[modeKey]?.snippet || null,
+          fullAnalysis: outputs[modeKey]?.fullAnalysis || null,
+          lineExplanations: explanations,
+          generatedPrompt: outputs[modeKey]?.generatedPrompt || '',
         },
       });
 
@@ -325,14 +324,15 @@ export default function HomePage() {
       const prompt = await analysisService.generatePrompt(code, language, mode);
       const modeKey = mode as 'simple' | 'medium' | 'advanced';
 
-      const currentOutput = outputs[modeKey] || { snippet: null, fullAnalysis: null, lineExplanations: [], generatedPrompt: '' };
+      // 🔥 Fixed: Use the correct payload shape for SET_OUTPUTS
       dispatch({
         type: 'SET_OUTPUTS',
         payload: {
-          [modeKey]: {
-            ...currentOutput,
-            generatedPrompt: prompt,
-          },
+          mode: modeKey,
+          snippet: outputs[modeKey]?.snippet || null,
+          fullAnalysis: outputs[modeKey]?.fullAnalysis || null,
+          lineExplanations: outputs[modeKey]?.lineExplanations || [],
+          generatedPrompt: prompt,
         },
       });
 
@@ -407,7 +407,6 @@ export default function HomePage() {
   return (
     <main className="min-h-screen bg-[#f8f9fa] p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
-        {/* ===== Header ===== */}
         <div className="mb-4">
           <h1 className="text-2xl font-bold text-[#1a1a2e] flex items-center gap-2">
             <span className="text-[#4a86f7]">⚡</span> Zbloue
@@ -418,7 +417,6 @@ export default function HomePage() {
           </p>
         </div>
 
-        {/* ===== Error Display ===== */}
         {errorMessage && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm flex items-center justify-between">
             <span>❌ {errorMessage}</span>
@@ -428,7 +426,6 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* ===== Editor + Output ===== */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 h-[calc(100vh-180px)] min-h-[600px]">
           <div className="min-h-[400px] lg:min-h-0">
             <Editor
@@ -451,7 +448,6 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* ===== Footer ===== */}
         <div className="mt-4 text-center text-xs text-[#a0a0b0] border-t border-[#d0d0d8] pt-3">
           Press <kbd className="px-1.5 py-0.5 bg-[#e8e8f0] rounded text-[#4a4a6a] text-xs font-mono">Ctrl+Enter</kbd> to generate
         </div>
