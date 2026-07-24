@@ -108,10 +108,11 @@ const LegacyCodeWalkthroughItemSchema = z.object({
   explanation: z.string(),
 });
 
+// 🔥 اصلاح: example به‌جای optional با default('') تبدیل شد تا تطابق با کامپوننت‌ها داشته باشد
 const LegacyBugAndRiskyCaseSchema = z.object({
   issue: z.string(),
   impact: z.string(),
-  example: z.string().optional(),
+  example: z.string().default(''), // همیشه رشته خواهد بود
 });
 
 const LegacyEdgeCaseSchema = z.object({
@@ -234,13 +235,7 @@ export type SnippetData = Snippet;
 // 9. Legacy generate response (historical API shape)
 // ============================================================
 
-/**
- * Runtime schema for the legacy generate API response.
- * Used to validate incoming responses at the service boundary.
- * This schema is strictly legacy; no canonical shapes are allowed.
- */
 export const LegacyGenerateResponseSchema = z.object({
-  // ===== Legacy fields =====
   analysis: z.string().optional(),
   card_title: z.string().optional(),
   key_concept: z.string().optional(),
@@ -270,7 +265,7 @@ export const LegacyGenerateResponseSchema = z.object({
   linkedin_post: z.string().optional(),
   error: z.string().optional(),
 
-  // ===== 🔥 Canonical fields (for advanced mode compatibility) =====
+  // Canonical fields (for advanced mode)
   findings: z.any().optional(),
   executionOverview: z.any().optional(),
   architecturalObservations: z.any().optional(),
@@ -289,10 +284,6 @@ export const LegacyGenerateResponseSchema = z.object({
   debug_trace: z.any().optional(),
 });
 
-/**
- * Legacy generate response type (derived from runtime schema).
- * Models the actual current API response from /api/generate.
- */
 export type LegacyGenerateResponse = z.infer<typeof LegacyGenerateResponseSchema>;
 
 // ============================================================
