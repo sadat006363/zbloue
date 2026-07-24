@@ -520,15 +520,15 @@ export default function Editor({
 
       {/* ===== Toolbar Top: Mode & Source Language ===== */}
       <div className="flex flex-col gap-2 p-3 bg-[#f1f3f5] border-b border-[#d0d0d8]">
-        {/* ===== Row 1: Mode Selector (بالا) ===== */}
-        <div className="flex flex-wrap items-center gap-2">
+        {/* ===== Row 1: Mode Selector (با flex-nowrap برای جلوگیری از شکستن خط) ===== */}
+        <div className="flex flex-nowrap items-center gap-2">
           <span className="text-xs font-medium text-[#4a4a6a] whitespace-nowrap">🎯 Mode:</span>
           <div className="flex gap-1">
             {modes.map((m) => (
               <button
                 key={m.value}
                 onClick={() => dispatch({ type: 'SET_MODE', payload: m.value })}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-all whitespace-nowrap ${
                   mode === m.value
                     ? 'bg-[#4a86f7] text-white shadow-sm'
                     : 'bg-white text-[#4a4a6a] hover:bg-[#e8e8f0] border border-[#d0d0d8]'
@@ -539,7 +539,7 @@ export default function Editor({
               </button>
             ))}
           </div>
-          <span className="text-xs text-[#6c7086] ml-1">
+          <span className="text-xs text-[#6c7086] ml-1 whitespace-nowrap flex-shrink-0">
             {mode === 'simple' && 'Quick overview'}
             {mode === 'medium' && 'Detailed analysis'}
             {mode === 'advanced' && 'Deep audit with concurrency checks'}
