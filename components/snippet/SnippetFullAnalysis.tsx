@@ -17,9 +17,10 @@ import { php } from '@codemirror/lang-php';
 import { EditorView } from '@codemirror/view';
 import type { Extension } from '@codemirror/state';
 import logger from '@/lib/logger';
+import { type Snippet } from '@/types'; // 🔥 استفاده از تایپ اصلی Snippet
 
 // ============================================================
-// Types
+// Types (فقط تایپ‌های داخلی که در Snippet وجود ندارند)
 // ============================================================
 
 export interface Evidence {
@@ -60,7 +61,6 @@ export interface ScorecardLegacy {
   overall?: number;
 }
 
-// ===== ScorecardNew: support both primitive numbers and rich objects =====
 export type ScoreItemValue = number | { score: number; reason: string; relatedFindings: string[] };
 
 export interface ScorecardNew {
@@ -78,10 +78,6 @@ export interface VerdictNew {
   explanation: string;
 }
 
-// ============================================================
-// Unified test type
-// ============================================================
-
 export interface UnifiedTest {
   title: string;
   purpose: string;
@@ -97,62 +93,11 @@ export interface UnifiedTest {
 }
 
 // ============================================================
-// Snippet Data Interface
-// ============================================================
-
-export interface SnippetData {
-  card_title?: string;
-  key_concept?: string;
-  code_walkthrough?: Array<{ section: string; explanation: string }>;
-  what_works_well?: string[];
-  bugs_and_risky_cases?: Array<{ issue: string; impact: string; example: string }>;
-  edge_cases?: Array<{ case: string; currentBehavior: string; expectedBehavior: string; risk: 'Low' | 'Medium' | 'High' }>;
-  performance_analysis?: {
-    timeComplexity: Array<{ target: string; complexity: string; explanation: string }>;
-    spaceComplexity: Array<{ target: string; complexity: string; explanation: string }>;
-    scalabilityNotes: string[];
-  };
-  security_analysis?: {
-    issues: string[];
-    recommendations: string[];
-    severity: 'Low' | 'Medium' | 'High' | 'Critical';
-  };
-  production_readiness?: {
-    isProductionReady: boolean;
-    reasons: string[];
-    requiredChanges: string[];
-  };
-  recommended_improvements?: Array<{ priority: 'High' | 'Medium' | 'Low'; improvement: string; reason: string }>;
-  improved_code?: string;
-  suggested_tests?: Array<{ name: string; input: string; expectedOutput: string; type: 'Normal' | 'Edge' | 'Invalid' }>;
-  scorecard?: ScorecardLegacy;
-  final_verdict_summary?: string;
-  final_verdict_approved?: boolean;
-  final_verdict_next_steps?: string;
-  findings?: Finding[];
-  execution_overview?: {
-    entryPoints: string[];
-    taskSubmissionPoints: string[];
-    blockingWaitPoints: string[];
-    sharedResources: string[];
-    resourceLifecycle: string[];
-  };
-  architectural_observations?: Array<{ title: string; explanation: string; relatedFindingIds: string[] }>;
-  recommended_actions?: Array<{ priority: number; severity: string; title: string; action: string; relatedFindingIds: string[] }>;
-  suggested_tests_new?: Array<{ title: string; purpose: string; setup: string[]; steps: string[]; expectedResult: string }>;
-  complexity?: { time: string; space: string; resourceGrowth: string; assumptions: string[] };
-  scorecard_new?: ScorecardNew;
-  verdict?: VerdictNew;
-  limitations?: string[];
-  language?: string;
-}
-
-// ============================================================
-// Component Props
+// Component Props – استفاده از تایپ اصلی Snippet
 // ============================================================
 
 export interface SnippetFullAnalysisProps {
-  snippet: SnippetData;
+  snippet: Snippet; // 🔥 تغییر از SnippetData به Snippet
 }
 
 // ============================================================
@@ -244,8 +189,8 @@ function renderValue(value: unknown): React.ReactNode {
 }
 
 function normalizeTests(
-  testsNew: SnippetData['suggested_tests_new'],
-  testsLegacy: SnippetData['suggested_tests']
+  testsNew: any[] | undefined,
+  testsLegacy: any[] | undefined
 ): UnifiedTest[] {
   if (testsNew && testsNew.length > 0) {
     return testsNew.map((t) => ({
@@ -298,7 +243,7 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
     const display = snippet.scorecard_new || snippet.scorecard;
     const isNew = !!snippet.scorecard_new;
 
-    let max = 10; // مقدار پیش‌فرض
+    let max = 10;
 
     if (display && typeof display === 'object') {
       const allScores: number[] = [];
@@ -617,25 +562,61 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
           <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
             <h3 className="text-lg font-semibold text-[#89b4fa]">📈 Complexity</h3>
             <div className="grid grid-cols-2 gap-2 mt-2 text-sm">
-              <div>
-                <span className="text-[#6c7086]">Time:</span>
-                <span className="text-[#cdd6f4] ml-2">{snippet.complexity.time}</span>
-              </div>
-              <div>
-                <span className="text-[#6c7086]">Space:</span>
-                <span className="text-[#cdd6f4] ml-2">{snippet.complexity.space}</span>
-              </div>
-              <div className="col-span-2">
-                <span className="text-[#6c7086]">Resource Growth:</span>
-                <span className="text-[#cdd6f4] ml-2">{snippet.complexity.resourceGrowth}</span>
-              </div>
-              {snippet.complexity.assumptions.length > 0 && (
-                <div className="col-span-2">
-                  <span className="text-[#6c7086]">Assumptions:</span>
-                  <ul className="list-disc list-inside text-[#cdd6f4]">
-                    {snippet.complexity.assumptions.map((a, i) => <li key={i}>{a}</li>)}
-                  </ul>
-                </div>
+              {/* ===== شناسایی نوع complexity ===== */}
+              {'time' in snippet.complexity ? (
+                // Legacy shape
+                <>
+                  <div>
+                    <span className="text-[#6c7086]">Time:</span>
+                    <span className="text-[#cdd6f4] ml-2">{snippet.complexity.time}</span>
+                  </div>
+                  <div>
+                    <span className="text-[#6c7086]">Space:</span>
+                    <span className="text-[#cdd6f4] ml-2">{snippet.complexity.space}</span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-[#6c7086]">Resource Growth:</span>
+                    <span className="text-[#cdd6f4] ml-2">{snippet.complexity.resourceGrowth}</span>
+                  </div>
+                  {snippet.complexity.assumptions.length > 0 && (
+                    <div className="col-span-2">
+                      <span className="text-[#6c7086]">Assumptions:</span>
+                      <ul className="list-disc list-inside text-[#cdd6f4]">
+                        {snippet.complexity.assumptions.map((a, i) => <li key={i}>{a}</li>)}
+                      </ul>
+                    </div>
+                  )}
+                </>
+              ) : (
+                // Canonical shape (with applicable)
+                <>
+                  <div className="col-span-2">
+                    <span className="text-[#6c7086]">Expression:</span>
+                    <span className="text-[#cdd6f4] ml-2">{snippet.complexity.expression || 'N/A'}</span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-[#6c7086]">Explanation:</span>
+                    <span className="text-[#cdd6f4] ml-2">{snippet.complexity.explanation || 'N/A'}</span>
+                  </div>
+                  {snippet.complexity.variables && snippet.complexity.variables.length > 0 && (
+                    <div className="col-span-2">
+                      <span className="text-[#6c7086]">Variables:</span>
+                      <ul className="list-disc list-inside text-[#cdd6f4]">
+                        {snippet.complexity.variables.map((v, i) => (
+                          <li key={i}>{v.symbol}: {v.definition}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {snippet.complexity.assumptions && snippet.complexity.assumptions.length > 0 && (
+                    <div className="col-span-2">
+                      <span className="text-[#6c7086]">Assumptions:</span>
+                      <ul className="list-disc list-inside text-[#cdd6f4]">
+                        {snippet.complexity.assumptions.map((a, i) => <li key={i}>{a}</li>)}
+                      </ul>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -734,7 +715,6 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
           </div>
         )}
 
-        {/* ===== Scorecard ===== */}
         {scorecardDisplay && (
           <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
             <h3 className="text-lg font-semibold text-[#89b4fa]">
