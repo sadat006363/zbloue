@@ -23,6 +23,7 @@ import {
   normalizeSnippetAudit,
   type NormalizedSnippetAudit,
 } from '@/lib/analysis/normalize-snippet-audit';
+import { type LineExplanation } from '@/types';
 
 // ============================================================
 // 🔥 params (Next.js 16)
@@ -89,7 +90,6 @@ async function getSnippet(slug: string): Promise<Snippet> {
     avatar_url: data.avatar_url ?? undefined,
     card_image_url: data.card_image_url ?? undefined,
 
-    // 🔥 Legacy fields – تبدیل null به undefined
     code_walkthrough: data.code_walkthrough ?? undefined,
     what_works_well: data.what_works_well ?? undefined,
     bugs_and_risky_cases: data.bugs_and_risky_cases ?? undefined,
@@ -107,7 +107,6 @@ async function getSnippet(slug: string): Promise<Snippet> {
     line_explanations: data.line_explanations ?? undefined,
     generated_prompt: data.generated_prompt ?? undefined,
 
-    // 🔥 Advanced fields – تبدیل null به undefined
     findings: data.findings ?? undefined,
     execution_overview: data.execution_overview ?? undefined,
     architectural_observations: data.architectural_observations ?? undefined,
@@ -191,6 +190,11 @@ export default async function SnippetPage({ params }: PageProps) {
     normalizedAudit,
   };
 
+  // 🔥 نرمالایز کردن line_explanations: اگر وجود دارد و آرایه است، به‌عنوان LineExplanation[] استفاده می‌شود
+  const lineExplanations = snippet.line_explanations && Array.isArray(snippet.line_explanations)
+    ? (snippet.line_explanations as LineExplanation[])
+    : [];
+
   return (
     <>
       {process.env.NODE_ENV === 'development' && <DebugLogger data={debugData} />}
@@ -252,9 +256,10 @@ export default async function SnippetPage({ params }: PageProps) {
             )}
           </div>
 
-          {snippet.line_explanations && snippet.line_explanations.length > 0 && (
+          {/* 🔥 خط به خط - با استفاده از lineExplanations نرمالایز شده */}
+          {lineExplanations.length > 0 && (
             <div id="snippet-line-by-line">
-              <SnippetLineByLine lineExplanations={snippet.line_explanations} />
+              <SnippetLineByLine lineExplanations={lineExplanations} />
             </div>
           )}
 
