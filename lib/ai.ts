@@ -22,7 +22,7 @@ Focus on:
 Code (${language}):
 ${code}
 
-Return your analysis as a plain text (not JSON).
+Return your analysis as plain text (not JSON).
 `;
 }
 
@@ -40,7 +40,7 @@ Include:
 Code (${language}):
 ${code}
 
-Return your analysis as a plain text (not JSON).
+Return your analysis as plain text (not JSON).
 `;
 }
 
@@ -70,7 +70,33 @@ function safeSlice(value: unknown, start: number, end?: number): string {
 }
 
 // ============================================================
-// 3. Main generation function
+// 3. Helper: extract text from possible JSON response
+// ============================================================
+
+function extractTextFromResponse(content: unknown): string {
+  if (typeof content !== 'string') {
+    return String(content);
+  }
+  const trimmed = content.trim();
+  // If it looks like JSON, try to parse and extract analysis/summary
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      // If it has analysis or summary fields, extract them
+      if (parsed.analysis && typeof parsed.analysis === 'string') return parsed.analysis;
+      if (parsed.summary && typeof parsed.summary === 'string') return parsed.summary;
+      // Otherwise return the whole JSON pretty-printed (for debugging)
+      return JSON.stringify(parsed, null, 2);
+    } catch {
+      // Not valid JSON, return as is
+      return content;
+    }
+  }
+  return content;
+}
+
+// ============================================================
+// 4. Main generation function
 // ============================================================
 
 export async function generateEducationalContent(
@@ -90,20 +116,16 @@ export async function generateEducationalContent(
     systemPrompt = getBaseSystemInstructions();
     userPrompt = buildMediumPrompt(code, language);
   } else {
-    // advanced
     systemPrompt = 'You are an expert code auditor. Return only valid JSON.';
     userPrompt = buildAdvancedPrompt(code, language);
   }
 
   try {
     if (mode === 'simple' || mode === 'medium') {
-      // 🔥 For simple/medium, call OpenAI with text response
       const content = await callOpenAI(systemPrompt, userPrompt, {
         responseFormat: 'text',
       });
-
-      // Ensure content is a string
-      const text = typeof content === 'string' ? content : String(content);
+      const text = extractTextFromResponse(content);
 
       return {
         analysis: text,
@@ -115,12 +137,10 @@ export async function generateEducationalContent(
         linkedin_post: 'Check out this code analysis! #Zbloue',
       };
     } else {
-      // 🔥 For advanced, call OpenAI with JSON response
+      // advanced: JSON response
       const content = await callOpenAIJson<any>(systemPrompt, userPrompt, {
         responseFormat: 'json_object',
       });
-
-      // content should be parsed object
       const parsed = typeof content === 'string' ? JSON.parse(content) : content;
 
       return {

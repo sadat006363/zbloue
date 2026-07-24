@@ -24,20 +24,56 @@ interface AnalysisTabProps {
   onDownloadFullAnalysis?: () => void;
 }
 
-// ===== Clean markdown =====
+// ===== Helper: detect JSON and extract readable text =====
+function formatText(text: string): string {
+  if (!text) return '';
+  const trimmed = text.trim();
+  // If it looks like JSON, try to parse it
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      // If it has analysis or summary fields, extract them
+      if (parsed.analysis && typeof parsed.analysis === 'string') {
+        return parsed.analysis;
+      }
+      if (parsed.summary && typeof parsed.summary === 'string') {
+        return parsed.summary;
+      }
+      // Otherwise return the whole JSON pretty-printed as a code block
+      return `<pre class="bg-[#1a1a2e] text-[#cdd6f4] p-4 rounded-md overflow-x-auto text-sm font-mono">${JSON.stringify(parsed, null, 2)}</pre>`;
+    } catch {
+      // Not valid JSON, return as is
+      return text;
+    }
+  }
+  return text;
+}
+
+// ===== Clean markdown (with JSON detection) =====
 const cleanMarkdown = (text: string) => {
   if (!text) return '';
-  let cleaned = text.replace(/^###\s*/gm, '');
+  // First, format the text to handle JSON
+  const formatted = formatText(text);
+  // If it's already HTML (starts with <pre), return as-is
+  if (formatted.startsWith('<pre')) {
+    return formatted;
+  }
+  let cleaned = formatted.replace(/^###\s*/gm, '');
   cleaned = cleaned.replace(/\n###\s*/g, '\n');
   cleaned = cleaned.replace(/^-\s*/gm, '• ');
   cleaned = cleaned.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
   return cleaned;
 };
 
-// ===== Clean text for copy =====
+// ===== Clean text for copy (with JSON detection) =====
 const cleanTextForCopy = (text: string) => {
   if (!text) return '';
-  let cleaned = text.replace(/^###\s*/gm, '');
+  const formatted = formatText(text);
+  // If formatted is HTML, return raw text (original)
+  if (formatted.startsWith('<pre')) {
+    return text;
+  }
+  let cleaned = formatted.replace(/^###\s*/gm, '');
   cleaned = cleaned.replace(/\n###\s*/g, '\n');
   cleaned = cleaned.replace(/^-\s*/gm, '• ');
   cleaned = cleaned.replace(/\*\*/g, '');
@@ -73,7 +109,8 @@ export default function AnalysisTab({
         text += `💡 Key Concept:\n${safeString(fullAnalysis.key_concept)}\n\n`;
       }
       if (fullAnalysis.analysis) {
-        text += `📝 Analysis:\n${safeString(fullAnalysis.analysis)}\n\n`;
+        const analysisText = formatText(fullAnalysis.analysis);
+        text += `📝 Analysis:\n${analysisText}\n\n`;
       }
 
       // Code Walkthrough
@@ -238,7 +275,7 @@ export default function AnalysisTab({
         text += `🔍 Debug Trace available (not displayed in text)\n`;
       }
     } else if (fullAnalysis?.analysis) {
-      text = fullAnalysis.analysis;
+      text = formatText(fullAnalysis.analysis);
     } else {
       text = 'No analysis available.';
     }
@@ -306,7 +343,7 @@ export default function AnalysisTab({
           )}
           {fullAnalysis.analysis && (
             <div className="mt-3 text-[#4a4a6a] whitespace-pre-wrap bg-gray-50 p-3 rounded-lg border border-gray-200">
-              {safeString(fullAnalysis.analysis)}
+              {formatText(fullAnalysis.analysis)}
             </div>
           )}
         </div>

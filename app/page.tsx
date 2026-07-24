@@ -29,6 +29,42 @@ import {
 export const dynamic = 'force-dynamic';
 
 // ============================================================
+// 🔥 Helper: safe slice (to avoid "slice is not a function")
+// ============================================================
+function safeSlice(value: unknown, start: number, end?: number): string {
+  if (typeof value === 'string') {
+    return value.slice(start, end);
+  }
+  return '';
+}
+
+// ============================================================
+// 🔥 Helper: extract text from possible JSON response
+// ============================================================
+function extractTextFromAnalysis(value: unknown): string {
+  if (typeof value !== 'string') {
+    return String(value);
+  }
+  const trimmed = value.trim();
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (parsed.analysis && typeof parsed.analysis === 'string') {
+        return parsed.analysis;
+      }
+      if (parsed.summary && typeof parsed.summary === 'string') {
+        return parsed.summary;
+      }
+      // Return the pretty-printed JSON as a readable fallback
+      return JSON.stringify(parsed, null, 2);
+    } catch {
+      return value;
+    }
+  }
+  return value;
+}
+
+// ============================================================
 // 🔥 Helper: Convert legacy response to UI-friendly format
 // ============================================================
 function normalizeLegacyResponse(data: LegacyGenerateResponse): {
@@ -51,10 +87,13 @@ function normalizeLegacyResponse(data: LegacyGenerateResponse): {
   scorecard?: LegacyScorecard;
   finalVerdict?: { summary: string; approved: boolean; nextSteps?: string };
 } {
+  let analysisText = data.analysis || '';
+  analysisText = extractTextFromAnalysis(analysisText);
+
   return {
     card_title: data.card_title || 'Code Analysis',
-    key_concept: data.key_concept || data.analysis?.slice(0, 200) || 'No summary provided.',
-    what_this_code_does: data.what_this_code_does || '',
+    key_concept: data.key_concept || safeSlice(analysisText, 0, 200) || 'No summary provided.',
+    what_this_code_does: data.what_this_code_does || analysisText,
     debug_analysis: data.debug_analysis || '-',
     optimization: data.optimization || '-',
     linkedin_post: data.linkedin_post || '',
@@ -74,18 +113,20 @@ function normalizeLegacyResponse(data: LegacyGenerateResponse): {
 }
 
 // ============================================================
-// 🔥 Helper: Build PromptInfo from response
+// 🔥 Helper: Build PromptInfo from response (safe)
 // ============================================================
 function buildPromptInfo(
   mode: AnalysisMode,
   data: LegacyGenerateResponse,
   pipelineStatus: 'completed' | 'failed' | 'fallback' = 'completed'
 ): PromptInfo {
-  const hasConcurrency = data.analysis?.toLowerCase().includes('concurrency') ||
-    data.bugsAndRiskyCases?.some((b: any) => 
-      b.issue?.toLowerCase().includes('thread') || 
-      b.issue?.toLowerCase().includes('deadlock')
-    ) ||
+  const analysisText = typeof data.analysis === 'string' ? data.analysis : '';
+  const hasConcurrency = 
+    analysisText.toLowerCase().includes('concurrency') ||
+    data.bugsAndRiskyCases?.some((b: any) => {
+      const issue = typeof b.issue === 'string' ? b.issue : '';
+      return issue.toLowerCase().includes('thread') || issue.toLowerCase().includes('deadlock');
+    }) ||
     false;
 
   return {
@@ -241,7 +282,6 @@ export default function HomePage() {
       // ===== Update outputs =====
       const modeKey = mode as 'simple' | 'medium' | 'advanced';
 
-      // 🔥 Fixed: Use the correct payload shape for SET_OUTPUTS
       dispatch({
         type: 'SET_OUTPUTS',
         payload: {
@@ -286,15 +326,15 @@ export default function HomePage() {
       const explanations = await analysisService.explainLineByLine(code, language);
       const modeKey = mode as 'simple' | 'medium' | 'advanced';
 
-      // 🔥 Fixed: Use the correct payload shape for SET_OUTPUTS
+      const currentOutput = outputs[modeKey] || { snippet: null, fullAnalysis: null, lineExplanations: [], generatedPrompt: '' };
       dispatch({
         type: 'SET_OUTPUTS',
         payload: {
           mode: modeKey,
-          snippet: outputs[modeKey]?.snippet || null,
-          fullAnalysis: outputs[modeKey]?.fullAnalysis || null,
+          snippet: currentOutput.snippet,
+          fullAnalysis: currentOutput.fullAnalysis,
           lineExplanations: explanations,
-          generatedPrompt: outputs[modeKey]?.generatedPrompt || '',
+          generatedPrompt: currentOutput.generatedPrompt,
         },
       });
 
@@ -324,14 +364,14 @@ export default function HomePage() {
       const prompt = await analysisService.generatePrompt(code, language, mode);
       const modeKey = mode as 'simple' | 'medium' | 'advanced';
 
-      // 🔥 Fixed: Use the correct payload shape for SET_OUTPUTS
+      const currentOutput = outputs[modeKey] || { snippet: null, fullAnalysis: null, lineExplanations: [], generatedPrompt: '' };
       dispatch({
         type: 'SET_OUTPUTS',
         payload: {
           mode: modeKey,
-          snippet: outputs[modeKey]?.snippet || null,
-          fullAnalysis: outputs[modeKey]?.fullAnalysis || null,
-          lineExplanations: outputs[modeKey]?.lineExplanations || [],
+          snippet: currentOutput.snippet,
+          fullAnalysis: currentOutput.fullAnalysis,
+          lineExplanations: currentOutput.lineExplanations,
           generatedPrompt: prompt,
         },
       });
@@ -407,6 +447,7 @@ export default function HomePage() {
   return (
     <main className="min-h-screen bg-[#f8f9fa] p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
+        {/* ===== Header ===== */}
         <div className="mb-4">
           <h1 className="text-2xl font-bold text-[#1a1a2e] flex items-center gap-2">
             <span className="text-[#4a86f7]">⚡</span> Zbloue
@@ -417,6 +458,7 @@ export default function HomePage() {
           </p>
         </div>
 
+        {/* ===== Error Display ===== */}
         {errorMessage && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm flex items-center justify-between">
             <span>❌ {errorMessage}</span>
@@ -426,6 +468,7 @@ export default function HomePage() {
           </div>
         )}
 
+        {/* ===== Editor + Output ===== */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 h-[calc(100vh-180px)] min-h-[600px]">
           <div className="min-h-[400px] lg:min-h-0">
             <Editor
@@ -448,6 +491,7 @@ export default function HomePage() {
           </div>
         </div>
 
+        {/* ===== Footer ===== */}
         <div className="mt-4 text-center text-xs text-[#a0a0b0] border-t border-[#d0d0d8] pt-3">
           Press <kbd className="px-1.5 py-0.5 bg-[#e8e8f0] rounded text-[#4a4a6a] text-xs font-mono">Ctrl+Enter</kbd> to generate
         </div>
