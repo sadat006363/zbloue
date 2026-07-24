@@ -469,15 +469,11 @@ export default function HomePage() {
     <main className="min-h-screen bg-[#f8f9fa] p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
         {/* ===== Header ===== */}
-        <div className="mb-4">
-          <h1 className="text-2xl font-bold text-[#1a1a2e] flex items-center gap-2">
-            <span className="text-[#4a86f7]">⚡</span> Zbloue
-            <span className="text-sm font-normal text-[#6c7086] ml-2">AI Code Analysis</span>
-          </h1>
-          <p className="text-sm text-[#6c7086]">
-            Paste your code, select a mode, and let AI analyze, explain, and improve it.
-          </p>
-        </div>
+       <div className="mb-4">
+  <h1 className="text-2xl font-bold text-[#1a1a2e] flex items-center gap-2">
+    <span className="text-[#4a86f7]">⚡</span> Zbloue
+  </h1>
+</div>
 
         {/* ===== Error Display ===== */}
         {errorMessage && (
