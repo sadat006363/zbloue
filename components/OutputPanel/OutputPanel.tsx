@@ -2,6 +2,17 @@
 'use client';
 import { forwardRef, useImperativeHandle, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Snippet, LegacyGenerateResponse, LineExplanation, AnalysisMode } from '@/types';
+import {
+  LegacyCodeWalkthroughItem,
+  LegacyBugAndRiskyCase,
+  LegacyEdgeCase,
+  LegacyPerformanceAnalysis,
+  LegacySecurityAnalysis,
+  LegacyProductionReadiness,
+  LegacyRecommendedImprovement,
+  LegacySuggestedTest, // 🔥 اضافه شد
+  LegacyScorecard,
+} from '@/types';
 import { toPng } from 'html-to-image';
 import CardPreview from '../card/CardPreview';
 import { CardTheme, themes } from '../card/themes';
@@ -425,21 +436,21 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
         }
         if (fullAnalysis.codeWalkthrough && fullAnalysis.codeWalkthrough.length > 0) {
           content += `🧩 Code Walkthrough:\n`;
-          fullAnalysis.codeWalkthrough.forEach((item) => {
+          fullAnalysis.codeWalkthrough.forEach((item: LegacyCodeWalkthroughItem) => {
             content += `  • ${safeString(item.section)}: ${safeString(item.explanation)}\n`;
           });
           content += `\n`;
         }
         if (fullAnalysis.whatWorksWell && fullAnalysis.whatWorksWell.length > 0) {
           content += `✅ What Works Well:\n`;
-          fullAnalysis.whatWorksWell.forEach((item) => {
+          fullAnalysis.whatWorksWell.forEach((item: string) => {
             content += `  • ${safeString(item)}\n`;
           });
           content += `\n`;
         }
         if (fullAnalysis.bugsAndRiskyCases && fullAnalysis.bugsAndRiskyCases.length > 0) {
           content += `🐛 Bugs and Risky Cases:\n`;
-          fullAnalysis.bugsAndRiskyCases.forEach((item) => {
+          fullAnalysis.bugsAndRiskyCases.forEach((item: LegacyBugAndRiskyCase) => {
             content += `  • ${safeString(item.issue)}\n`;
             content += `    Impact: ${safeString(item.impact)}\n`;
             if (item.example) content += `    Example: ${safeString(item.example)}\n`;
@@ -448,7 +459,7 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
         }
         if (fullAnalysis.edgeCases && fullAnalysis.edgeCases.length > 0) {
           content += `🧪 Edge Cases:\n`;
-          fullAnalysis.edgeCases.forEach((item) => {
+          fullAnalysis.edgeCases.forEach((item: LegacyEdgeCase) => {
             content += `  • ${safeString(item.case)}\n`;
             content += `    Current: ${safeString(item.currentBehavior)}\n`;
             content += `    Expected: ${safeString(item.expectedBehavior)}\n`;
@@ -514,7 +525,7 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
         }
         if (fullAnalysis.recommendedImprovements && fullAnalysis.recommendedImprovements.length > 0) {
           content += `🔧 Recommended Improvements:\n`;
-          fullAnalysis.recommendedImprovements.forEach((item) => {
+          fullAnalysis.recommendedImprovements.forEach((item: LegacyRecommendedImprovement) => {
             content += `  • [${safeString(item.priority)}] ${safeString(item.improvement)}\n`;
             content += `    Reason: ${safeString(item.reason)}\n`;
           });
@@ -522,7 +533,8 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
         }
         if (fullAnalysis.suggestedTests && fullAnalysis.suggestedTests.length > 0) {
           content += `🧪 Suggested Tests:\n`;
-          fullAnalysis.suggestedTests.forEach((test) => {
+          // 🔥 FIX: اضافه کردن نوع صریح برای test
+          fullAnalysis.suggestedTests.forEach((test: LegacySuggestedTest) => {
             content += `  • ${safeString(test.name)}\n`;
             if (test.input) content += `    Input: ${safeString(test.input)}\n`;
             if (test.expectedOutput) content += `    Expected: ${safeString(test.expectedOutput)}\n`;
