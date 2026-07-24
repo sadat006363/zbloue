@@ -7,7 +7,7 @@ import OutputPanel from '@/components/OutputPanel/OutputPanel';
 import { useAppContext } from '@/context';
 import { analysisService } from '@/services/analysisService';
 import { snippetService } from '@/services/snippetService';
-import { cleanCodeForAnalysis } from '@/lib/utils'; // 🔥 اضافه شده
+import { cleanCodeForAnalysis } from '@/lib/utils';
 import {
   type LegacyGenerateResponse,
   type Snippet,
@@ -26,7 +26,6 @@ import {
   LegacyScorecard,
 } from '@/types';
 
-// 🔥 جلوگیری از prerender در build
 export const dynamic = 'force-dynamic';
 
 // ============================================================
@@ -190,15 +189,12 @@ export default function HomePage() {
     dispatch({ type: 'SET_LOADING', payload: true });
 
     try {
-      // 🔥 ۱. تمیز کردن کد (حذف کامنت‌ها و فاصله‌های اضافی)
       const cleanedCode = cleanCodeForAnalysis(code, language);
 
-      // 🔥 ۲. به‌روزرسانی ادیتور با کد تمیز شده
       if (cleanedCode !== code) {
         dispatch({ type: 'SET_CODE', payload: cleanedCode });
       }
 
-      // 🔥 ۳. ارسال کد تمیز شده به API
       const response = await analysisService.generate({
         code: cleanedCode,
         language,
@@ -212,14 +208,12 @@ export default function HomePage() {
       const genData = response as LegacyGenerateResponse;
       const normalized = normalizeLegacyResponse(genData);
 
-      // ===== Normalize user fields =====
       const normalizedUsername = username && username.trim() !== '' ? username : 'Developer';
       const normalizedGithubUsername = githubUsername && githubUsername.trim() !== '' ? githubUsername : undefined;
       const normalizedAvatarUrl = avatarUrl && avatarUrl.trim() !== '' ? avatarUrl : undefined;
 
-      // ===== Build save data =====
       const saveData = {
-        code: cleanedCode, // کد تمیز شده ذخیره می‌شود
+        code: cleanedCode,
         language,
         card_title: normalized.card_title,
         key_concept: normalized.key_concept,
@@ -246,18 +240,16 @@ export default function HomePage() {
         final_verdict_next_steps: normalized.finalVerdict?.nextSteps,
       };
 
-      // ===== Save to database =====
       const saveResult = await snippetService.save(saveData);
 
       if (!saveResult.success) {
         throw new Error(saveResult.error || 'Failed to save snippet');
       }
 
-      // ===== Build Snippet =====
       const snippetData: Snippet = {
         id: saveResult.id,
         slug: saveResult.slug,
-        raw_code: cleanedCode, // کد تمیز شده ذخیره می‌شود
+        raw_code: cleanedCode,
         language,
         card_title: normalized.card_title,
         key_concept: normalized.key_concept,
@@ -300,7 +292,6 @@ export default function HomePage() {
         generated_prompt: undefined,
       };
 
-      // ===== Update outputs =====
       const modeKey = mode as 'simple' | 'medium' | 'advanced';
 
       dispatch({
@@ -314,7 +305,6 @@ export default function HomePage() {
         },
       });
 
-      // ===== Build and set PromptInfo =====
       const promptInfo = buildPromptInfo(mode, genData);
       dispatch({
         type: 'SET_PROMPT_INFO',
@@ -466,14 +456,15 @@ export default function HomePage() {
   }, [handleGenerate]);
 
   return (
-    <main className="min-h-screen bg-[#f8f9fa] p-4 md:p-6">
+    // 🔥 padding کاهش یافته برای افزایش عرض ادیتور و پنل
+    <main className="min-h-screen bg-[#f8f9fa] p-2 md:p-3">
       <div className="max-w-7xl mx-auto">
         {/* ===== Header ===== */}
-       <div className="mb-4">
-  <h1 className="text-2xl font-bold text-[#1a1a2e] flex items-center gap-2">
-    <span className="text-[#4a86f7]">⚡</span> Zbloue
-  </h1>
-</div>
+        <div className="mb-4">
+          <h1 className="text-2xl font-bold text-[#1a1a2e] flex items-center gap-2">
+            <span className="text-[#4a86f7]">⚡</span> Zbloue
+          </h1>
+        </div>
 
         {/* ===== Error Display ===== */}
         {errorMessage && (
