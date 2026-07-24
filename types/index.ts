@@ -111,7 +111,7 @@ const LegacyCodeWalkthroughItemSchema = z.object({
 const LegacyBugAndRiskyCaseSchema = z.object({
   issue: z.string(),
   impact: z.string(),
-  example: z.string().default(''), // 🔥 همیشه رشته
+  example: z.string().default(''),
 });
 
 const LegacyEdgeCaseSchema = z.object({
@@ -211,15 +211,14 @@ export const SnippetDataSchema = z.object({
   line_explanations: z.unknown().optional(),
   generated_prompt: z.string().optional(),
 
-  // Canonical fields
+  // Canonical fields – temporarily `any` to support both legacy and canonical shapes
   findings: z.array(AuditFindingSchema).optional(),
   execution_overview: ExecutionOverviewSchema.optional(),
   architectural_observations: z.array(ArchitecturalObservationSchema).optional(),
   recommended_actions: z.array(RecommendedActionSchema).optional(),
   suggested_tests_new: z.array(SuggestedTestSchema).optional(),
-  // 🔥 complexity: به‌صورت موقت `any` تا تطابق با کامپوننت‌های Legacy
-  complexity: z.any().optional(),
-  scorecard_new: AuditScorecardSchema.optional(),
+  complexity: z.any().optional(),          // 🔥 temporary
+  scorecard_new: z.any().optional(),       // 🔥 temporary – avoid type conflict
   verdict: CanonicalVerdictSchema.optional(),
   limitations: z.array(z.string()).optional(),
 
