@@ -175,9 +175,10 @@ const LegacyScorecardSchema = z.object({
 
 /**
  * NOTE: This schema is currently in a transitional state.
- * `complexity` is set to `z.any()` to allow both canonical and legacy shapes
- * while UI components are being migrated to canonical.
- * After UI migration, this will be replaced with ComplexitySchema.
+ * Several fields (findings, complexity, scorecard_new, verdict) are set to
+ * z.any() to allow both canonical and legacy shapes while UI components
+ * are being migrated to canonical.
+ * After UI migration, these will be replaced with proper schemas.
  */
 export const SnippetDataSchema = z.object({
   id: z.string(),
@@ -216,15 +217,15 @@ export const SnippetDataSchema = z.object({
   line_explanations: z.unknown().optional(),
   generated_prompt: z.string().optional(),
 
-  // Canonical fields (some are temporary `any` to unblock build)
-  findings: z.any().optional(), // temporary; will be replaced with z.array(AuditFindingSchema)
+  // Canonical fields – temporarily `any` to unblock build
+  findings: z.any().optional(),
   execution_overview: ExecutionOverviewSchema.optional(),
   architectural_observations: z.array(ArchitecturalObservationSchema).optional(),
   recommended_actions: z.array(RecommendedActionSchema).optional(),
   suggested_tests_new: z.array(SuggestedTestSchema).optional(),
-  complexity: z.any().optional(), // 🔥 temporary to support both legacy and canonical shapes
-  scorecard_new: AuditScorecardSchema.optional(),
-  verdict: CanonicalVerdictSchema.optional(),
+  complexity: z.any().optional(),
+  scorecard_new: z.any().optional(), // 🔥 temporary to support both shapes
+  verdict: z.any().optional(), // 🔥 temporary
   limitations: z.array(z.string()).optional(),
 
   audit_result: AdvancedAuditResultSchema.optional(),
