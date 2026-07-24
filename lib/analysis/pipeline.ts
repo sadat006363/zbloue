@@ -9,8 +9,10 @@ import { repairAudit } from './repair';
 import {
   AdvancedAuditResultSchema,
   type AdvancedAuditResult,
-  type AuditStatus,
-  type AuditType,
+  type CompletionStatus,
+  type AppliedSpecialization,
+  type AuditStatus, // still needed for internal pipeline status? We'll keep internal.
+  type AuditType, // still needed for internal selection
 } from './schema';
 import type { DetectorResult, AuditValidationResult } from './types';
 import { ANALYSIS_CONFIG } from './analysis.config';
@@ -53,14 +55,15 @@ function extractJSON(text: string): string {
 }
 
 // ============================================================
-// HELPER: FINALIZE AUDIT CANDIDATE
+// HELPER: FINALIZE AUDIT CANDIDATE (UPDATED FOR CANONICAL SCHEMA)
 // ============================================================
 
 function finalizeAuditCandidate(
   candidate: unknown,
   metadata: {
-    status: AuditStatus;
-    auditType: AuditType;
+    completionStatus: CompletionStatus;
+    repairApplied: boolean;
+    appliedSpecializations: AppliedSpecialization[];
     language: string;
   }
 ):
@@ -82,10 +85,20 @@ function finalizeAuditCandidate(
   }
 
   const payload: any = { ...candidate };
+  // Override with pipeline metadata
   payload.schemaVersion = '1.0';
-  payload.auditType = metadata.auditType;
-  payload.status = metadata.status;
+  payload.auditType = 'comprehensive';
+  payload.completionStatus = metadata.completionStatus;
+  payload.repairApplied = metadata.repairApplied;
+  payload.appliedSpecializations = metadata.appliedSpecializations;
   payload.language = metadata.language;
+
+  // Ensure analysisCoverage is present (if not, normalizer already provides defaults)
+  // but we might want to guarantee it exists.
+  if (!payload.analysisCoverage) {
+    // This should be handled by normalizer; but fallback just in case.
+    payload.analysisCoverage = [];
+  }
 
   const result = AdvancedAuditResultSchema.safeParse(payload);
   if (result.success) {
@@ -96,7 +109,7 @@ function finalizeAuditCandidate(
 }
 
 // ============================================================
-// HELPER: REPAIR WRAPPER
+// HELPER: REPAIR WRAPPER (UPDATED)
 // ============================================================
 
 async function attemptRepairWithBudget(
@@ -104,10 +117,11 @@ async function attemptRepairWithBudget(
   previousCandidate: unknown,
   validationResult: AuditValidationResult,
   language: string,
-  auditType: AuditType,
+  auditType: 'generic' | 'concurrency',
   attemptNumber: number,
   maxAttempts: number,
-  deadline: number
+  deadline: number,
+  appliedSpecializations: AppliedSpecialization[]
 ): Promise<AdvancedAuditResult | null> {
   if (attemptNumber >= maxAttempts) {
     logger.warn(`[Pipeline] Repair budget exhausted (${attemptNumber}/${maxAttempts})`);
@@ -132,9 +146,11 @@ async function attemptRepairWithBudget(
 
     if (!repaired) return null;
 
+    // After repair, we consider the result as valid (if schema passes) and mark repairApplied true.
     const finalizeResult = finalizeAuditCandidate(repaired, {
-      status: 'repaired',
-      auditType,
+      completionStatus: 'complete',
+      repairApplied: true,
+      appliedSpecializations,
       language,
     });
 
@@ -156,7 +172,7 @@ async function attemptRepairWithBudget(
 
 export interface PipelineResult {
   result: AdvancedAuditResult | null;
-  status: AuditStatus;
+  status: AuditStatus; // internal pipeline status: 'complete' | 'repaired' | 'failed_validation'
   error?: string;
   trace?: {
     requestPayload?: unknown;
@@ -228,26 +244,29 @@ export async function runAdvancedPipeline(
     // ===== 3. Build Prompt Context =====
     const promptContext: PromptContext = {
       sourceLanguage: language,
-      responseLanguage: 'English',
+      responseLanguage: 'English', // or maybe from user preference later
       numberedCode,
       rawCode: code,
     };
 
     // ===== 4. Select audit strategy =====
     const stageStart3 = Date.now();
-    let auditType: AuditType;
+    let auditType: 'generic' | 'concurrency';
     let prompt: string;
+    let appliedSpecializations: AppliedSpecialization[] = [];
 
     if (detectorResult.requiresConcurrencyAudit) {
       prompt = buildConcurrencyAuditPrompt(promptContext);
       auditType = 'concurrency';
+      appliedSpecializations = ['concurrency'];
       logger.info('[Pipeline] Concurrency audit selected');
     } else {
       prompt = buildGenericAdvancedPrompt(promptContext);
       auditType = 'generic';
+      appliedSpecializations = [];
       logger.info('[Pipeline] Generic audit selected');
     }
-    stages.push({ name: 'select_strategy', durationMs: Date.now() - stageStart3, data: { auditType } });
+    stages.push({ name: 'select_strategy', durationMs: Date.now() - stageStart3, data: { auditType, appliedSpecializations } });
 
     // ===== Save prompt in development =====
     if (process.env.NODE_ENV === 'development') {
@@ -374,7 +393,7 @@ export async function runAdvancedPipeline(
       }
 
       const parsed = JSON.parse(jsonString);
-      // ✅ استفاده از Normalizer جدید (با پشتیبانی از ساختار Object)
+      // Normalize will produce an object with default fields, but we will override some later.
       normalizedData = normalizeAnalysisOutput(parsed);
     } catch (normError) {
       normalizationError = normError instanceof Error ? normError.message : 'Normalization failed';
@@ -393,11 +412,12 @@ export async function runAdvancedPipeline(
 
     // ===== 7. Validation & Repair =====
     if (normalizedData) {
+      // Zod validation
       const zodResult = AdvancedAuditResultSchema.safeParse(normalizedData);
       if (zodResult.success) {
         stages.push({ name: 'normalization_success', durationMs: Date.now() - stageStart4 });
 
-        // ✅ استفاده از Validator جدید (با پشتیبانی از ساختار Object)
+        // Semantic validation
         let initialValidation = validateSemanticCompleteness(zodResult.data, detectorResult, code);
 
         let lastCandidate = zodResult.data;
@@ -406,6 +426,8 @@ export async function runAdvancedPipeline(
         let wasRepaired = false;
         let finalCandidate: unknown = zodResult.data;
         let finalValidation = initialValidation;
+        let completionStatus: CompletionStatus = 'complete';
+        let repairApplied = false;
 
         while (lastValidation.repairRequired && repairAttempts < MAX_REPAIR_ATTEMPTS) {
           if (Date.now() > deadline) {
@@ -423,22 +445,26 @@ export async function runAdvancedPipeline(
             auditType,
             repairAttempts,
             MAX_REPAIR_ATTEMPTS,
-            deadline
+            deadline,
+            appliedSpecializations
           );
 
           if (repaired) {
-            // ✅ اعتبارسنجی مجدد با Validator جدید
             const revalidation = validateSemanticCompleteness(repaired, detectorResult, code);
             if (revalidation.structurallyValid && !revalidation.repairRequired) {
               finalCandidate = repaired;
               finalValidation = revalidation;
               wasRepaired = true;
+              repairApplied = true;
+              completionStatus = 'complete';
               stages.push({ name: 'repair_success', durationMs: Date.now() - stageStartRepair, data: { attempt: repairAttempts + 1 } });
               break;
             } else if (revalidation.structurallyValid && revalidation.repairRequired) {
               finalCandidate = repaired;
               finalValidation = revalidation;
               wasRepaired = true;
+              repairApplied = true;
+              // Still partially complete? We'll keep trying if attempts remain.
               stages.push({ name: 'repair_partial', durationMs: Date.now() - stageStartRepair, data: { attempt: repairAttempts + 1, issuesCount: revalidation.issues.length } });
             } else {
               logger.warn('[Pipeline] Repair produced structurally invalid data despite Zod pass');
@@ -453,26 +479,41 @@ export async function runAdvancedPipeline(
           repairAttempts++;
         }
 
+        // After repair loop, finalize
         if (finalValidation.structurallyValid) {
-          const status: AuditStatus = wasRepaired ? 'repaired' : 'complete';
+          // If we had repairs but still have issues, we might mark as partially-complete? 
+          // For now, we treat as complete if structurally valid.
+          // But if repair was attempted and failed to fix all, we may still have warnings (not errors).
+          // We'll set completionStatus to 'complete' if no errors remain; otherwise we could set 'partially-complete'.
+          // However, semantically we consider it complete if it passes semantic validation.
+          // semantic validation may have warnings (not errors), but repairRequired indicates errors.
+          // If repairRequired is false, it's complete.
+          // If repairRequired true but we exhausted attempts, we might set partially-complete.
+          // Let's set completionStatus based on whether repairRequired is false.
+          const finalCompletionStatus: CompletionStatus = finalValidation.repairRequired ? 'partially-complete' : 'complete';
+          const finalRepairApplied = wasRepaired || repairApplied;
+
           const finalizeResult = finalizeAuditCandidate(finalCandidate, {
-            status,
-            auditType,
+            completionStatus: finalCompletionStatus,
+            repairApplied: finalRepairApplied,
+            appliedSpecializations,
             language,
           });
 
           if (finalizeResult.success) {
             const duration = Date.now() - startTime;
-            logger.info(`[Pipeline] Completed in ${duration}ms, status: ${status}`);
+            logger.info(`[Pipeline] Completed in ${duration}ms, completionStatus: ${finalCompletionStatus}, repairApplied: ${finalRepairApplied}`);
             const trace = {
               stages,
               rawAIResponse: rawContent,
               extractedJSON: jsonString || '',
               finalData: finalizeResult.data,
             };
+            // Internal pipeline status: if repairApplied true, set 'repaired'; else 'complete'
+            const pipelineStatus = finalRepairApplied ? 'repaired' : 'complete';
             return {
               result: finalizeResult.data,
-              status,
+              status: pipelineStatus,
               trace,
             };
           } else {
@@ -484,8 +525,17 @@ export async function runAdvancedPipeline(
               trace: { stages, rawAIResponse: rawContent, extractedJSON: jsonString || '' },
             };
           }
+        } else {
+          // Not structurally valid even after repair
+          return {
+            result: null,
+            status: 'failed_validation',
+            error: 'Result failed structural validation after repair',
+            trace: { stages, rawAIResponse: rawContent, extractedJSON: jsonString || '' },
+          };
         }
       } else {
+        // Zod validation failed initially; try repair once more
         logger.warn('[Pipeline] Zod validation failed even after normalization:', zodResult.error.issues);
         if (MAX_REPAIR_ATTEMPTS > 0 && Date.now() < deadline) {
           const repairResult = await attemptRepairWithBudget(
@@ -507,7 +557,8 @@ export async function runAdvancedPipeline(
             auditType,
             0,
             MAX_REPAIR_ATTEMPTS,
-            deadline
+            deadline,
+            appliedSpecializations
           );
           if (repairResult) {
             stages.push({ name: 'repair_success_after_normalization', durationMs: Date.now() - stageStart4 });
@@ -546,7 +597,8 @@ export async function runAdvancedPipeline(
           auditType,
           0,
           MAX_REPAIR_ATTEMPTS,
-          deadline
+          deadline,
+          appliedSpecializations
         );
         if (repairResult) {
           stages.push({ name: 'repair_success_after_normalization_failure', durationMs: Date.now() - stageStart4 });

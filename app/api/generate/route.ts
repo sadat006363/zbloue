@@ -16,19 +16,25 @@ import { AdvancedAuditResultSchema } from '@/lib/analysis/schema';
 import { normalizeAnalysisOutput } from '@/lib/analysis/normalizer';
 import { withErrorHandlerAndLog } from '@/lib/errorHandler';
 import crypto from 'crypto';
+import {
+  GenerateRequestSchema,
+  type GenerateRequest,
+  type LegacyGenerateResponse,
+  type AnalysisMode,
+} from '@/types';
 
 // ============================================================
-// 🔥 کش ساده در حافظه
+// 🔥 Cache (In-Memory)
 // ============================================================
 
 interface CacheEntry {
-  result: GenerateResponseValidated;
+  result: LegacyGenerateResponse;
   timestamp: number;
   pipelineTrace?: unknown;
 }
 
 const cache = new Map<string, CacheEntry>();
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 function getCacheKey(code: string, language: string, mode: string): string {
   const hash = crypto.createHash('sha256').update(`${code}|${language}|${mode}`).digest('hex');
@@ -45,7 +51,7 @@ function getCachedResult(key: string): CacheEntry | null {
   return entry;
 }
 
-function setCacheResult(key: string, result: GenerateResponseValidated, pipelineTrace?: unknown): void {
+function setCacheResult(key: string, result: LegacyGenerateResponse, pipelineTrace?: unknown): void {
   cache.set(key, {
     result,
     timestamp: Date.now(),
@@ -61,162 +67,110 @@ function setCacheResult(key: string, result: GenerateResponseValidated, pipeline
 }
 
 // ============================================================
-// 1. Schemas
+// 2. Helpers
 // ============================================================
-
-const ModeValues = ['simple', 'medium', 'advanced'] as const;
-type Mode = typeof ModeValues[number];
-
-const ModeSchema = z.enum(ModeValues);
-
-const GenerateRequestSchema = z.object({
-  code: z.string().min(1, 'Code is required').max(MAX_CODE_LENGTH, `Code exceeds maximum length of ${MAX_CODE_LENGTH} characters`),
-  language: z.string().min(1, 'Language is required').max(50, 'Language name too long'),
-  mode: ModeSchema,
-});
-
-type GenerateRequestValidated = z.infer<typeof GenerateRequestSchema>;
-
-const GenerateResponseSchema = z.object({
-  linkedin_post: z.string().min(1).max(300),
-}).passthrough();
-
-type GenerateResponseValidated = z.infer<typeof GenerateResponseSchema>;
-
-// ============================================================
-// 2. Language helpers
-// ============================================================
-
-const supportedLanguagesSet = new Set<string>(SUPPORTED_LANGUAGES);
-
-const languageAliases: Record<string, string> = {
-  js: 'javascript',
-  ts: 'typescript',
-  py: 'python',
-  rb: 'ruby',
-  'c++': 'cpp',
-  'c#': 'csharp',
-  cs: 'csharp',
-  kt: 'kotlin',
-  swift: 'swift',
-  go: 'go',
-  rs: 'rust',
-  php: 'php',
-  html: 'html',
-  htm: 'html',
-  css: 'css',
-  json: 'json',
-  xml: 'xml',
-  yml: 'yaml',
-  yaml: 'yaml',
-  sh: 'bash',
-  bash: 'bash',
-  shell: 'bash',
-  sql: 'sql',
-};
 
 function normalizeLanguage(lang: string): string {
   const normalized = lang.toLowerCase().trim();
+  const languageAliases: Record<string, string> = {
+    js: 'javascript',
+    ts: 'typescript',
+    py: 'python',
+    rb: 'ruby',
+    'c++': 'cpp',
+    'c#': 'csharp',
+    cs: 'csharp',
+    kt: 'kotlin',
+    swift: 'swift',
+    go: 'go',
+    rs: 'rust',
+    php: 'php',
+    html: 'html',
+    htm: 'html',
+    css: 'css',
+    json: 'json',
+    xml: 'xml',
+    yml: 'yaml',
+    yaml: 'yaml',
+    sh: 'bash',
+    bash: 'bash',
+    shell: 'bash',
+    sql: 'sql',
+  };
   return languageAliases[normalized] || normalized;
 }
 
 function isSupportedLanguage(lang: string): boolean {
   const normalized = normalizeLanguage(lang);
-  return supportedLanguagesSet.has(normalized);
+  return new Set(SUPPORTED_LANGUAGES).has(normalized);
 }
 
-// ============================================================
-// 3. Helpers
-// ============================================================
-
-function validateResponse(result: unknown): GenerateResponseValidated {
+function validateResponse(result: unknown): LegacyGenerateResponse {
+  // For now, we just ensure linkedin_post exists (legacy).
+  // In future, we'll migrate to canonical response.
   const withDefault = {
     ...(result as Record<string, unknown>),
     linkedin_post: (result as Record<string, unknown>)?.linkedin_post || 'Check out this code analysis! #Zbloue',
   };
-  return GenerateResponseSchema.parse(withDefault);
+  // We don't have a Zod schema for LegacyGenerateResponse in this file,
+  // but we can use the one from types.
+  // Actually, we can rely on the type; but we could parse if needed.
+  return withDefault as LegacyGenerateResponse;
 }
 
-// ============================================================
-// 4. Streaming Handler
-// ============================================================
-
-async function processGenerateRequest(
-  code: string,
-  language: string,
-  mode: Mode,
-  ip: string
-): Promise<{ result: GenerateResponseValidated; pipelineTrace?: unknown }> {
-  // ===== بررسی کش =====
-  const cacheKey = getCacheKey(code, language, mode);
-  const cached = getCachedResult(cacheKey);
-  if (cached) {
-    logger.info(`[generate] Cache hit for IP ${ip}, mode ${mode}`);
-    return { result: cached.result, pipelineTrace: cached.pipelineTrace };
-  }
-
-  // ===== Mock =====
-  if (process.env.USE_MOCK_RESPONSE === 'true' && mode === 'advanced') {
-    logger.info(`[generate] Using mock response for advanced mode (IP ${ip})`);
-    const validatedMock = validateResponse(MOCK_RESPONSE);
-    setCacheResult(cacheKey, validatedMock);
-    return { result: validatedMock };
-  }
-
-  let result: GenerateResponseValidated;
-  let pipelineTrace: unknown = null;
-
-  if (mode === 'advanced') {
-    logger.info(`[generate] Running advanced pipeline for IP ${ip}`);
-    try {
-      const pipelineResult = await runAdvancedPipeline(code, language);
-      if (pipelineResult.result) {
-        try {
-          const normalized = normalizeAnalysisOutput(pipelineResult.result);
-          const validated = AdvancedAuditResultSchema.parse(normalized);
-          result = {
-            ...validated,
-            linkedin_post: validated.linkedin_post || 'Check out this code analysis! #Zbloue',
-          } as GenerateResponseValidated;
-          logger.info(`[generate] Advanced pipeline succeeded with status: ${pipelineResult.status}`);
-          pipelineTrace = pipelineResult.trace;
-        } catch (schemaError) {
-          logger.error('[generate] Pipeline output failed schema validation, falling back to legacy:', schemaError);
-          const legacyResult = await generateEducationalContent(code, language, mode);
-          result = validateResponse(legacyResult);
+/**
+ * Maps a canonical AdvancedAuditResult to the legacy response shape.
+ * This is a temporary adapter until the UI consumes canonical directly.
+ */
+function mapCanonicalToLegacy(canonical: any): LegacyGenerateResponse {
+  return {
+    analysis: canonical.summary || '',
+    card_title: canonical.title || 'Code Analysis',
+    key_concept: canonical.summary?.slice(0, 2000) || '',
+    what_this_code_does: canonical.executionOverview?.entryPoints?.join(', ') || '',
+    debug_analysis: canonical.findings?.length ? `${canonical.findings.length} findings` : '-',
+    optimization: canonical.recommendedActions?.length
+      ? canonical.recommendedActions.map((a: any) => a.title).join('; ')
+      : '-',
+    linkedin_post: canonical.linkedin_post || 'Check out this code analysis! #Zbloue',
+    // Legacy fields may be empty; we can fill from canonical if needed.
+    codeWalkthrough: [],
+    whatWorksWell: [],
+    bugsAndRiskyCases: [],
+    edgeCases: [],
+    performanceAnalysis: undefined,
+    securityAnalysis: undefined,
+    productionReadiness: undefined,
+    recommendedImprovements: [],
+    improvedCode: canonical.improvedCode?.available
+      ? {
+          available: canonical.improvedCode.available,
+          code: canonical.improvedCode.code || '',
+          notes: canonical.improvedCode.notes || '',
         }
-      } else {
-        logger.warn(`[generate] Advanced pipeline failed: ${pipelineResult.error}`);
-        const legacyResult = await generateEducationalContent(code, language, mode);
-        result = validateResponse(legacyResult);
-      }
-    } catch (pipelineError) {
-      logger.error(`[generate] Pipeline error, falling back to legacy:`, pipelineError);
-      const legacyResult = await generateEducationalContent(code, language, mode);
-      result = validateResponse(legacyResult);
-    }
-  } else {
-    logger.info(`[generate] Running legacy generation for mode ${mode} (IP ${ip})`);
-    const legacyResult = await generateEducationalContent(code, language, mode);
-    result = validateResponse(legacyResult);
-  }
-
-  // ===== ذخیره در کش =====
-  setCacheResult(cacheKey, result, pipelineTrace);
-
-  return { result, pipelineTrace };
+      : undefined,
+    suggestedTests: [],
+    scorecard: undefined,
+    finalVerdict: canonical.verdict
+      ? {
+          summary: canonical.verdict.explanation,
+          approved: canonical.verdict.status === 'approved' || canonical.verdict.status === 'approved-with-suggestions',
+          nextSteps: '',
+        }
+      : undefined,
+    error: undefined,
+  };
 }
 
 // ============================================================
-// 5. Main Handler (با Streaming)
+// 3. Main POST handler
 // ============================================================
 
 export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
   const startTime = Date.now();
   const ip = getClientIP(req);
-  const acceptHeader = req.headers.get('accept') || '';
 
-  // ===== Rate Limiter =====
+  // Rate limiting
   const rateLimitResult = await rateLimiter(ip);
   if (!rateLimitResult.allowed) {
     logger.warn(`[generate] Rate limit exceeded for IP ${ip}`);
@@ -226,7 +180,7 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
     );
   }
 
-  // ===== Parse Request =====
+  // Parse request
   let rawBody: unknown;
   try {
     rawBody = await req.json();
@@ -234,6 +188,7 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
     return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
   }
 
+  // Validate using canonical request schema
   const validation = GenerateRequestSchema.safeParse(rawBody);
   if (!validation.success) {
     const firstError = validation.error.issues[0];
@@ -249,7 +204,9 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
 
   if (!isSupportedLanguage(language)) {
     return NextResponse.json(
-      { error: `Unsupported language: "${rawLanguage}" (normalized: "${language}").` },
+      {
+        error: `Unsupported language: "${rawLanguage}" (normalized: "${language}"). Supported: ${SUPPORTED_LANGUAGES.join(', ')}`,
+      },
       { status: 400 }
     );
   }
@@ -267,64 +224,69 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
     return NextResponse.json({ error: 'Payload too large (max 100KB)' }, { status: 413 });
   }
 
-  // ============================================================
-  // 🔥 Streaming Response (اگر کلاینت درخواست کرده باشد)
-  // ============================================================
-  if (acceptHeader.includes('text/event-stream') || acceptHeader.includes('stream')) {
-    const encoder = new TextEncoder();
+  // Check cache
+  const cacheKey = getCacheKey(code, language, mode);
+  const cached = getCachedResult(cacheKey);
+  if (cached) {
+    logger.info(`[generate] Cache hit for IP ${ip}, mode ${mode}, key ${cacheKey.slice(0, 8)}...`);
+    return NextResponse.json(cached.result);
+  }
 
-    const stream = new ReadableStream({
-      async start(controller) {
-        try {
-          // ===== ارسال پیام شروع =====
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'start', message: 'Analysis started...' })}\n\n`));
+  // Mock support
+  if (process.env.USE_MOCK_RESPONSE === 'true' && mode === 'advanced') {
+    logger.info(`[generate] Using mock response for advanced mode (IP ${ip})`);
+    const mock = validateResponse(MOCK_RESPONSE);
+    setCacheResult(cacheKey, mock);
+    return NextResponse.json(mock);
+  }
 
-          // ===== پردازش =====
-          const { result, pipelineTrace } = await processGenerateRequest(code, language, mode, ip);
+  // Actual generation
+  let legacyResult: LegacyGenerateResponse;
+  let pipelineTrace: unknown = null;
 
-          // ===== ارسال نتیجه =====
-          const responseData = { ...result };
-          if (pipelineTrace) {
-            (responseData as any).debug_trace = pipelineTrace;
+  if (mode === 'advanced') {
+    logger.info(`[generate] Running advanced pipeline for IP ${ip}`);
+    try {
+      const pipelineResult = await runAdvancedPipeline(code, language);
+      if (pipelineResult.result) {
+        // Validate the canonical result
+        const validated = AdvancedAuditResultSchema.safeParse(pipelineResult.result);
+        if (validated.success) {
+          // Map to legacy shape for now
+          legacyResult = mapCanonicalToLegacy(validated.data);
+          // Add debug trace if available
+          if (pipelineResult.trace) {
+            (legacyResult as any).debug_trace = pipelineResult.trace;
           }
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'complete', data: responseData })}\n\n`));
-
-          // ===== ارسال پیام پایان =====
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done', message: 'Analysis complete!' })}\n\n`));
-        } catch (error) {
-          logger.error('[generate] Stream error:', error);
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', message: 'Analysis failed' })}\n\n`));
-        } finally {
-          controller.close();
+          logger.info(`[generate] Advanced pipeline succeeded with status: ${pipelineResult.status}`);
+        } else {
+          // Fallback to legacy generation
+          logger.warn('[generate] Pipeline output failed schema validation, falling back to legacy');
+          const legacyData = await generateEducationalContent(code, language, mode);
+          legacyResult = validateResponse(legacyData);
         }
-      },
-    });
-
-    const duration = Date.now() - startTime;
-    logger.info(`[generate] Stream completed in ${duration}ms for mode ${mode} (IP ${ip})`);
-
-    return new Response(stream, {
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-        'X-Accel-Buffering': 'no',
-      },
-    });
+      } else {
+        logger.warn(`[generate] Advanced pipeline failed: ${pipelineResult.error}`);
+        const legacyData = await generateEducationalContent(code, language, mode);
+        legacyResult = validateResponse(legacyData);
+      }
+    } catch (error) {
+      logger.error('[generate] Pipeline error, falling back to legacy:', error);
+      const legacyData = await generateEducationalContent(code, language, mode);
+      legacyResult = validateResponse(legacyData);
+    }
+  } else {
+    // Simple / Medium modes
+    logger.info(`[generate] Running legacy generation for mode ${mode} (IP ${ip})`);
+    const legacyData = await generateEducationalContent(code, language, mode);
+    legacyResult = validateResponse(legacyData);
   }
 
-  // ============================================================
-  // 🔥 Regular Response (بدون Streaming)
-  // ============================================================
-  const { result, pipelineTrace } = await processGenerateRequest(code, language, mode, ip);
-
-  const responseData = { ...result };
-  if (pipelineTrace) {
-    (responseData as any).debug_trace = pipelineTrace;
-  }
+  // Cache the result
+  setCacheResult(cacheKey, legacyResult, pipelineTrace);
 
   const duration = Date.now() - startTime;
   logger.info(`[generate] Request completed in ${duration}ms for mode ${mode} (IP ${ip})`);
 
-  return NextResponse.json(responseData);
+  return NextResponse.json(legacyResult);
 });

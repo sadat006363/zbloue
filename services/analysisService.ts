@@ -1,19 +1,20 @@
 // services/analysisService.ts
 
-import { GenerateResponse, GenerateRequest, LineExplanation } from '@/types';
+import { LegacyGenerateResponse, LineExplanation, AnalysisMode } from '@/types';
 
 interface GenerateOptions {
   code: string;
   language: string;
-  mode: 'simple' | 'medium' | 'advanced';
+  mode: AnalysisMode;
   signal?: AbortSignal;
 }
 
 export const analysisService = {
   /**
-   * تولید تحلیل کد
+   * Generate code analysis
+   * Returns legacy response shape for now.
    */
-  async generate({ code, language, mode, signal }: GenerateOptions): Promise<GenerateResponse> {
+  async generate({ code, language, mode, signal }: GenerateOptions): Promise<LegacyGenerateResponse> {
     const response = await fetch('/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -25,11 +26,11 @@ export const analysisService = {
     if (!response.ok) {
       throw new Error(data.error || 'AI generation failed');
     }
-    return data;
+    return data as LegacyGenerateResponse;
   },
 
   /**
-   * تولید توضیحات خط به خط
+   * Generate line-by-line explanations
    */
   async explainLineByLine(code: string, language: string): Promise<LineExplanation[]> {
     const response = await fetch('/api/explain-line-by-line', {
@@ -46,7 +47,7 @@ export const analysisService = {
   },
 
   /**
-   * تولید پرامپت از کد
+   * Generate prompt from code
    */
   async generatePrompt(code: string, language: string, mode: string): Promise<string> {
     const response = await fetch('/api/generate-prompt', {
@@ -63,7 +64,7 @@ export const analysisService = {
   },
 
   /**
-   * تبدیل کد به زبان دیگر
+   * Convert code to another language
    */
   async convertCode(code: string, sourceLanguage: string, targetLanguage: string): Promise<string> {
     const response = await fetch('/api/convert-code', {

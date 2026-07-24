@@ -7,52 +7,93 @@ import OutputPanel from '@/components/OutputPanel/OutputPanel';
 import { useAppContext } from '@/context';
 import { analysisService } from '@/services/analysisService';
 import { snippetService } from '@/services/snippetService';
-import { type GenerateResponse, type Snippet } from '@/types';
-import { 
-  CodeWalkthroughItem,
-  BugAndRiskyCase,
-  EdgeCase,
-  PerformanceAnalysis,
-  SecurityAnalysis,
-  ProductionReadiness,
-  RecommendedImprovement,
+import {
+  type LegacyGenerateResponse,
+  type Snippet,
+  type AnalysisMode,
+  type PromptInfo,
+} from '@/types';
+import {
+  LegacyCodeWalkthroughItem,
+  LegacyBugAndRiskyCase,
+  LegacyEdgeCase,
+  LegacyPerformanceAnalysis,
+  LegacySecurityAnalysis,
+  LegacyProductionReadiness,
+  LegacyRecommendedImprovement,
+  LegacySuggestedTest,
+  LegacyScorecard,
 } from '@/types';
 
 // 🔥 جلوگیری از prerender در build
 export const dynamic = 'force-dynamic';
 
 // ============================================================
-// 🔥 تابع تبدیل Legacy به Advanced
+// 🔥 Helper: Convert legacy response to UI-friendly format
 // ============================================================
-function convertLegacyToAdvanced(genData: GenerateResponse): Partial<GenerateResponse> {
-  const result: Partial<GenerateResponse> = { ...genData };
+function normalizeLegacyResponse(data: LegacyGenerateResponse): {
+  card_title: string;
+  key_concept: string;
+  what_this_code_does: string;
+  debug_analysis: string;
+  optimization: string;
+  linkedin_post: string;
+  codeWalkthrough?: LegacyCodeWalkthroughItem[];
+  whatWorksWell?: string[];
+  bugsAndRiskyCases?: LegacyBugAndRiskyCase[];
+  edgeCases?: LegacyEdgeCase[];
+  performanceAnalysis?: LegacyPerformanceAnalysis;
+  securityAnalysis?: LegacySecurityAnalysis;
+  productionReadiness?: LegacyProductionReadiness;
+  recommendedImprovements?: LegacyRecommendedImprovement[];
+  improvedCode?: any;
+  suggestedTests?: LegacySuggestedTest[];
+  scorecard?: LegacyScorecard;
+  finalVerdict?: { summary: string; approved: boolean; nextSteps?: string };
+} {
+  return {
+    card_title: data.card_title || 'Code Analysis',
+    key_concept: data.key_concept || data.analysis?.slice(0, 200) || 'No summary provided.',
+    what_this_code_does: data.what_this_code_does || '',
+    debug_analysis: data.debug_analysis || '-',
+    optimization: data.optimization || '-',
+    linkedin_post: data.linkedin_post || '',
+    codeWalkthrough: data.codeWalkthrough,
+    whatWorksWell: data.whatWorksWell,
+    bugsAndRiskyCases: data.bugsAndRiskyCases,
+    edgeCases: data.edgeCases,
+    performanceAnalysis: data.performanceAnalysis,
+    securityAnalysis: data.securityAnalysis,
+    productionReadiness: data.productionReadiness,
+    recommendedImprovements: data.recommendedImprovements,
+    improvedCode: data.improvedCode,
+    suggestedTests: data.suggestedTests,
+    scorecard: data.scorecard,
+    finalVerdict: data.finalVerdict,
+  };
+}
 
-  if (genData.codeWalkthrough) {
-    result.codeWalkthrough = genData.codeWalkthrough;
-  }
-  if (genData.whatWorksWell) {
-    result.whatWorksWell = genData.whatWorksWell;
-  }
-  if (genData.bugsAndRiskyCases) {
-    result.bugsAndRiskyCases = genData.bugsAndRiskyCases;
-  }
-  if (genData.edgeCases) {
-    result.edgeCases = genData.edgeCases;
-  }
-  if (genData.performanceAnalysis) {
-    result.performanceAnalysis = genData.performanceAnalysis;
-  }
-  if (genData.securityAnalysis) {
-    result.securityAnalysis = genData.securityAnalysis;
-  }
-  if (genData.productionReadiness) {
-    result.productionReadiness = genData.productionReadiness;
-  }
-  if (genData.recommendedImprovements) {
-    result.recommendedImprovements = genData.recommendedImprovements;
-  }
+// ============================================================
+// 🔥 Helper: Build PromptInfo from response
+// ============================================================
+function buildPromptInfo(
+  mode: AnalysisMode,
+  data: LegacyGenerateResponse,
+  pipelineStatus: 'completed' | 'failed' | 'fallback' = 'completed'
+): PromptInfo {
+  // Try to detect if concurrency was applied
+  const hasConcurrency = data.analysis?.toLowerCase().includes('concurrency') ||
+    data.findings?.some((f: any) => f?.category?.toLowerCase().includes('concurrency')) ||
+    data.bugsAndRiskyCases?.some((b: any) => b.issue?.toLowerCase().includes('thread') || b.issue?.toLowerCase().includes('deadlock'));
 
-  return result;
+  return {
+    mode,
+    auditType: 'comprehensive',
+    appliedSpecializations: hasConcurrency ? ['concurrency'] : [],
+    completionStatus: 'complete',
+    repairApplied: false,
+    pipelineStatus,
+  };
 }
 
 export default function HomePage() {
@@ -104,111 +145,94 @@ export default function HomePage() {
         throw new Error(response.error);
       }
 
-      const genData = response as GenerateResponse;
+      const genData = response as LegacyGenerateResponse;
+      const normalized = normalizeLegacyResponse(genData);
 
-      const card_title = genData.title ?? genData.card_title ?? 'Code Analysis';
-      const key_concept = genData.highLevelSummary ?? genData.summary ?? 'No summary provided.';
-      const what_this_code_does = genData.analysis ?? genData.what_this_code_does ?? '';
-      const debug_analysis = genData.debug_analysis ?? '-';
-      const optimization = genData.optimization ?? '-';
-      const linkedin_post = genData.linkedin_post ?? '';
-
-      // 🔥 نرمالایز کردن فیلدهای اختیاری (رفع خطای ۴۰۰)
+      // ===== Normalize user fields =====
       const normalizedUsername = username && username.trim() !== '' ? username : 'Developer';
       const normalizedGithubUsername = githubUsername && githubUsername.trim() !== '' ? githubUsername : undefined;
       const normalizedAvatarUrl = avatarUrl && avatarUrl.trim() !== '' ? avatarUrl : undefined;
 
-      // ===== ساخت شیء برای SaveSnippetData =====
+      // ===== Build save data =====
       const saveData = {
         code: code,
         language,
-        card_title,
-        key_concept,
-        what_this_code_does,
-        debug_analysis,
-        optimization,
-        linkedin_post,
+        card_title: normalized.card_title,
+        key_concept: normalized.key_concept,
+        what_this_code_does: normalized.what_this_code_does,
+        debug_analysis: normalized.debug_analysis,
+        optimization: normalized.optimization,
+        linkedin_post: normalized.linkedin_post,
         username: normalizedUsername,
         github_username: normalizedGithubUsername,
         avatar_url: normalizedAvatarUrl,
-        code_walkthrough: genData.codeWalkthrough ?? undefined,
-        what_works_well: genData.whatWorksWell ?? undefined,
-        bugs_and_risky_cases: genData.bugsAndRiskyCases ?? undefined,
-        edge_cases: genData.edgeCases ?? undefined,
-        performance_analysis: genData.performanceAnalysis ?? undefined,
-        security_analysis: genData.securityAnalysis ?? undefined,
-        production_readiness: genData.productionReadiness ?? undefined,
-        recommended_improvements: genData.recommendedImprovements ?? undefined,
-        improved_code: genData.improvedCode?.code ?? undefined,
-        suggested_tests: genData.suggestedTestsLegacy ?? undefined,
-        scorecard: genData.scorecardLegacy ?? undefined,
-        final_verdict_summary: genData.finalVerdict?.summary ?? undefined,
-        final_verdict_approved: genData.finalVerdict?.approved ?? undefined,
-        final_verdict_next_steps: genData.finalVerdict?.nextSteps ?? undefined,
-        findings: genData.findings ?? undefined,
-        execution_overview: genData.executionOverview ?? undefined,
-        architectural_observations: genData.architecturalObservations ?? undefined,
-        recommended_actions: genData.recommendedActions ?? undefined,
-        suggested_tests_new: genData.suggestedTests ?? undefined,
-        complexity: genData.complexity ?? undefined,
-        scorecard_new: genData.scorecard ?? undefined,
-        verdict: genData.verdict ?? undefined,
-        limitations: genData.limitations ?? undefined,
-        audit_result: genData,
-        debug_trace: (genData as any).debug_trace ?? undefined,
+        code_walkthrough: normalized.codeWalkthrough,
+        what_works_well: normalized.whatWorksWell,
+        bugs_and_risky_cases: normalized.bugsAndRiskyCases,
+        edge_cases: normalized.edgeCases,
+        performance_analysis: normalized.performanceAnalysis,
+        security_analysis: normalized.securityAnalysis,
+        production_readiness: normalized.productionReadiness,
+        recommended_improvements: normalized.recommendedImprovements,
+        improved_code: normalized.improvedCode?.code,
+        suggested_tests: normalized.suggestedTests,
+        scorecard: normalized.scorecard,
+        final_verdict_summary: normalized.finalVerdict?.summary,
+        final_verdict_approved: normalized.finalVerdict?.approved,
+        final_verdict_next_steps: normalized.finalVerdict?.nextSteps,
       };
 
-      // ===== ذخیره در دیتابیس =====
+      // ===== Save to database =====
       const saveResult = await snippetService.save(saveData);
 
-      // ===== ساخت Snippet کامل =====
+      // ===== Build Snippet =====
       const snippetData: Snippet = {
         id: saveResult.id,
         slug: saveResult.slug,
         raw_code: code,
         language,
-        card_title,
-        key_concept,
-        what_this_code_does,
-        debug_analysis,
-        optimization,
-        linkedin_post,
+        card_title: normalized.card_title,
+        key_concept: normalized.key_concept,
+        what_this_code_does: normalized.what_this_code_does,
+        debug_analysis: normalized.debug_analysis,
+        optimization: normalized.optimization,
+        linkedin_post: normalized.linkedin_post,
         is_public: true,
         created_at: new Date().toISOString(),
-        username: saveResult.username || username || 'Developer',
+        username: saveResult.username || normalizedUsername,
         github_username: saveResult.github_username ?? normalizedGithubUsername,
-        // 🔥 اصلاح: استفاده از normalizedAvatarUrl به جای saveResult.avatar_url
-        avatar_url: normalizedAvatarUrl,
+        avatar_url: saveResult.avatar_url ?? normalizedAvatarUrl,
         card_image_url: undefined,
-        code_walkthrough: genData.codeWalkthrough ?? undefined,
-        what_works_well: genData.whatWorksWell ?? undefined,
-        bugs_and_risky_cases: genData.bugsAndRiskyCases ?? undefined,
-        edge_cases: genData.edgeCases ?? undefined,
-        performance_analysis: genData.performanceAnalysis ?? undefined,
-        security_analysis: genData.securityAnalysis ?? undefined,
-        production_readiness: genData.productionReadiness ?? undefined,
-        recommended_improvements: genData.recommendedImprovements ?? undefined,
-        improved_code: genData.improvedCode?.code ?? undefined,
-        suggested_tests: genData.suggestedTestsLegacy ?? undefined,
-        scorecard: genData.scorecardLegacy ?? undefined,
-        final_verdict_summary: genData.finalVerdict?.summary ?? undefined,
-        final_verdict_approved: genData.finalVerdict?.approved ?? undefined,
-        final_verdict_next_steps: genData.finalVerdict?.nextSteps ?? undefined,
-        findings: genData.findings ?? undefined,
-        execution_overview: genData.executionOverview ?? undefined,
-        architectural_observations: genData.architecturalObservations ?? undefined,
-        recommended_actions: genData.recommendedActions ?? undefined,
-        suggested_tests_new: genData.suggestedTests ?? undefined,
-        complexity: genData.complexity ?? undefined,
-        scorecard_new: genData.scorecard ?? undefined,
-        verdict: genData.verdict ?? undefined,
-        limitations: genData.limitations ?? undefined,
-        audit_result: genData,
-        debug_trace: (genData as any).debug_trace ?? undefined,
+        code_walkthrough: normalized.codeWalkthrough,
+        what_works_well: normalized.whatWorksWell,
+        bugs_and_risky_cases: normalized.bugsAndRiskyCases,
+        edge_cases: normalized.edgeCases,
+        performance_analysis: normalized.performanceAnalysis,
+        security_analysis: normalized.securityAnalysis,
+        production_readiness: normalized.productionReadiness,
+        recommended_improvements: normalized.recommendedImprovements,
+        improved_code: normalized.improvedCode?.code,
+        suggested_tests: normalized.suggestedTests,
+        scorecard: normalized.scorecard,
+        final_verdict_summary: normalized.finalVerdict?.summary,
+        final_verdict_approved: normalized.finalVerdict?.approved,
+        final_verdict_next_steps: normalized.finalVerdict?.nextSteps,
+        findings: genData.findings,
+        execution_overview: genData.executionOverview,
+        architectural_observations: genData.architecturalObservations,
+        recommended_actions: genData.recommendedActions,
+        suggested_tests_new: genData.suggestedTests,
+        complexity: genData.complexity,
+        scorecard_new: genData.scorecard,
+        verdict: genData.verdict,
+        limitations: genData.limitations,
+        audit_result: genData as any,
+        debug_trace: (genData as any).debug_trace,
+        line_explanations: undefined,
+        generated_prompt: undefined,
       };
 
-      // ===== به‌روزرسانی Outputs =====
-      const fullAnalysis = convertLegacyToAdvanced(genData);
+      // ===== Update outputs =====
       const modeKey = mode as 'simple' | 'medium' | 'advanced';
 
       dispatch({
@@ -216,28 +240,23 @@ export default function HomePage() {
         payload: {
           [modeKey]: {
             snippet: snippetData,
-            fullAnalysis,
+            fullAnalysis: genData,
             lineExplanations: [],
             generatedPrompt: '',
           },
         },
       });
 
-      const auditType = genData.auditType ?? null;
-      const status = genData.status ?? null;
+      // ===== Build and set PromptInfo =====
+      const promptInfo = buildPromptInfo(mode, genData);
       dispatch({
         type: 'SET_PROMPT_INFO',
-        payload: {
-          auditType: auditType === 'concurrency' ? 'concurrency' : 'generic',
-          status: status as any,
-          isPipeline: true,
-        },
+        payload: promptInfo,
       });
 
       if (outputPanelRef.current) {
         outputPanelRef.current.setActiveTab('analysis');
       }
-
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Analysis failed. Please try again.';
       setErrorMessage(message);

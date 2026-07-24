@@ -1,22 +1,42 @@
 // lib/analysis/normalizer.ts
 
-import type {
-  AdvancedAuditResult,
-  AuditFinding,
-  AuditScorecard,
-  ScoreItem,
-  ImprovedCode,
-  VerdictStatus,
-} from './schema';
+import {
+  AdvancedAuditResultSchema,
+  type AdvancedAuditResult,
+  type AuditFinding,
+  type AuditScorecard,
+  type ScoreItem,
+  type ImprovedCode,
+  type VerdictStatus,
+  type Complexity,
+  type AnalysisCoverageItem,
+  type ArchitecturalObservation,
+  type SuggestedTest,
+  type ExecutionOverview,
+  type CompletionStatus,
+  type AnalysisCoverage,
+  type AppliedSpecialization,
+  type NonEmptyText,
+} from '@/lib/analysis/schema';
+
 import {
   SeveritySchema,
   ConfidenceSchema,
-  FindingCategorySchema,
-  AuditTypeSchema,
-  AuditStatusSchema,
+  BroadCategorySchema,
+  VerdictSchema,
   VerdictStatusSchema,
-} from './schema';
+  ComplexitySchema,
+  ImprovedCodeSchema,
+} from '@/lib/analysis/schema';
+
 import logger from '@/lib/logger';
+
+// ============================================================
+// Constants
+// ============================================================
+
+const DEFAULT_TITLE = 'Code Analysis Report';
+const DEFAULT_LINKEDIN_POST = 'Check out this code analysis! #Zbloue';
 
 // ============================================================
 // Type Guards & Helpers
@@ -56,26 +76,159 @@ function sanitizeEnum<T extends string>(
 }
 
 // ============================================================
+// Title Normalization
+// ============================================================
+
+function normalizeTitle(source: unknown, summary?: string): string {
+  const title = getSafeString(source);
+  if (title.length > 0) return title;
+  if (summary && summary.length > 0) {
+    const clean = summary.replace(/[#*`]/g, '').trim();
+    return clean.length > 80 ? `${clean.slice(0, 77)}...` : clean;
+  }
+  return DEFAULT_TITLE;
+}
+
+// ============================================================
+// Completion Status Normalization
+// ============================================================
+
+function normalizeCompletionStatus(source: unknown): CompletionStatus {
+  const status = getSafeString(source);
+  if (status === 'complete' || status === 'partially-complete') {
+    return status as CompletionStatus;
+  }
+  return 'complete';
+}
+
+// ============================================================
+// Repair Applied Normalization
+// ============================================================
+
+function normalizeRepairApplied(source: unknown): boolean {
+  return Boolean(source);
+}
+
+// ============================================================
+// Applied Specializations Normalization
+// ============================================================
+
+function normalizeAppliedSpecializations(source: unknown): AppliedSpecialization[] {
+  const arr = getSafeArray<unknown>(source, []);
+  const result: AppliedSpecialization[] = [];
+  for (const item of arr) {
+    if (item === 'concurrency') {
+      result.push(item);
+    }
+  }
+  return result;
+}
+
+// ============================================================
+// Analysis Coverage Normalization
+// ============================================================
+
+const ALL_DIMENSIONS = [
+  'correctness',
+  'security',
+  'concurrency',
+  'liveness',
+  'performance',
+  'resource-management',
+  'error-handling',
+  'input-validation',
+  'data-integrity',
+  'api-design',
+  'architecture',
+  'maintainability',
+  'testability',
+  'observability',
+  'compatibility',
+] as const;
+
+type Dimension = typeof ALL_DIMENSIONS[number];
+
+function normalizeAnalysisCoverage(source: unknown): AnalysisCoverageItem[] {
+  const input = getSafeObject(source);
+  const coverageMap: Record<string, { status: string; summary: string; limitation: string | null }> = {};
+
+  // Try to parse from input if it's an array
+  if (Array.isArray(source)) {
+    for (const item of source) {
+      if (isObject(item)) {
+        const dim = getSafeString(item.dimension);
+        if (ALL_DIMENSIONS.includes(dim as Dimension)) {
+          coverageMap[dim] = {
+            status: getSafeString(item.status, 'analyzed'),
+            summary: getSafeString(item.summary, `Analysis of ${dim} dimension.`),
+            limitation: getSafeString(item.limitation) || null,
+          };
+        }
+      }
+    }
+  } else if (isObject(source)) {
+    // If it's an object with dimension keys
+    for (const key of ALL_DIMENSIONS) {
+      const value = input[key];
+      if (isObject(value)) {
+        coverageMap[key] = {
+          status: getSafeString((value as any).status, 'analyzed'),
+          summary: getSafeString((value as any).summary, `Analysis of ${key} dimension.`),
+          limitation: getSafeString((value as any).limitation) || null,
+        };
+      }
+    }
+  }
+
+  // Ensure all dimensions are covered
+  const result: AnalysisCoverageItem[] = [];
+  for (const dim of ALL_DIMENSIONS) {
+    const existing = coverageMap[dim];
+    result.push({
+      dimension: dim as any,
+      status: existing?.status === 'not-applicable' || existing?.status === 'limited'
+        ? (existing.status as any)
+        : 'analyzed',
+      summary: existing?.summary || `Analysis of ${dim} dimension.`,
+      limitation: existing?.limitation ?? null,
+    });
+  }
+
+  return result;
+}
+
+// ============================================================
 // Score Normalization (0-100 Object)
 // ============================================================
 
 function normalizeScore(value: unknown, fallback: number = 0): number {
   if (typeof value === 'number' && isFinite(value)) {
+    // If value is in 0-10 range (legacy), scale to 0-100
+    if (value <= 10 && value >= 0) {
+      return Math.max(0, Math.min(100, Math.round(value * 10)));
+    }
     return Math.max(0, Math.min(100, Math.round(value)));
   }
   if (typeof value === 'string') {
     const parsed = parseFloat(value);
     if (!isNaN(parsed) && isFinite(parsed)) {
+      if (parsed <= 10 && parsed >= 0) {
+        return Math.max(0, Math.min(100, Math.round(parsed * 10)));
+      }
       return Math.max(0, Math.min(100, Math.round(parsed)));
     }
   }
   return fallback;
 }
 
-function normalizeScoreItem(value: unknown, fallback: number = 0): ScoreItem {
+function normalizeScoreItem(
+  value: unknown,
+  fallback: number = 0,
+  defaultReason: string = ''
+): ScoreItem {
   if (isObject(value)) {
     const score = normalizeScore(value.score, fallback);
-    const reason = typeof value.reason === 'string' ? value.reason.trim() : '';
+    const reason = typeof value.reason === 'string' ? value.reason.trim() : defaultReason;
     const relatedFindings = Array.isArray(value.relatedFindings)
       ? value.relatedFindings.filter((id): id is string => typeof id === 'string')
       : [];
@@ -85,23 +238,121 @@ function normalizeScoreItem(value: unknown, fallback: number = 0): ScoreItem {
   const score = normalizeScore(value, fallback);
   return {
     score,
-    reason: '',
+    reason: defaultReason || 'Score derived from legacy data.',
     relatedFindings: [],
   };
 }
 
 function normalizeScorecard(source: unknown): AuditScorecard {
   const input = getSafeObject(source);
+  const legacyScale = isObject(input.correctness) && typeof (input.correctness as any).score === 'number'
+    ? 100
+    : 10;
 
   return {
-    correctness: normalizeScoreItem(input.correctness, 0),
-    concurrencySafety: normalizeScoreItem(input.concurrencySafety, 0),
-    liveness: normalizeScoreItem(input.liveness, 0),
-    errorHandling: normalizeScoreItem(input.errorHandling, 0),
-    resourceManagement: normalizeScoreItem(input.resourceManagement, 0),
-    maintainability: normalizeScoreItem(input.maintainability, 0),
-    productionReadiness: normalizeScoreItem(input.productionReadiness, 0),
+    correctness: normalizeScoreItem(input.correctness, 0, 'Correctness assessment.'),
+    concurrencySafety: normalizeScoreItem(input.concurrencySafety ?? input.concurrency, 0, 'Concurrency safety assessment.'),
+    liveness: normalizeScoreItem(input.liveness, 0, 'Liveness assessment.'),
+    errorHandling: normalizeScoreItem(input.errorHandling, 0, 'Error handling assessment.'),
+    resourceManagement: normalizeScoreItem(input.resourceManagement, 0, 'Resource management assessment.'),
+    maintainability: normalizeScoreItem(input.maintainability, 0, 'Maintainability assessment.'),
+    productionReadiness: normalizeScoreItem(input.productionReadiness, 0, 'Production readiness assessment.'),
   };
+}
+
+// ============================================================
+// Complexity Normalization
+// ============================================================
+
+function normalizeComplexity(source: unknown): Complexity {
+  const input = getSafeObject(source);
+
+  // If already in canonical shape
+  if (isObject(input) && 'applicable' in input) {
+    try {
+      return ComplexitySchema.parse(input);
+    } catch {
+      // Fall through to legacy handling
+    }
+  }
+
+  const applicable = typeof input.applicable === 'boolean' ? input.applicable : true;
+
+  if (!applicable) {
+    return {
+      applicable: false,
+      expression: null,
+      explanation: null,
+      variables: [],
+      assumptions: [],
+    };
+  }
+
+  const expression = getSafeString(input.time ?? input.expression, 'unknown');
+  const explanation = getSafeString(input.explanation, 'Complexity derived from source code.');
+  const variables = Array.isArray(input.variables) ? input.variables : [];
+  const assumptions = getStringArray(input.assumptions);
+
+  // Try to extract variables from expression if not provided
+  const parsedVariables = variables.length > 0 ? variables : extractVariables(expression);
+
+  return {
+    applicable: true,
+    expression,
+    explanation,
+    variables: parsedVariables,
+    assumptions: assumptions.length > 0 ? assumptions : ['Complexity inferred from visible code structure.'],
+  };
+}
+
+function extractVariables(expression: string): Array<{ symbol: string; definition: string }> {
+  const matched = expression.match(/[OΩΘ]\(([^)]+)\)/g);
+  if (!matched) return [];
+
+  const variables: Array<{ symbol: string; definition: string }> = [];
+  for (const part of matched) {
+    const inner = part.replace(/[OΩΘ]\(/, '').replace(/\)$/, '');
+    const symbols = inner.split(/[\s,]+/).filter((s) => s.length > 0 && !/^\d+$/.test(s));
+    for (const sym of symbols) {
+      if (!variables.find((v) => v.symbol === sym)) {
+        variables.push({
+          symbol: sym,
+          definition: `${sym}: size of the relevant input or collection`,
+        });
+      }
+    }
+  }
+  return variables;
+}
+
+// ============================================================
+// Verdict Normalization
+// ============================================================
+
+function normalizeVerdict(source: unknown): { status: VerdictStatus; explanation: string } {
+  const input = getSafeObject(source);
+
+  // If already in canonical shape
+  if (isObject(input) && 'status' in input && 'explanation' in input) {
+    try {
+      return VerdictSchema.parse(input);
+    } catch {
+      // Fall through to legacy handling
+    }
+  }
+
+  const status = sanitizeEnum(
+    input.status,
+    VerdictStatusSchema.options,
+    'requires-changes'
+  );
+
+  const explanation = getSafeString(
+    input.explanation ?? input.summary,
+    'Verdict based on code analysis.'
+  );
+
+  return { status, explanation };
 }
 
 // ============================================================
@@ -111,51 +362,266 @@ function normalizeScorecard(source: unknown): AuditScorecard {
 function normalizeImprovedCode(source: unknown): ImprovedCode {
   const input = getSafeObject(source);
 
-  const available = typeof input.available === 'boolean' ? input.available : false;
-  const code = typeof input.code === 'string' && input.code.trim().length > 0
-    ? input.code
-    : null;
-  const notes = typeof input.notes === 'string' ? input.notes.trim() : '';
-
-  if (available && !code) {
-    return {
-      available: false,
-      code: null,
-      notes: notes || 'Code was expected but not provided.',
-    };
+  // If already in canonical shape (discriminated union)
+  if (isObject(input) && 'available' in input) {
+    try {
+      return ImprovedCodeSchema.parse(input);
+    } catch {
+      // Fall through to legacy handling
+    }
   }
 
-  if (!available && code) {
+  const code = getSafeString(input.code ?? input.improved_code);
+  const notes = getSafeString(input.notes);
+
+  if (code.length > 0) {
     return {
-      available: false,
-      code: null,
-      notes: notes || 'Code was provided but marked as unavailable.',
+      available: true,
+      code,
+      notes: notes || 'Improved code provided.',
     };
   }
 
   return {
-    available,
-    code,
-    notes: notes || (available ? 'Code patch provided.' : 'No safe patch available from context.'),
+    available: false,
+    code: null,
+    notes: notes || 'No improved code available from context.',
   };
 }
 
 // ============================================================
-// Verdict Normalization (✅ با تایپ صحیح)
+// Finding Normalization (with new taxonomy)
 // ============================================================
 
-function normalizeVerdict(source: unknown): { status: VerdictStatus; explanation: string } {
+function normalizeFinding(finding: unknown, index: number, usedIds: Set<string>): AuditFinding {
+  const f = getSafeObject(finding);
+
+  const evidenceList = getSafeArray<unknown>(f.evidence, []);
+  const normalizedEvidence = evidenceList.map((e: unknown) => {
+    const ev = getSafeObject(e);
+    let startLine = typeof ev.startLine === 'number' ? ev.startLine : (typeof ev.line === 'number' ? ev.line : 1);
+    let endLine = typeof ev.endLine === 'number' ? ev.endLine : startLine;
+    if (endLine < startLine) {
+      endLine = startLine;
+    }
+    return {
+      startLine: Math.max(1, startLine),
+      endLine: Math.max(1, endLine),
+      code: getSafeString(ev.code, getSafeString(ev.snippet, '')),
+      explanation: getSafeString(ev.explanation, getSafeString(ev.details, '')),
+    };
+  });
+
+  let testToReproduce = null;
+  const testRaw = f.testToReproduce ?? f.test;
+  if (isObject(testRaw)) {
+    const setup = getStringArray(testRaw.setup);
+    const steps = getStringArray(testRaw.steps);
+    if (steps.length > 0) {
+      testToReproduce = {
+        title: getSafeString(testRaw.title, 'Reproduction Test'),
+        setup,
+        steps,
+        expectedResult: getSafeString(testRaw.expectedResult, ''),
+      };
+    }
+  }
+
+  // Generate unique ID
+  let id = getSafeString(f.id, `F-${String(index + 1).padStart(3, '0')}`);
+  if (!/^F-\d{3,}$/.test(id)) {
+    id = `F-${String(index + 1).padStart(3, '0')}`;
+  }
+  let counter = 1;
+  let finalId = id;
+  while (usedIds.has(finalId)) {
+    const numericPart = id.replace('F-', '');
+    const baseNum = parseInt(numericPart, 10) || 0;
+    finalId = `F-${String(baseNum + counter).padStart(3, '0')}`;
+    counter++;
+  }
+  usedIds.add(finalId);
+
+  // Map legacy category to new broad category
+  const legacyCategory = getSafeString(f.category ?? f.type, 'other');
+  const broadCategory = mapToBroadCategory(legacyCategory);
+
+  // Extract mechanisms
+  const mechanisms = extractMechanisms(f);
+
+  return {
+    id: finalId,
+    title: getSafeString(f.title, getSafeString(f.name, 'Untitled Finding')),
+    category: broadCategory,
+    mechanisms,
+    severity: sanitizeEnum(
+      f.severity ?? f.priority,
+      SeveritySchema.options,
+      'medium'
+    ),
+    confidence: sanitizeEnum(
+      f.confidence,
+      ConfidenceSchema.options,
+      'conditional'
+    ),
+    evidence: normalizedEvidence,
+    executionPath: getStringArray(f.executionPath) || getStringArray(f.path) || [],
+    triggerConditions: getStringArray(f.triggerConditions) || getStringArray(f.conditions) || [],
+    consequence: getSafeString(f.consequence, getSafeString(f.impact, getSafeString(f.effect, ''))),
+    technicalExplanation: getSafeString(f.technicalExplanation, getSafeString(f.details, '')),
+    remediation: getSafeString(f.remediation, getSafeString(f.fix, getSafeString(f.solution, ''))),
+    relatedSymbols: getStringArray(f.relatedSymbols) || getStringArray(f.symbols) || [],
+    testToReproduce,
+  };
+}
+
+function mapToBroadCategory(legacy: string): 'correctness' | 'concurrency' | 'security' | 'reliability' | 'error-handling' | 'resource-management' | 'performance' | 'data-integrity' | 'input-validation' | 'api-design' | 'configuration' | 'architecture' | 'maintainability' | 'testability' | 'observability' | 'compatibility' | 'other' {
+  const mapping: Record<string, any> = {
+    'liveness': 'concurrency',
+    'thread-starvation': 'concurrency',
+    'deadlock': 'concurrency',
+    'race-condition': 'concurrency',
+    'duplicate-submission': 'concurrency',
+    'queue-misuse': 'concurrency',
+    'race condition': 'concurrency',
+    'shared-state': 'concurrency',
+    'shared state': 'concurrency',
+    'configuration': 'configuration',
+    'resource-lifecycle': 'resource-management',
+    'resource lifecycle': 'resource-management',
+    'resource leak': 'resource-management',
+    'timeout': 'error-handling',
+    'interruption': 'error-handling',
+    'cancellation': 'error-handling',
+    'retry': 'error-handling',
+    'error-handling': 'error-handling',
+    'api-semantics': 'api-design',
+    'api-design': 'api-design',
+    'performance': 'performance',
+    'security': 'security',
+    'maintainability': 'maintainability',
+    'architectural-duplication': 'architecture',
+  };
+  return mapping[legacy] || 'other';
+}
+
+function extractMechanisms(finding: Record<string, unknown>): string[] {
+  const mechanisms: string[] = [];
+  const legacyCategory = getSafeString(finding.category ?? finding.type);
+
+  const mechanismMapping: Record<string, string[]> = {
+    'deadlock': ['deadlock'],
+    'thread-starvation': ['thread-starvation'],
+    'race-condition': ['race-condition'],
+    'race condition': ['race-condition'],
+    'duplicate-submission': ['duplicate-submission'],
+    'queue-misuse': ['queue-misuse'],
+    'blocking-wait': ['blocking-wait'],
+    'shared-state': ['shared-state'],
+    'shared state': ['shared-state'],
+    'configuration': ['configuration-collision'],
+    'resource-lifecycle': ['resource-leak'],
+    'resource lifecycle': ['resource-leak'],
+    'timeout': ['timeout-misuse'],
+    'interruption': ['interruption-loss'],
+    'cancellation': ['cancellation-failure'],
+    'retry': ['retry-amplification'],
+  };
+
+  const fromCategory = mechanismMapping[legacyCategory] || [];
+  mechanisms.push(...fromCategory);
+
+  // Also check if finding has explicit mechanisms field
+  const explicit = getSafeArray(finding.mechanisms, []);
+  for (const m of explicit) {
+    if (typeof m === 'string' && !mechanisms.includes(m)) {
+      mechanisms.push(m);
+    }
+  }
+
+  return mechanisms;
+}
+
+// ============================================================
+// Execution Overview Normalization
+// ============================================================
+
+function normalizeExecutionOverview(source: unknown): ExecutionOverview {
   const input = getSafeObject(source);
+  return {
+    entryPoints: getStringArray(input.entryPoints),
+    taskSubmissionPoints: getStringArray(input.taskSubmissionPoints),
+    blockingWaitPoints: getStringArray(input.blockingWaitPoints),
+    sharedResources: getStringArray(input.sharedResources),
+    resourceLifecycle: getStringArray(input.resourceLifecycle),
+  };
+}
 
-  const status = sanitizeEnum(
-    input.status,
-    VerdictStatusSchema.options,
-    'requires-changes'
-  );
+// ============================================================
+// Architectural Observations Normalization
+// ============================================================
 
-  const explanation = getSafeString(input.explanation, 'Verdict explanation not provided.');
+function normalizeArchitecturalObservations(
+  source: unknown,
+  findingIds: Set<string>
+): ArchitecturalObservation[] {
+  const arr = getSafeArray<unknown>(source, []);
+  return arr
+    .map((obs: unknown) => {
+      const o = getSafeObject(obs);
+      const title = getSafeString(o.title, '');
+      const explanation = getSafeString(o.explanation, '');
+      const relatedFindingIds = getStringArray(o.relatedFindingIds).filter((id) => findingIds.has(id));
+      return { title, explanation, relatedFindingIds };
+    })
+    .filter((obs) => obs.title.length > 0 || obs.explanation.length > 0);
+}
 
-  return { status, explanation };
+// ============================================================
+// Recommended Actions Normalization
+// ============================================================
+
+function normalizeRecommendedActions(
+  source: unknown,
+  findingIds: Set<string>
+): Array<{ priority: number; severity: any; title: string; action: string; relatedFindingIds: string[] }> {
+  const arr = getSafeArray<unknown>(source, []);
+  return arr
+    .map((act: unknown) => {
+      const a = getSafeObject(act);
+      let priority = typeof a.priority === 'number' && a.priority > 0 ? Math.round(a.priority) : 1;
+      const severity = sanitizeEnum(a.severity, SeveritySchema.options, 'medium');
+      const title = getSafeString(a.title, '');
+      const action = getSafeString(a.action, '');
+      const relatedFindingIds = getStringArray(a.relatedFindingIds).filter((id) => findingIds.has(id));
+      return { priority, severity, title, action, relatedFindingIds };
+    })
+    .filter((act) => act.title.length > 0 || act.action.length > 0)
+    .sort((a, b) => a.priority - b.priority)
+    .map((act, index) => ({ ...act, priority: index + 1 }));
+}
+
+// ============================================================
+// Suggested Tests Normalization
+// ============================================================
+
+function normalizeSuggestedTests(
+  source: unknown,
+  findingIds: Set<string>
+): SuggestedTest[] {
+  const arr = getSafeArray<unknown>(source, []);
+  return arr
+    .map((test: unknown) => {
+      const t = getSafeObject(test);
+      const title = getSafeString(t.title, getSafeString(t.name, ''));
+      const purpose = getSafeString(t.purpose, '');
+      const setup = getStringArray(t.setup) || [];
+      const steps = getStringArray(t.steps) || [];
+      const expectedResult = getSafeString(t.expectedResult, getSafeString(t.expectedOutput, ''));
+      const relatedFindingIds = getStringArray(t.relatedFindingIds).filter((id) => findingIds.has(id));
+      return { title, purpose, setup, steps, expectedResult, relatedFindingIds };
+    })
+    .filter((test) => test.title.length > 0 || test.purpose.length > 0);
 }
 
 // ============================================================
@@ -166,25 +632,43 @@ function normalizeLanguage(source: unknown): string {
   return getSafeString(source, 'unknown');
 }
 
-function normalizeResponseLanguage(source: unknown): 'English' | 'Persian' | undefined {
+function normalizeResponseLanguage(source: unknown): 'English' | 'Persian' | null {
   const value = getSafeString(source);
   if (value === 'English' || value === 'Persian') {
     return value;
   }
-  return undefined;
+  return null;
 }
 
 // ============================================================
 // Main Normalizer
 // ============================================================
 
+/**
+ * Normalizes any incoming analysis result (Legacy or Partial) into a
+ * strict Canonical AdvancedAuditResult.
+ * This acts as an Anti-Corruption Layer for the application.
+ */
 export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
   const startTime = Date.now();
   logger.debug('[Normalizer] Starting normalization');
 
   const input = getSafeObject(raw);
 
-  // ===== 1. Findings =====
+  // ===== 1. Core Identification & Metadata =====
+  const summary = getSafeString(input.summary, getSafeString(input.highLevelSummary, 'No summary provided.'));
+  const title = normalizeTitle(input.title, summary);
+  const completionStatus = normalizeCompletionStatus(input.status ?? input.completionStatus);
+  const repairApplied = normalizeRepairApplied(input.repairApplied ?? false);
+  const appliedSpecializations = normalizeAppliedSpecializations(
+    input.appliedSpecializations ?? input.specializations ?? []
+  );
+
+  // ===== 2. Language =====
+  const language = normalizeLanguage(input.language);
+  const responseLanguage = normalizeResponseLanguage(input.responseLanguage);
+
+  // ===== 3. Findings =====
   const findingsSource =
     input.findings ??
     input.issues ??
@@ -196,117 +680,29 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
   const usedIds = new Set<string>();
 
   const normalizedFindings: AuditFinding[] = findingsArray
-    .map((f: unknown, index: number) => {
-      const finding = getSafeObject(f);
-
-      const evidenceList = getSafeArray<unknown>(finding.evidence, []);
-      const normalizedEvidence = evidenceList.map((e: unknown) => {
-        const ev = getSafeObject(e);
-        let startLine = typeof ev.startLine === 'number' ? ev.startLine : (typeof ev.line === 'number' ? ev.line : 1);
-        let endLine = typeof ev.endLine === 'number' ? ev.endLine : startLine;
-        if (endLine < startLine) {
-          endLine = startLine;
-        }
-        return {
-          startLine: Math.max(1, startLine),
-          endLine: Math.max(1, endLine),
-          code: getSafeString(ev.code, getSafeString(ev.snippet, '')),
-          explanation: getSafeString(ev.explanation, getSafeString(ev.details, '')),
-        };
-      });
-
-      let testToReproduce = null;
-      const testRaw = finding.testToReproduce ?? finding.test;
-      if (isObject(testRaw)) {
-        const setup = getStringArray(testRaw.setup);
-        const steps = getStringArray(testRaw.steps);
-        if (steps.length > 0) {
-          testToReproduce = {
-            title: getSafeString(testRaw.title, 'Reproduction Test'),
-            setup,
-            steps,
-            expectedResult: getSafeString(testRaw.expectedResult, ''),
-          };
-        }
-      }
-
-      let id = getSafeString(finding.id, `F-${String(index + 1).padStart(3, '0')}`);
-      if (!/^F-\d{3,}$/.test(id)) {
-        id = `F-${String(index + 1).padStart(3, '0')}`;
-      }
-      let counter = 1;
-      let finalId = id;
-      while (usedIds.has(finalId)) {
-        const numericPart = id.replace('F-', '');
-        const baseNum = parseInt(numericPart, 10) || 0;
-        finalId = `F-${String(baseNum + counter).padStart(3, '0')}`;
-        counter++;
-      }
-      usedIds.add(finalId);
-
-      return {
-        id: finalId,
-        title: getSafeString(finding.title, getSafeString(finding.name, 'Untitled Finding')),
-        category: sanitizeEnum(
-          finding.category ?? finding.type,
-          FindingCategorySchema.options,
-          'other'
-        ),
-        severity: sanitizeEnum(
-          finding.severity ?? finding.priority,
-          SeveritySchema.options,
-          'medium'
-        ),
-        confidence: sanitizeEnum(
-          finding.confidence,
-          ConfidenceSchema.options,
-          'conditional'
-        ),
-        evidence: normalizedEvidence,
-        executionPath: getStringArray(finding.executionPath) || getStringArray(finding.path) || [],
-        triggerConditions: getStringArray(finding.triggerConditions) || getStringArray(finding.conditions) || [],
-        consequence: getSafeString(finding.consequence, getSafeString(finding.impact, getSafeString(finding.effect, ''))),
-        technicalExplanation: getSafeString(finding.technicalExplanation, getSafeString(finding.details, '')),
-        remediation: getSafeString(finding.remediation, getSafeString(finding.fix, getSafeString(finding.solution, ''))),
-        relatedSymbols: getStringArray(finding.relatedSymbols) || getStringArray(finding.symbols) || [],
-        testToReproduce,
-      };
-    })
+    .map((f: unknown, index: number) => normalizeFinding(f, index, usedIds))
     .filter((finding) => finding.title.trim().length > 0 || finding.evidence.length > 0);
 
-  // ===== 2. Execution Overview =====
-  const overviewSource = getSafeObject(input.executionOverview, getSafeObject(input.overview, {}));
-  const executionOverview = {
-    entryPoints: getStringArray(overviewSource.entryPoints) || [],
-    taskSubmissionPoints: getStringArray(overviewSource.taskSubmissionPoints) || [],
-    blockingWaitPoints: getStringArray(overviewSource.blockingWaitPoints) || [],
-    sharedResources: getStringArray(overviewSource.sharedResources) || [],
-    resourceLifecycle: getStringArray(overviewSource.resourceLifecycle) || [],
-  };
+  const findingIds = new Set(normalizedFindings.map((f) => f.id));
 
-  // ===== 3. Scorecard =====
+  // ===== 4. Scorecard =====
   const scorecardSource = getSafeObject(
-    input.scorecard_new ??
     input.scorecard ??
+    input.scorecard_new ??
     input.scorecardLegacy ??
     {}
   );
   const scorecard = normalizeScorecard(scorecardSource);
 
-  // ===== 4. Verdict =====
-  const verdictSource = getSafeObject(input.verdict, getSafeObject(input.finalVerdict, {}));
+  // ===== 5. Verdict =====
+  const verdictSource = getSafeObject(input.verdict ?? input.finalVerdict ?? {});
   const verdict = normalizeVerdict(verdictSource);
 
-  // ===== 5. Complexity =====
-  const complexitySource = getSafeObject(input.complexity, {});
-  const complexity = {
-    time: getSafeString(complexitySource.time, 'unknown'),
-    space: getSafeString(complexitySource.space, 'unknown'),
-    resourceGrowth: getSafeString(complexitySource.resourceGrowth, 'unknown'),
-    assumptions: getStringArray(complexitySource.assumptions) || [],
-  };
+  // ===== 6. Complexity =====
+  const complexitySource = getSafeObject(input.complexity ?? {});
+  const complexity = normalizeComplexity(complexitySource);
 
-  // ===== 6. ImprovedCode =====
+  // ===== 7. ImprovedCode =====
   const improvedCodeSource = getSafeObject(
     input.improvedCode ??
     input.improved_code ??
@@ -314,7 +710,40 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
   );
   const improvedCode = normalizeImprovedCode(improvedCodeSource);
 
-  // ===== 7. linkedin_post =====
+  // ===== 8. Execution Overview =====
+  const executionOverviewSource = getSafeObject(
+    input.executionOverview ??
+    input.execution_overview ??
+    input.overview ??
+    {}
+  );
+  const executionOverview = normalizeExecutionOverview(executionOverviewSource);
+
+  // ===== 9. Architectural Observations =====
+  const architecturalObservations = normalizeArchitecturalObservations(
+    input.architecturalObservations ?? input.architectural_observations,
+    findingIds
+  );
+
+  // ===== 10. Recommended Actions =====
+  const recommendedActions = normalizeRecommendedActions(
+    input.recommendedActions ?? input.recommended_actions,
+    findingIds
+  );
+
+  // ===== 11. Suggested Tests =====
+  const suggestedTests = normalizeSuggestedTests(
+    input.suggestedTests ??
+    input.suggested_tests ??
+    input.suggestedTestsNew ??
+    input.suggested_tests_new,
+    findingIds
+  );
+
+  // ===== 12. Limitations =====
+  const limitations = getStringArray(input.limitations);
+
+  // ===== 13. linkedin_post =====
   let linkedinPost =
     typeof input.linkedin_post === 'string'
       ? input.linkedin_post.trim()
@@ -323,73 +752,26 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
         : '';
 
   if (!linkedinPost) {
-    linkedinPost = 'Check out this code analysis! #Zbloue';
+    linkedinPost = DEFAULT_LINKEDIN_POST;
   }
 
-  // ===== 8. Language =====
-  const language = normalizeLanguage(input.language);
-  const responseLanguage = normalizeResponseLanguage(input.responseLanguage);
+  // ===== 14. Analysis Coverage =====
+  const analysisCoverage = normalizeAnalysisCoverage(
+    input.analysisCoverage ?? input.coverage ?? {}
+  );
 
-  // ===== 9. Other arrays =====
-  const architecturalObservations = getSafeArray<unknown>(input.architecturalObservations, [])
-    .map((obs: unknown) => {
-      const o = getSafeObject(obs);
-      const title = getSafeString(o.title, '');
-      const explanation = getSafeString(o.explanation, '');
-      const allFindingIds = new Set(normalizedFindings.map((f) => f.id));
-      const relatedFindingIds = getStringArray(o.relatedFindingIds).filter((id) => allFindingIds.has(id));
-      return { title, explanation, relatedFindingIds };
-    })
-    .filter((obs) => obs.title.length > 0 || obs.explanation.length > 0);
-
-  const recommendedActions = getSafeArray<unknown>(input.recommendedActions, [])
-    .map((act: unknown) => {
-      const a = getSafeObject(act);
-      let priority = typeof a.priority === 'number' && a.priority > 0 ? Math.round(a.priority) : 1;
-      const severity = sanitizeEnum(a.severity, SeveritySchema.options, 'medium');
-      const title = getSafeString(a.title, '');
-      const action = getSafeString(a.action, '');
-      const allFindingIds = new Set(normalizedFindings.map((f) => f.id));
-      const relatedFindingIds = getStringArray(a.relatedFindingIds).filter((id) => allFindingIds.has(id));
-      return { priority, severity, title, action, relatedFindingIds };
-    })
-    .filter((act) => act.title.length > 0 || act.action.length > 0)
-    .sort((a, b) => a.priority - b.priority)
-    .map((act, index) => ({ ...act, priority: index + 1 }));
-
-  const suggestedTests = getSafeArray<unknown>(
-    input.suggestedTests ??
-    input.suggested_tests ??
-    input.suggestedTestsNew ??
-    input.suggested_tests_new ??
-    []
-  )
-    .map((test: unknown) => {
-      const t = getSafeObject(test);
-      const title = getSafeString(t.title, getSafeString(t.name, ''));
-      const purpose = getSafeString(t.purpose, '');
-      const setup = getStringArray(t.setup) || [];
-      const steps = getStringArray(t.steps) || [];
-      const expectedResult = getSafeString(t.expectedResult, getSafeString(t.expectedOutput, ''));
-      const allFindingIds = new Set(normalizedFindings.map((f) => f.id));
-      const relatedFindingIds = getStringArray(t.relatedFindingIds).filter((id) => allFindingIds.has(id));
-      return { title, purpose, setup, steps, expectedResult, relatedFindingIds };
-    })
-    .filter((test) => test.title.length > 0 || test.purpose.length > 0);
-
-  const limitations = getStringArray(input.limitations) || [];
-
-  // ===== 10. Build final result =====
-  const status = sanitizeEnum(input.status, AuditStatusSchema.options, 'complete');
-  const auditType = sanitizeEnum(input.auditType, AuditTypeSchema.options, 'generic');
-  const summary = getSafeString(input.summary, getSafeString(input.highLevelSummary, 'No summary provided.'));
-  const schemaVersion: '1.0' = '1.0';
-
+  // ===== 15. Build Final Result =====
   const result: AdvancedAuditResult = {
-    schemaVersion,
-    auditType,
-    status,
+    // Metadata
+    schemaVersion: '1.0',
+    auditType: 'comprehensive',
+    appliedSpecializations,
+    completionStatus,
+    repairApplied,
+    title,
     language,
+    responseLanguage,
+    analysisCoverage,
     summary,
     executionOverview,
     findings: normalizedFindings,
@@ -404,12 +786,15 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
     linkedin_post: linkedinPost,
   };
 
-  if (responseLanguage) {
-    (result as any).responseLanguage = responseLanguage;
+  // ===== 16. Validate with Canonical Schema =====
+  try {
+    const validated = AdvancedAuditResultSchema.parse(result);
+    const duration = Date.now() - startTime;
+    logger.debug('[Normalizer] Completed in', duration, 'ms, findings:', normalizedFindings.length);
+    return validated;
+  } catch (error) {
+    logger.error('[Normalizer] Schema validation failed:', error);
+    // Return the best-effort result anyway; upstream should handle validation errors
+    return result;
   }
-
-  const duration = Date.now() - startTime;
-  logger.debug('[Normalizer] Completed in', duration, 'ms, findings:', normalizedFindings.length);
-
-  return result;
 }

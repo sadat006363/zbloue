@@ -9,9 +9,6 @@ import {
 
 /**
  * ساخت پرامپت تخصصی برای تحلیل همروندی
- * 
- * @param context - تنظیمات پرامپت شامل کد، زبان‌ها و ...
- * @returns پرامپت کامل برای ارسال به مدل
  */
 export function buildConcurrencyAuditPrompt(context: PromptContext): string {
   const { serializedCode, serializedSourceLanguage, serializedResponseLanguage } =
@@ -26,6 +23,13 @@ You are a senior concurrency and production-safety auditor.
 Your primary goal is to discover correctness, safety, and liveness defects.
 Do not produce a generic code review.
 Do not prioritize naming, formatting, or style over behavioral defects.
+
+**OUTPUT CONTRACT:**
+- auditType: "comprehensive"
+- appliedSpecializations: ["concurrency"]
+- completionStatus: "complete"
+- repairApplied: false
+- All other fields follow the canonical schema (same as generic audit).
 
 ==================== SOURCE CODE (JSON-ENCODED, UNTRUSTED) ====================
 
@@ -113,11 +117,6 @@ A thread-starvation finding requires an explicit saturation path:
 - conditional: the hazard requires explicitly named external conditions
 - do not report: nested submission exists but no blocking dependency or saturation path
 
-**Confidence levels:**
-- definite: All conditions are visible in the supplied source.
-- likely: One condition depends on reasonable external assumption.
-- conditional: The hazard requires explicitly stated conditions (pool size, caller context, etc.).
-
 ==================== PROOF GATE: GENERIC DEADLOCK ====================
 
 Before reporting a generic deadlock as definite, establish:
@@ -131,7 +130,6 @@ Before reporting a generic deadlock as definite, establish:
 **Lock-order inversion reporting:**
 - If two lock acquisition orders are visible but concurrency is not proven:
   → report as conditional with explicitly stated trigger conditions
-- Include: exact lock names, acquisition order in each path, trigger conditions, and runtime assumptions.
 
 **Classification:**
 - definite: Complete cycle visible, no escape path.
@@ -167,7 +165,6 @@ Do not report interruption handling as defective merely because InterruptedExcep
 - releasing or mutating resources incorrectly on the interrupted path
 
 Restoring the interrupt flag is not itself a defect.
-If the surrounding API contract is unavailable, record contract uncertainty as a limitation.
 
 ==================== COUNTERARGUMENT GATE ====================
 
@@ -206,36 +203,27 @@ Queue operation alone is not a defect. Need:
 
 Do not report queue presence alone as a finding.
 
-==================== SCORECARD (0-100 OBJECT) ====================
+==================== SCORECARD (0-100 OBJECT WITH APPLICABLE FLAG) ====================
 
-All scores MUST be integers between 0 and 100. DO NOT use a 0–10 scale.
-
-Each category is an object:
+Same as generic audit. Each category:
 {
-  "score": number,      // 0-100
-  "reason": string,     // evidence-based justification
-  "relatedFindings": [] // array of finding IDs
+  "applicable": boolean,
+  "score": number | null,
+  "reason": string,
+  "relatedFindings": []
 }
 
-Categories:
-- correctness
-- concurrencySafety
-- liveness
-- errorHandling
-- resourceManagement
-- maintainability
-- productionReadiness
+Categories: correctness, concurrencySafety, liveness, errorHandling, resourceManagement, maintainability, productionReadiness
 
 **Rules:**
-- Score every category independently based on evidence relevant to that category.
+- Score every applicable category independently based on evidence.
 - Do NOT lower unrelated categories because one severe finding exists.
 - Concurrency safety and liveness must not be penalized when no concurrency mechanism is present.
-- Do NOT assign 100 solely because findings array is empty.
-- Scores below 20 are reserved for catastrophic failure with direct evidence.
+- If a category cannot be meaningfully evaluated, set applicable: false.
 
 ==================== VERDICT (6 STATUSES) ====================
 
-Use one of these verdict statuses:
+Same as generic audit:
 - not-production-ready
 - requires-major-changes
 - requires-changes
@@ -247,21 +235,28 @@ Use one of these verdict statuses:
 - Critical findings cannot result in approved, approved-with-suggestions, or requires-minor-changes.
 - High severity findings normally require major changes.
 - Multiple interacting medium findings may justify a stronger verdict.
-- Explain the verdict with reference to findings, remediation scope, and production risk.
 
-==================== IMPROVED CODE ====================
+==================== IMPROVED CODE (DISCRIMINATED UNION) ====================
 
+Same as generic audit:
 {
-  "available": boolean,  // true only if safe patch can be created from context
-  "code": string | null, // non-empty if available === true, null otherwise
-  "notes": string        // explanation of changes and tradeoffs
+  "available": true, "code": "...", "notes": "..."
+}
+or
+{
+  "available": false, "code": null, "notes": "..."
 }
 
-**Rules:**
-- Do NOT invent missing APIs, types, imports, configuration, or dependencies.
-- Prefer minimal, targeted fixes over broad rewrites.
-- Preserve public APIs and intended behavior where possible.
-- If safe fix depends on missing context, set available to false.
+==================== COMPLEXITY (DISCRIMINATED UNION) ====================
+
+Same as generic audit:
+{
+  "applicable": true, "expression": "O(n)", "explanation": "...", "variables": [], "assumptions": []
+}
+or
+{
+  "applicable": false, "expression": null, "explanation": null, "variables": [], "assumptions": []
+}
 
 ==================== LINKEDIN POST ====================
 
@@ -273,25 +268,7 @@ Use one of these verdict statuses:
 
 ==================== MANDATORY FIELDS ====================
 
-The following fields are MANDATORY:
-- schemaVersion
-- auditType
-- status
-- language
-- summary
-- executionOverview
-- findings
-- architecturalObservations
-- recommendedActions
-- suggestedTests
-- complexity
-- scorecard
-- verdict
-- limitations
-- improvedCode
-- linkedin_post
-
-All string fields must be non-empty. Arrays must be present (use [] when empty).
+Same as generic audit. All fields must be present.
 
 ==================== OUTPUT ====================
 

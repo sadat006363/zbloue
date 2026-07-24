@@ -1,11 +1,22 @@
 // components/OutputPanel/tabs/AnalysisTab.tsx
 'use client';
-import { GenerateResponse, AuditFinding, EvidenceItem } from '@/types';
+import {
+  LegacyGenerateResponse,
+  LegacyCodeWalkthroughItem,
+  LegacyBugAndRiskyCase,
+  LegacyEdgeCase,
+  LegacyPerformanceAnalysis,
+  LegacySecurityAnalysis,
+  LegacyProductionReadiness,
+  LegacyRecommendedImprovement,
+  LegacySuggestedTest,
+  LegacyScorecard,
+} from '@/types';
 import { safeString } from '@/lib/utils';
 import { useState } from 'react';
 
 interface AnalysisTabProps {
-  fullAnalysis: GenerateResponse | null | undefined;
+  fullAnalysis: LegacyGenerateResponse | null | undefined;
   isAdvanced: boolean;
   quickAnalysisText: string | null;
   snippet: any;
@@ -38,119 +49,6 @@ const safeArray = <T,>(arr: T[] | undefined | null): T[] => {
   return Array.isArray(arr) ? arr : [];
 };
 
-// ===== Render single finding =====
-const FindingCard = ({ finding }: { finding: AuditFinding }) => {
-  const severityColors: Record<string, string> = {
-    critical: 'bg-red-100 text-red-700 border-red-200',
-    high: 'bg-orange-100 text-orange-700 border-orange-200',
-    medium: 'bg-yellow-100 text-yellow-700 border-yellow-200',
-    low: 'bg-blue-100 text-blue-700 border-blue-200',
-    info: 'bg-gray-100 text-gray-700 border-gray-200',
-  };
-
-  const confidenceLabels: Record<string, string> = {
-    definite: '✅ Definite',
-    likely: '🔶 Likely',
-    conditional: '⚠️ Conditional',
-  };
-
-  return (
-    <div className={`p-4 rounded-lg border ${severityColors[finding.severity] || 'bg-gray-50 border-gray-200'}`}>
-      {/* ===== Title & badges ===== */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="font-semibold text-[#1a1a2e]">{safeString(finding.title)}</span>
-        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-          finding.severity === 'critical' ? 'bg-red-500 text-white' :
-          finding.severity === 'high' ? 'bg-orange-500 text-white' :
-          finding.severity === 'medium' ? 'bg-yellow-500 text-white' :
-          'bg-blue-500 text-white'
-        }`}>
-          {safeString(finding.severity)}
-        </span>
-        <span className="text-xs text-[#6c7086]">{confidenceLabels[finding.confidence] || safeString(finding.confidence)}</span>
-      </div>
-
-      {/* ===== Evidence ===== */}
-      {safeArray(finding.evidence).length > 0 && (
-        <div className="mt-2 text-xs text-[#6c7086] space-y-1">
-          <span className="font-medium text-[#4a86f7]">Evidence:</span>
-          {safeArray(finding.evidence).map((ev: EvidenceItem, idx: number) => (
-            <div key={idx} className="bg-white/50 p-2 rounded border border-[#e8e8f0] font-mono text-[#1a1a2e]">
-              <span className="text-[#6c7086]">Lines {ev.startLine}-{ev.endLine}:</span> {safeString(ev.code)}
-              <p className="text-[#4a4a6a] text-xs mt-1">{safeString(ev.explanation)}</p>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* ===== Execution Path ===== */}
-      {safeArray(finding.executionPath).length > 0 && (
-        <div className="mt-2">
-          <span className="text-xs font-medium text-[#4a86f7]">Execution Path:</span>
-          <div className="text-xs text-[#4a4a6a] bg-white/50 p-2 rounded border border-[#e8e8f0] mt-1">
-            {safeArray(finding.executionPath).map((step: string, idx: number) => (
-              <div key={idx}>→ {safeString(step)}</div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ===== Trigger Conditions ===== */}
-      {safeArray(finding.triggerConditions).length > 0 && (
-        <div className="mt-2">
-          <span className="text-xs font-medium text-[#4a86f7]">Trigger Conditions:</span>
-          <ul className="list-disc list-inside text-xs text-[#4a4a6a] mt-1">
-            {safeArray(finding.triggerConditions).map((cond: string, idx: number) => (
-              <li key={idx}>{safeString(cond)}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* ===== Consequence ===== */}
-      {finding.consequence && (
-        <div className="mt-2">
-          <span className="text-xs font-medium text-[#e53935]">Consequence:</span>
-          <p className="text-sm text-[#4a4a6a]">{safeString(finding.consequence)}</p>
-        </div>
-      )}
-
-      {/* ===== Remediation ===== */}
-      {finding.remediation && (
-        <div className="mt-2">
-          <span className="text-xs font-medium text-[#43a047]">💡 Remediation:</span>
-          <p className="text-sm text-[#4a4a6a]">{safeString(finding.remediation)}</p>
-        </div>
-      )}
-
-      {/* ===== Technical Explanation ===== */}
-      {finding.technicalExplanation && (
-        <div className="mt-2">
-          <span className="text-xs font-medium text-[#6c7086]">Technical Details:</span>
-          <p className="text-xs text-[#4a4a6a]">{safeString(finding.technicalExplanation)}</p>
-        </div>
-      )}
-
-      {/* ===== Test to Reproduce ===== */}
-      {finding.testToReproduce && (
-        <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-200">
-          <span className="text-xs font-medium text-[#4a86f7]">🧪 Test to Reproduce:</span>
-          <div className="text-xs text-[#4a4a6a] mt-1 space-y-1">
-            <p><span className="font-medium">Title:</span> {safeString(finding.testToReproduce.title)}</p>
-            {safeArray(finding.testToReproduce.setup).length > 0 && (
-              <p><span className="font-medium">Setup:</span> {safeArray(finding.testToReproduce.setup).join(', ')}</p>
-            )}
-            {safeArray(finding.testToReproduce.steps).length > 0 && (
-              <p><span className="font-medium">Steps:</span> {safeArray(finding.testToReproduce.steps).join(' → ')}</p>
-            )}
-            <p><span className="font-medium">Expected:</span> {safeString(finding.testToReproduce.expectedResult)}</p>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
 export default function AnalysisTab({
   fullAnalysis,
   isAdvanced,
@@ -167,57 +65,179 @@ export default function AnalysisTab({
 
     let text = '';
 
-    if (isAdvanced && fullAnalysis.findings) {
+    if (isAdvanced && fullAnalysis) {
       text += `📊 Zbloue Advanced Analysis Report\n`;
       text += `═══════════════════════════════════════\n\n`;
-      text += `📌 Title: ${safeString(fullAnalysis.title)}\n\n`;
-      if (fullAnalysis.summary || fullAnalysis.highLevelSummary) {
-        text += `💡 Summary:\n${safeString(fullAnalysis.summary || fullAnalysis.highLevelSummary)}\n\n`;
+      text += `📌 Title: ${safeString(fullAnalysis.card_title)}\n\n`;
+      if (fullAnalysis.key_concept) {
+        text += `💡 Key Concept:\n${safeString(fullAnalysis.key_concept)}\n\n`;
       }
-      text += `🔍 Findings:\n`;
-      safeArray(fullAnalysis.findings).forEach((f: AuditFinding) => {
-        text += `  • ${safeString(f.title)} [${safeString(f.severity)}] (${safeString(f.confidence)})\n`;
-        if (safeArray(f.evidence).length > 0) {
-          const lines = safeArray(f.evidence).map((e: EvidenceItem) => `${e.startLine}-${e.endLine}`).join(', ');
-          text += `    Lines: ${lines}\n`;
-        }
-        if (safeArray(f.executionPath).length > 0) {
-          text += `    Path: ${safeArray(f.executionPath).join(' → ')}\n`;
-        }
-        if (safeArray(f.triggerConditions).length > 0) {
-          text += `    Triggers: ${safeArray(f.triggerConditions).join('; ')}\n`;
-        }
-        text += `    Consequence: ${safeString(f.consequence)}\n`;
-        if (f.remediation) text += `    Fix: ${safeString(f.remediation)}\n\n`;
-      });
-      if (fullAnalysis.complexity) {
-        text += `⚡ Complexity:\n`;
-        text += `  Time: ${safeString(fullAnalysis.complexity.time)}\n`;
-        text += `  Space: ${safeString(fullAnalysis.complexity.space)}\n`;
-        if (fullAnalysis.complexity.resourceGrowth) {
-          text += `  Resource Growth: ${safeString(fullAnalysis.complexity.resourceGrowth)}\n`;
-        }
-        text += '\n';
+      if (fullAnalysis.analysis) {
+        text += `📝 Analysis:\n${safeString(fullAnalysis.analysis)}\n\n`;
       }
-      if (fullAnalysis.verdict) {
-        text += `🏁 Verdict:\n`;
-        text += `  Status: ${safeString(fullAnalysis.verdict.status)}\n`;
-        text += `  Explanation: ${safeString(fullAnalysis.verdict.explanation)}\n\n`;
+
+      // Code Walkthrough
+      if (fullAnalysis.codeWalkthrough && fullAnalysis.codeWalkthrough.length > 0) {
+        text += `🧩 Code Walkthrough:\n`;
+        fullAnalysis.codeWalkthrough.forEach((item: LegacyCodeWalkthroughItem) => {
+          text += `  • ${safeString(item.section)}: ${safeString(item.explanation)}\n`;
+        });
+        text += `\n`;
       }
+
+      // What Works Well
+      if (fullAnalysis.whatWorksWell && fullAnalysis.whatWorksWell.length > 0) {
+        text += `✅ What Works Well:\n`;
+        fullAnalysis.whatWorksWell.forEach((item: string) => {
+          text += `  • ${safeString(item)}\n`;
+        });
+        text += `\n`;
+      }
+
+      // Bugs and Risky Cases
+      if (fullAnalysis.bugsAndRiskyCases && fullAnalysis.bugsAndRiskyCases.length > 0) {
+        text += `🐛 Bugs and Risky Cases:\n`;
+        fullAnalysis.bugsAndRiskyCases.forEach((item: LegacyBugAndRiskyCase) => {
+          text += `  • ${safeString(item.issue)}\n`;
+          text += `    Impact: ${safeString(item.impact)}\n`;
+          if (item.example) text += `    Example: ${safeString(item.example)}\n`;
+        });
+        text += `\n`;
+      }
+
+      // Edge Cases
+      if (fullAnalysis.edgeCases && fullAnalysis.edgeCases.length > 0) {
+        text += `🧪 Edge Cases:\n`;
+        fullAnalysis.edgeCases.forEach((item: LegacyEdgeCase) => {
+          text += `  • ${safeString(item.case)}\n`;
+          text += `    Current: ${safeString(item.currentBehavior)}\n`;
+          text += `    Expected: ${safeString(item.expectedBehavior)}\n`;
+          text += `    Risk: ${safeString(item.risk)}\n`;
+        });
+        text += `\n`;
+      }
+
+      // Performance Analysis
+      if (fullAnalysis.performanceAnalysis) {
+        text += `⚡ Performance Analysis:\n`;
+        const pa = fullAnalysis.performanceAnalysis;
+        if (pa.timeComplexity && pa.timeComplexity.length > 0) {
+          text += `  Time Complexity:\n`;
+          pa.timeComplexity.forEach((item) => {
+            text += `    • ${safeString(item.target)}: ${safeString(item.complexity)} (${safeString(item.explanation)})\n`;
+          });
+        }
+        if (pa.spaceComplexity && pa.spaceComplexity.length > 0) {
+          text += `  Space Complexity:\n`;
+          pa.spaceComplexity.forEach((item) => {
+            text += `    • ${safeString(item.target)}: ${safeString(item.complexity)} (${safeString(item.explanation)})\n`;
+          });
+        }
+        if (pa.scalabilityNotes && pa.scalabilityNotes.length > 0) {
+          text += `  Scalability Notes:\n`;
+          pa.scalabilityNotes.forEach((item) => {
+            text += `    • ${safeString(item)}\n`;
+          });
+        }
+        text += `\n`;
+      }
+
+      // Security Analysis
+      if (fullAnalysis.securityAnalysis) {
+        text += `🔒 Security Analysis:\n`;
+        text += `  Severity: ${safeString(fullAnalysis.securityAnalysis.severity)}\n`;
+        if (fullAnalysis.securityAnalysis.issues && fullAnalysis.securityAnalysis.issues.length > 0) {
+          text += `  Issues:\n`;
+          fullAnalysis.securityAnalysis.issues.forEach((issue) => {
+            text += `    • ${safeString(issue)}\n`;
+          });
+        }
+        if (fullAnalysis.securityAnalysis.recommendations && fullAnalysis.securityAnalysis.recommendations.length > 0) {
+          text += `  Recommendations:\n`;
+          fullAnalysis.securityAnalysis.recommendations.forEach((rec) => {
+            text += `    • ${safeString(rec)}\n`;
+          });
+        }
+        text += `\n`;
+      }
+
+      // Production Readiness
+      if (fullAnalysis.productionReadiness) {
+        text += `🛡️ Production Readiness:\n`;
+        text += `  Ready: ${fullAnalysis.productionReadiness.isProductionReady ? 'Yes' : 'No'}\n`;
+        if (fullAnalysis.productionReadiness.reasons && fullAnalysis.productionReadiness.reasons.length > 0) {
+          fullAnalysis.productionReadiness.reasons.forEach((reason) => {
+            text += `    • ${safeString(reason)}\n`;
+          });
+        }
+        if (fullAnalysis.productionReadiness.requiredChanges && fullAnalysis.productionReadiness.requiredChanges.length > 0) {
+          text += `  Required Changes:\n`;
+          fullAnalysis.productionReadiness.requiredChanges.forEach((change) => {
+            text += `    • ${safeString(change)}\n`;
+          });
+        }
+        text += `\n`;
+      }
+
+      // Recommended Improvements
+      if (fullAnalysis.recommendedImprovements && fullAnalysis.recommendedImprovements.length > 0) {
+        text += `🔧 Recommended Improvements:\n`;
+        fullAnalysis.recommendedImprovements.forEach((item: LegacyRecommendedImprovement) => {
+          text += `  • [${safeString(item.priority)}] ${safeString(item.improvement)}\n`;
+          text += `    Reason: ${safeString(item.reason)}\n`;
+        });
+        text += `\n`;
+      }
+
+      // Improved Code
+      if (fullAnalysis.improvedCode && fullAnalysis.improvedCode.available) {
+        text += `✨ Improved Code:\n`;
+        text += `Notes: ${safeString(fullAnalysis.improvedCode.notes)}\n`;
+        text += `${safeString(fullAnalysis.improvedCode.code)}\n\n`;
+      }
+
+      // Suggested Tests
+      if (fullAnalysis.suggestedTests && fullAnalysis.suggestedTests.length > 0) {
+        text += `🧪 Suggested Tests:\n`;
+        fullAnalysis.suggestedTests.forEach((test: LegacySuggestedTest) => {
+          text += `  • ${safeString(test.name)}\n`;
+          if (test.input) text += `    Input: ${safeString(test.input)}\n`;
+          if (test.expectedOutput) text += `    Expected: ${safeString(test.expectedOutput)}\n`;
+          if (test.type) text += `    Type: ${safeString(test.type)}\n`;
+        });
+        text += `\n`;
+      }
+
+      // Scorecard
       if (fullAnalysis.scorecard) {
         text += `📊 Scorecard:\n`;
         const sc = fullAnalysis.scorecard;
-        text += `  Correctness: ${sc.correctness}/10\n`;
-        text += `  Concurrency Safety: ${sc.concurrencySafety}/10\n`;
-        text += `  Liveness: ${sc.liveness}/10\n`;
-        text += `  Error Handling: ${sc.errorHandling}/10\n`;
-        text += `  Resource Management: ${sc.resourceManagement}/10\n`;
-        text += `  Maintainability: ${sc.maintainability}/10\n`;
-        text += `  Production Readiness: ${sc.productionReadiness}/10\n\n`;
+        text += `  Correctness: ${safeString(sc.correctness)}/10\n`;
+        text += `  Readability: ${safeString(sc.readability)}/10\n`;
+        text += `  Performance: ${safeString(sc.performance)}/10\n`;
+        text += `  Maintainability: ${safeString(sc.maintainability)}/10\n`;
+        text += `  Production Readiness: ${safeString(sc.productionReadiness)}/10\n`;
+        if (sc.security !== undefined) text += `  Security: ${safeString(sc.security)}/10\n`;
+        if (sc.overall !== undefined) text += `  Overall: ${safeString(sc.overall)}/10\n`;
+        text += `\n`;
       }
-      text += `Audit Type: ${safeString(fullAnalysis.auditType)}\n`;
-      text += `Status: ${safeString(fullAnalysis.status)}\n`;
-    } else if (fullAnalysis.analysis) {
+
+      // Final Verdict
+      if (fullAnalysis.finalVerdict) {
+        text += `🏁 Final Verdict:\n`;
+        text += `  Summary: ${safeString(fullAnalysis.finalVerdict.summary)}\n`;
+        text += `  Approved: ${fullAnalysis.finalVerdict.approved ? '✅ Yes' : '❌ No'}\n`;
+        if (fullAnalysis.finalVerdict.nextSteps) {
+          text += `  Next Steps: ${safeString(fullAnalysis.finalVerdict.nextSteps)}\n`;
+        }
+        text += `\n`;
+      }
+
+      // Debug / metadata if available
+      if ((fullAnalysis as any).debug_trace) {
+        text += `🔍 Debug Trace available (not displayed in text)\n`;
+      }
+    } else if (fullAnalysis?.analysis) {
       text = fullAnalysis.analysis;
     } else {
       text = 'No analysis available.';
@@ -248,7 +268,7 @@ export default function AnalysisTab({
     URL.revokeObjectURL(url);
   };
 
-  // ===== Advanced mode with new structure =====
+  // ===== Advanced mode with full legacy response =====
   if (isAdvanced && fullAnalysis) {
     return (
       <div className="space-y-6">
@@ -276,97 +296,203 @@ export default function AnalysisTab({
           </button>
         </div>
 
-        {/* ===== Title and Summary ===== */}
+        {/* ===== Title and Key Concept ===== */}
         <div>
-          <h2 className="text-2xl font-bold text-[#1a1a2e]">{safeString(fullAnalysis.title || 'Advanced Analysis')}</h2>
-          {fullAnalysis.summary || fullAnalysis.highLevelSummary ? (
+          <h2 className="text-2xl font-bold text-[#1a1a2e]">{safeString(fullAnalysis.card_title || 'Advanced Analysis')}</h2>
+          {fullAnalysis.key_concept && (
             <p className="mt-2 text-[#4a4a6a] bg-blue-50 p-3 rounded-lg border border-blue-200">
-              {safeString(fullAnalysis.summary || fullAnalysis.highLevelSummary)}
+              {safeString(fullAnalysis.key_concept)}
             </p>
-          ) : null}
-          <div className="mt-2 flex flex-wrap gap-2 text-xs">
-            <span className="bg-gray-100 px-2 py-0.5 rounded-full">Audit: {safeString(fullAnalysis.auditType)}</span>
-            <span className="bg-gray-100 px-2 py-0.5 rounded-full">Status: {safeString(fullAnalysis.status)}</span>
-            <span className="bg-gray-100 px-2 py-0.5 rounded-full">Language: {safeString(fullAnalysis.language)}</span>
-            <span className="bg-gray-100 px-2 py-0.5 rounded-full">Schema: {safeString(fullAnalysis.schemaVersion)}</span>
-          </div>
+          )}
+          {fullAnalysis.analysis && (
+            <div className="mt-3 text-[#4a4a6a] whitespace-pre-wrap bg-gray-50 p-3 rounded-lg border border-gray-200">
+              {safeString(fullAnalysis.analysis)}
+            </div>
+          )}
         </div>
 
-        {/* ===== Execution Overview ===== */}
-        {fullAnalysis.executionOverview && (
+        {/* ===== Code Walkthrough ===== */}
+        {safeArray(fullAnalysis.codeWalkthrough).length > 0 && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
-            <h3 className="font-semibold text-[#4a86f7] mb-2">🔄 Execution Overview</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-[#4a4a6a]">
-              <div>
-                <span className="font-medium">Entry Points:</span>
-                <ul className="list-disc list-inside mt-1">
-                  {safeArray(fullAnalysis.executionOverview.entryPoints).map((ep: string, idx: number) => (
-                    <li key={idx}>{safeString(ep)}</li>
-                  ))}
-                </ul>
-              </div>
-              <div>
-                <span className="font-medium">Task Submission Points:</span>
-                <ul className="list-disc list-inside mt-1">
-                  {safeArray(fullAnalysis.executionOverview.taskSubmissionPoints).map((tsp: string, idx: number) => (
-                    <li key={idx}>{safeString(tsp)}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ===== Findings ===== */}
-        {safeArray(fullAnalysis.findings).length > 0 && (
-          <div>
-            <h3 className="text-lg font-semibold text-[#1a1a2e] mb-3">🔍 Findings</h3>
-            <div className="space-y-3">
-              {safeArray(fullAnalysis.findings).map((finding: AuditFinding) => (
-                <FindingCard key={finding.id} finding={finding} />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ===== Architectural Observations ===== */}
-        {safeArray(fullAnalysis.architecturalObservations).length > 0 && (
-          <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
-            <h3 className="font-semibold text-[#4a86f7] mb-2">🏗️ Architectural Observations</h3>
-            {safeArray(fullAnalysis.architecturalObservations).map((obs: any, idx: number) => (
+            <h3 className="font-semibold text-[#4a86f7] mb-2">🧩 Code Walkthrough</h3>
+            {safeArray(fullAnalysis.codeWalkthrough).map((item: LegacyCodeWalkthroughItem, idx: number) => (
               <div key={idx} className="border-b border-[#d0d0d8] pb-2 last:border-0 last:pb-0">
-                <p className="font-medium text-[#1a1a2e]">{safeString(obs.title)}</p>
-                <p className="text-sm text-[#4a4a6a]">{safeString(obs.explanation)}</p>
+                <p className="font-medium text-[#1a1a2e]">{safeString(item.section)}</p>
+                <p className="text-sm text-[#4a4a6a]">{safeString(item.explanation)}</p>
               </div>
             ))}
           </div>
         )}
 
-        {/* ===== Recommended Actions ===== */}
-        {safeArray(fullAnalysis.recommendedActions).length > 0 && (
+        {/* ===== What Works Well ===== */}
+        {safeArray(fullAnalysis.whatWorksWell).length > 0 && (
+          <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
+            <h3 className="font-semibold text-[#43a047] mb-2">✅ What Works Well</h3>
+            <ul className="list-disc list-inside text-sm text-[#4a4a6a]">
+              {safeArray(fullAnalysis.whatWorksWell).map((item: string, idx: number) => (
+                <li key={idx}>{safeString(item)}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* ===== Bugs and Risky Cases ===== */}
+        {safeArray(fullAnalysis.bugsAndRiskyCases).length > 0 && (
           <div>
-            <h3 className="text-lg font-semibold text-[#1a1a2e] mb-3">🔧 Recommended Actions</h3>
-            <div className="space-y-2">
-              {safeArray(fullAnalysis.recommendedActions)
-                .sort((a: any, b: any) => a.priority - b.priority)
-                .map((action: any, idx: number) => (
-                  <div key={idx} className="flex items-start gap-2 p-3 bg-[#f8f9fa] rounded-lg border border-[#d0d0d8]">
-                    <span className="text-sm font-medium text-[#4a86f7]">#{action.priority}</span>
-                    <div>
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                        action.severity === 'critical' ? 'bg-red-100 text-red-700' :
-                        action.severity === 'high' ? 'bg-orange-100 text-orange-700' :
-                        action.severity === 'medium' ? 'bg-yellow-100 text-yellow-700' :
-                        'bg-blue-100 text-blue-700'
-                      }`}>
-                        {safeString(action.severity)}
-                      </span>
-                      <p className="font-medium text-[#1a1a2e] mt-1">{safeString(action.title)}</p>
-                      <p className="text-sm text-[#4a4a6a]">{safeString(action.action)}</p>
-                    </div>
-                  </div>
-                ))}
+            <h3 className="text-lg font-semibold text-[#e53935] mb-3">🐛 Bugs and Risky Cases</h3>
+            <div className="space-y-3">
+              {safeArray(fullAnalysis.bugsAndRiskyCases).map((item: LegacyBugAndRiskyCase, idx: number) => (
+                <div key={idx} className="p-4 bg-red-50 rounded-lg border border-red-200">
+                  <p className="font-semibold text-[#1a1a2e]">{safeString(item.issue)}</p>
+                  <p className="text-sm text-[#4a4a6a]"><span className="font-medium">Impact:</span> {safeString(item.impact)}</p>
+                  {item.example && <p className="text-sm text-[#4a4a6a]"><span className="font-medium">Example:</span> {safeString(item.example)}</p>}
+                </div>
+              ))}
             </div>
+          </div>
+        )}
+
+        {/* ===== Edge Cases ===== */}
+        {safeArray(fullAnalysis.edgeCases).length > 0 && (
+          <div>
+            <h3 className="text-lg font-semibold text-[#f57c00] mb-3">🧪 Edge Cases</h3>
+            <div className="space-y-2">
+              {safeArray(fullAnalysis.edgeCases).map((item: LegacyEdgeCase, idx: number) => (
+                <div key={idx} className="p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                  <p className="font-medium text-[#1a1a2e]">{safeString(item.case)}</p>
+                  <p className="text-sm text-[#4a4a6a]"><span className="font-medium">Current:</span> {safeString(item.currentBehavior)}</p>
+                  <p className="text-sm text-[#4a4a6a]"><span className="font-medium">Expected:</span> {safeString(item.expectedBehavior)}</p>
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${
+                    item.risk === 'High' ? 'bg-red-100 text-red-700' :
+                    item.risk === 'Medium' ? 'bg-yellow-100 text-yellow-700' :
+                    'bg-blue-100 text-blue-700'
+                  }`}>
+                    Risk: {safeString(item.risk)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ===== Performance Analysis ===== */}
+        {fullAnalysis.performanceAnalysis && (
+          <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
+            <h3 className="font-semibold text-[#4a86f7] mb-2">⚡ Performance Analysis</h3>
+            {fullAnalysis.performanceAnalysis.timeComplexity && fullAnalysis.performanceAnalysis.timeComplexity.length > 0 && (
+              <div className="mb-2">
+                <span className="font-medium text-sm">Time Complexity:</span>
+                {fullAnalysis.performanceAnalysis.timeComplexity.map((item, idx) => (
+                  <div key={idx} className="text-sm text-[#4a4a6a] ml-4">• {safeString(item.target)}: {safeString(item.complexity)} ({safeString(item.explanation)})</div>
+                ))}
+              </div>
+            )}
+            {fullAnalysis.performanceAnalysis.spaceComplexity && fullAnalysis.performanceAnalysis.spaceComplexity.length > 0 && (
+              <div className="mb-2">
+                <span className="font-medium text-sm">Space Complexity:</span>
+                {fullAnalysis.performanceAnalysis.spaceComplexity.map((item, idx) => (
+                  <div key={idx} className="text-sm text-[#4a4a6a] ml-4">• {safeString(item.target)}: {safeString(item.complexity)} ({safeString(item.explanation)})</div>
+                ))}
+              </div>
+            )}
+            {fullAnalysis.performanceAnalysis.scalabilityNotes && fullAnalysis.performanceAnalysis.scalabilityNotes.length > 0 && (
+              <div>
+                <span className="font-medium text-sm">Scalability Notes:</span>
+                {fullAnalysis.performanceAnalysis.scalabilityNotes.map((note, idx) => (
+                  <div key={idx} className="text-sm text-[#4a4a6a] ml-4">• {safeString(note)}</div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ===== Security Analysis ===== */}
+        {fullAnalysis.securityAnalysis && (
+          <div className={`p-4 rounded-lg border ${
+            fullAnalysis.securityAnalysis.severity === 'Critical' ? 'bg-red-50 border-red-300' :
+            fullAnalysis.securityAnalysis.severity === 'High' ? 'bg-orange-50 border-orange-300' :
+            fullAnalysis.securityAnalysis.severity === 'Medium' ? 'bg-yellow-50 border-yellow-300' :
+            'bg-blue-50 border-blue-300'
+          }`}>
+            <h3 className="font-semibold text-[#1a1a2e]">🔒 Security Analysis</h3>
+            <p className="text-sm"><span className="font-medium">Severity:</span> {safeString(fullAnalysis.securityAnalysis.severity)}</p>
+            {fullAnalysis.securityAnalysis.issues && fullAnalysis.securityAnalysis.issues.length > 0 && (
+              <div className="mt-2">
+                <span className="font-medium text-sm">Issues:</span>
+                {fullAnalysis.securityAnalysis.issues.map((issue, idx) => (
+                  <div key={idx} className="text-sm text-[#4a4a6a] ml-4">• {safeString(issue)}</div>
+                ))}
+              </div>
+            )}
+            {fullAnalysis.securityAnalysis.recommendations && fullAnalysis.securityAnalysis.recommendations.length > 0 && (
+              <div className="mt-2">
+                <span className="font-medium text-sm">Recommendations:</span>
+                {fullAnalysis.securityAnalysis.recommendations.map((rec, idx) => (
+                  <div key={idx} className="text-sm text-[#4a4a6a] ml-4">• {safeString(rec)}</div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ===== Production Readiness ===== */}
+        {fullAnalysis.productionReadiness && (
+          <div className={`p-4 rounded-lg border ${
+            fullAnalysis.productionReadiness.isProductionReady ? 'bg-green-50 border-green-200' : 'bg-orange-50 border-orange-200'
+          }`}>
+            <h3 className="font-semibold text-[#1a1a2e]">🛡️ Production Readiness</h3>
+            <p className="text-sm"><span className="font-medium">Ready:</span> {fullAnalysis.productionReadiness.isProductionReady ? '✅ Yes' : '❌ No'}</p>
+            {fullAnalysis.productionReadiness.reasons && fullAnalysis.productionReadiness.reasons.length > 0 && (
+              <div className="mt-2">
+                <span className="font-medium text-sm">Reasons:</span>
+                {fullAnalysis.productionReadiness.reasons.map((reason, idx) => (
+                  <div key={idx} className="text-sm text-[#4a4a6a] ml-4">• {safeString(reason)}</div>
+                ))}
+              </div>
+            )}
+            {fullAnalysis.productionReadiness.requiredChanges && fullAnalysis.productionReadiness.requiredChanges.length > 0 && (
+              <div className="mt-2">
+                <span className="font-medium text-sm">Required Changes:</span>
+                {fullAnalysis.productionReadiness.requiredChanges.map((change, idx) => (
+                  <div key={idx} className="text-sm text-[#4a4a6a] ml-4">• {safeString(change)}</div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ===== Recommended Improvements ===== */}
+        {safeArray(fullAnalysis.recommendedImprovements).length > 0 && (
+          <div>
+            <h3 className="text-lg font-semibold text-[#1a1a2e] mb-3">🔧 Recommended Improvements</h3>
+            <div className="space-y-2">
+              {safeArray(fullAnalysis.recommendedImprovements).map((item: LegacyRecommendedImprovement, idx: number) => (
+                <div key={idx} className="flex items-start gap-2 p-3 bg-[#f8f9fa] rounded-lg border border-[#d0d0d8]">
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                    item.priority === 'High' ? 'bg-red-100 text-red-700' :
+                    item.priority === 'Medium' ? 'bg-yellow-100 text-yellow-700' :
+                    'bg-blue-100 text-blue-700'
+                  }`}>
+                    {safeString(item.priority)}
+                  </span>
+                  <div>
+                    <p className="font-medium text-[#1a1a2e]">{safeString(item.improvement)}</p>
+                    <p className="text-sm text-[#4a4a6a]">{safeString(item.reason)}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ===== Improved Code ===== */}
+        {fullAnalysis.improvedCode && fullAnalysis.improvedCode.available && (
+          <div className="bg-[#e8f5e9] p-4 rounded-lg border border-green-200">
+            <h3 className="font-semibold text-[#43a047] mb-2">✨ Improved Code</h3>
+            <p className="text-sm text-[#4a4a6a]"><span className="font-medium">Notes:</span> {safeString(fullAnalysis.improvedCode.notes)}</p>
+            <pre className="mt-2 p-3 bg-[#1a1a2e] text-[#cdd6f4] rounded-md overflow-x-auto text-sm font-mono">
+              {safeString(fullAnalysis.improvedCode.code)}
+            </pre>
           </div>
         )}
 
@@ -375,46 +501,19 @@ export default function AnalysisTab({
           <div>
             <h3 className="text-lg font-semibold text-[#1a1a2e] mb-3">🧪 Suggested Tests</h3>
             <div className="space-y-2">
-              {safeArray(fullAnalysis.suggestedTests).map((test: any, idx: number) => (
+              {safeArray(fullAnalysis.suggestedTests).map((test: LegacySuggestedTest, idx: number) => (
                 <div key={idx} className="p-3 bg-[#f8f9fa] rounded-lg border border-[#d0d0d8]">
-                  <p className="font-medium text-[#1a1a2e]">{safeString(test.title || test.name || 'Test')}</p>
-                  <p className="text-sm text-[#4a4a6a]">{safeString(test.purpose)}</p>
-                  <details className="mt-1">
-                    <summary className="text-xs text-[#4a86f7] cursor-pointer">Show details</summary>
-                    <div className="mt-1 text-xs text-[#4a4a6a] space-y-1">
-                      {safeArray(test.setup).length > 0 && (
-                        <div><span className="font-medium">Setup:</span> {safeArray(test.setup).join(', ')}</div>
-                      )}
-                      {safeArray(test.steps).length > 0 && (
-                        <div><span className="font-medium">Steps:</span> {safeArray(test.steps).join(' → ')}</div>
-                      )}
-                      <div><span className="font-medium">Expected:</span> {safeString(test.expectedResult || test.expectedOutput)}</div>
-                    </div>
-                  </details>
+                  <p className="font-medium text-[#1a1a2e]">{safeString(test.name)}</p>
+                  {test.input && <p className="text-sm text-[#4a4a6a]"><span className="font-medium">Input:</span> {safeString(test.input)}</p>}
+                  {test.expectedOutput && <p className="text-sm text-[#4a4a6a]"><span className="font-medium">Expected:</span> {safeString(test.expectedOutput)}</p>}
+                  {test.type && <span className={`text-xs px-2 py-0.5 rounded-full ${
+                    test.type === 'Invalid' ? 'bg-red-100 text-red-700' :
+                    test.type === 'Edge' ? 'bg-yellow-100 text-yellow-700' :
+                    'bg-blue-100 text-blue-700'
+                  }`}>{safeString(test.type)}</span>}
                 </div>
               ))}
             </div>
-          </div>
-        )}
-
-        {/* ===== Complexity ===== */}
-        {fullAnalysis.complexity && (
-          <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
-            <h3 className="font-semibold text-[#4a86f7] mb-2">⚡ Complexity</h3>
-            <div className="grid grid-cols-2 gap-2 text-sm text-[#4a4a6a]">
-              <div><span className="font-medium">Time:</span> {safeString(fullAnalysis.complexity.time)}</div>
-              <div><span className="font-medium">Space:</span> {safeString(fullAnalysis.complexity.space)}</div>
-            </div>
-            {fullAnalysis.complexity.resourceGrowth && (
-              <div className="text-sm text-[#4a4a6a] mt-1">
-                <span className="font-medium">Resource Growth:</span> {safeString(fullAnalysis.complexity.resourceGrowth)}
-              </div>
-            )}
-            {safeArray(fullAnalysis.complexity.assumptions).length > 0 && (
-              <div className="mt-2 text-xs text-[#6c7086]">
-                <span className="font-medium">Assumptions:</span> {safeArray(fullAnalysis.complexity.assumptions).join(', ')}
-              </div>
-            )}
           </div>
         )}
 
@@ -433,33 +532,32 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* ===== Verdict ===== */}
-        {fullAnalysis.verdict && (
+        {/* ===== Final Verdict ===== */}
+        {fullAnalysis.finalVerdict && (
           <div className={`p-4 rounded-lg border ${
-            fullAnalysis.verdict.status === 'approved' || fullAnalysis.verdict.status === 'approved-with-suggestions' ? 'bg-green-50 border-green-200' :
-            fullAnalysis.verdict.status === 'requires-minor-changes' ? 'bg-yellow-50 border-yellow-200' :
-            fullAnalysis.verdict.status === 'requires-major-changes' ? 'bg-orange-50 border-orange-200' :
-            fullAnalysis.verdict.status === 'requires-changes' ? 'bg-orange-50 border-orange-200' :
-            'bg-red-50 border-red-200'
+            fullAnalysis.finalVerdict.approved ? 'bg-green-50 border-green-200' : 'bg-orange-50 border-orange-200'
           }`}>
-            <h3 className="font-semibold text-[#1a1a2e]">🏁 Verdict</h3>
-            <p className="mt-1 text-sm text-[#4a4a6a]">
-              <span className="font-medium">Status:</span> {safeString(fullAnalysis.verdict.status)}
+            <h3 className="font-semibold text-[#1a1a2e]">🏁 Final Verdict</h3>
+            <p className="mt-1 text-sm text-[#4a4a6a]">{safeString(fullAnalysis.finalVerdict.summary)}</p>
+            <p className="mt-1 text-sm">
+              <span className="font-medium">Approved:</span> {fullAnalysis.finalVerdict.approved ? '✅ Yes' : '❌ No'}
             </p>
-            <p className="mt-1 text-sm text-[#4a4a6a]">{safeString(fullAnalysis.verdict.explanation)}</p>
+            {fullAnalysis.finalVerdict.nextSteps && (
+              <p className="mt-1 text-sm text-[#4a4a6a]"><span className="font-medium">Next Steps:</span> {safeString(fullAnalysis.finalVerdict.nextSteps)}</p>
+            )}
           </div>
         )}
 
-        {/* ===== Limitations ===== */}
-        {safeArray(fullAnalysis.limitations).length > 0 && (
-          <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
-            <h3 className="font-semibold text-[#4a86f7] mb-2">⚠️ Limitations</h3>
-            <ul className="list-disc list-inside text-sm text-[#4a4a6a]">
-              {safeArray(fullAnalysis.limitations).map((lim: string, idx: number) => (
-                <li key={idx}>{safeString(lim)}</li>
-              ))}
-            </ul>
-          </div>
+        {/* ===== Debug info (if available) ===== */}
+        {(fullAnalysis as any).debug_trace && process.env.NODE_ENV === 'development' && (
+          <details className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
+            <summary className="cursor-pointer text-sm font-medium text-[#1a1a2e]">
+              🔍 Debug Trace
+            </summary>
+            <pre className="mt-2 text-xs text-[#4a4a6a] whitespace-pre-wrap bg-white p-3 rounded border border-[#d0d0d8] max-h-[200px] overflow-y-auto">
+              {JSON.stringify((fullAnalysis as any).debug_trace, null, 2)}
+            </pre>
+          </details>
         )}
       </div>
     );

@@ -2,7 +2,12 @@
 
 import { callOpenAI } from '@/lib/openaiClient';
 import { buildRepairPrompt } from './prompts/repair';
-import { AdvancedAuditResultSchema, type AdvancedAuditResult } from './schema';
+import {
+  AdvancedAuditResultSchema,
+  type AdvancedAuditResult,
+  type CompletionStatus,
+  type AppliedSpecialization,
+} from './schema';
 import type { AuditValidationResult } from './types';
 import { validateSemanticIntegrity } from './semantic-validator';
 import { parseModelOutput } from './parse-model-output';
@@ -21,7 +26,7 @@ function extractJSON(text: string): string {
 }
 
 // ============================================================
-// MAIN REPAIR FUNCTION
+// MAIN REPAIR FUNCTION (UPDATED FOR CANONICAL SCHEMA)
 // ============================================================
 
 export async function repairAudit(
@@ -49,7 +54,7 @@ export async function repairAudit(
       sourceLanguage: language,
       responseLanguage: 'English',
       numberedCode,
-      rawCode: numberedCode, // برای تعمیر، کد شماره‌گذاری‌شده کافی است
+      rawCode: numberedCode,
     };
 
     // ===== 3. Build repair prompt =====
@@ -88,26 +93,39 @@ export async function repairAudit(
       return null;
     }
 
-    // ===== 7. Ensure auditType matches =====
-    if (repaired.auditType !== auditType) {
-      logger.warn('[Repair] Audit type mismatch, correcting:', {
-        expected: auditType,
-        actual: repaired.auditType,
-      });
-      // اصلاح auditType
-      (repaired as any).auditType = auditType;
+    // ===== 7. Ensure canonical fields are correctly set =====
+    // Override with pipeline metadata
+    const canonicalRepaired: AdvancedAuditResult = {
+      ...repaired,
+      schemaVersion: '1.0',
+      auditType: 'comprehensive',
+      completionStatus: 'complete',
+      repairApplied: true,
+      // Preserve appliedSpecializations from the repaired output if present
+      // or set based on auditType
+      appliedSpecializations: repaired.appliedSpecializations && repaired.appliedSpecializations.length > 0
+        ? repaired.appliedSpecializations
+        : (auditType === 'concurrency' ? ['concurrency'] : []),
+      language: language,
+    };
+
+    // Ensure analysisCoverage is present
+    if (!canonicalRepaired.analysisCoverage || canonicalRepaired.analysisCoverage.length === 0) {
+      // This shouldn't happen if normalizer worked, but just in case
+      logger.warn('[Repair] analysisCoverage missing in repaired output; will be filled by normalizer');
     }
 
-    // ===== 8. Ensure status is 'repaired' =====
-    if (repaired.status !== 'repaired') {
-      logger.debug('[Repair] Setting status to repaired');
-      (repaired as any).status = 'repaired';
+    // ===== 8. Final validation with Zod =====
+    const finalValidation = AdvancedAuditResultSchema.safeParse(canonicalRepaired);
+    if (!finalValidation.success) {
+      logger.error('[Repair] Final validation failed:', finalValidation.error.issues);
+      return null;
     }
 
     const duration = Date.now() - startTime;
     logger.info('[Repair] Completed successfully in', duration, 'ms');
 
-    return repaired;
+    return finalValidation.data;
   } catch (error) {
     logger.error('[Repair] Failed:', error);
     return null;
@@ -135,6 +153,92 @@ export async function repairAuditSafe(
     );
   } catch (error) {
     logger.error('[RepairSafe] Unhandled error:', error);
+    return null;
+  }
+}
+
+/**
+ * تعمیر خروجی با تمرکز بر ساختار (بدون تغییر معنا)
+ * این تابع برای مواردی استفاده می‌شود که خروجی Structurally Invalid است
+ */
+export async function repairStructureOnly(
+  numberedCode: string,
+  previousAudit: string,
+  validationIssues: any[],
+  language: string,
+  auditType: 'generic' | 'concurrency'
+): Promise<AdvancedAuditResult | null> {
+  const startTime = Date.now();
+  logger.debug('[Repair] Starting structural repair attempt');
+
+  try {
+    // ===== 1. Build minimal repair context =====
+    const promptContext: PromptContext = {
+      sourceLanguage: language,
+      responseLanguage: 'English',
+      numberedCode,
+      rawCode: numberedCode,
+    };
+
+    // ===== 2. Create a simpler repair prompt focusing on structure =====
+    const missingCoverage: string[] = [];
+    const issues: any[] = [];
+
+    // ===== 3. Build repair prompt =====
+    const prompt = buildRepairPrompt(
+      promptContext,
+      previousAudit,
+      issues,
+      missingCoverage
+    );
+
+    // ===== 4. Call AI =====
+    const systemPrompt = 'You are an expert code auditor. Return only valid JSON that matches the canonical schema. Do not use Markdown fences or any text outside the JSON.';
+
+    const rawContent = await callOpenAI(systemPrompt, prompt, {
+      mode: 'advanced',
+      responseFormat: 'text',
+    });
+
+    // ===== 5. Parse =====
+    const parseResult = parseModelOutput(rawContent, AdvancedAuditResultSchema, {
+      requestId: `repair-structural-${Date.now()}`,
+      logErrors: true,
+    });
+
+    if (!parseResult.success || !parseResult.data) {
+      logger.warn('[Repair] Structural repair parse failed:', parseResult.error);
+      return null;
+    }
+
+    const repaired = parseResult.data;
+
+    // ===== 6. Ensure canonical fields =====
+    const canonicalRepaired: AdvancedAuditResult = {
+      ...repaired,
+      schemaVersion: '1.0',
+      auditType: 'comprehensive',
+      completionStatus: 'complete',
+      repairApplied: true,
+      appliedSpecializations: repaired.appliedSpecializations && repaired.appliedSpecializations.length > 0
+        ? repaired.appliedSpecializations
+        : (auditType === 'concurrency' ? ['concurrency'] : []),
+      language: language,
+    };
+
+    // ===== 7. Final validation =====
+    const finalValidation = AdvancedAuditResultSchema.safeParse(canonicalRepaired);
+    if (!finalValidation.success) {
+      logger.error('[Repair] Structural repair final validation failed:', finalValidation.error.issues);
+      return null;
+    }
+
+    const duration = Date.now() - startTime;
+    logger.info('[Repair] Structural repair completed in', duration, 'ms');
+
+    return finalValidation.data;
+  } catch (error) {
+    logger.error('[Repair] Structural repair failed:', error);
     return null;
   }
 }

@@ -9,9 +9,6 @@ import {
 
 /**
  * ساخت پرامپت عمومی برای تحلیل کد
- * 
- * @param context - تنظیمات پرامپت شامل کد، زبان‌ها و ...
- * @returns پرامپت کامل برای ارسال به مدل
  */
 export function buildGenericAdvancedPrompt(context: PromptContext): string {
   const { serializedCode, serializedSourceLanguage, serializedResponseLanguage } =
@@ -50,6 +47,61 @@ Response language: ${serializedResponseLanguage}
 All explanatory text and human-readable fields must be written in ${context.responseLanguage}.
 Keep identifiers, code, enum values, IDs, and schema keys unchanged.
 
+==================== CANONICAL OUTPUT CONTRACT ====================
+
+You must return a JSON object with the following structure:
+
+{
+  "schemaVersion": "1.0",
+  "auditType": "comprehensive",
+  "appliedSpecializations": [],
+  "completionStatus": "complete",
+  "repairApplied": false,
+  "title": "Descriptive audit title",
+  "language": "${context.sourceLanguage}",
+  "responseLanguage": "${context.responseLanguage}",
+  "analysisCoverage": [
+    { "dimension": "correctness", "status": "analyzed", "summary": "...", "limitation": null },
+    { "dimension": "security", "status": "analyzed", "summary": "...", "limitation": null },
+    // ... all 15 dimensions
+  ],
+  "summary": "Concise summary of findings and code quality.",
+  "executionOverview": {
+    "entryPoints": [],
+    "taskSubmissionPoints": [],
+    "blockingWaitPoints": [],
+    "sharedResources": [],
+    "resourceLifecycle": []
+  },
+  "findings": [],
+  "architecturalObservations": [],
+  "recommendedActions": [],
+  "suggestedTests": [],
+  "complexity": {
+    "applicable": true,
+    "expression": "O(1)",
+    "explanation": "Constant time complexity.",
+    "variables": [{ "symbol": "n", "definition": "size of input" }],
+    "assumptions": ["Input size is bounded."]
+  },
+  "scorecard": {
+    "correctness": { "applicable": true, "score": 85, "reason": "Good", "relatedFindings": [] },
+    "concurrencySafety": { "applicable": false, "score": null, "reason": "No concurrency primitives", "relatedFindings": [] },
+    // ... all 7 categories
+  },
+  "verdict": {
+    "status": "approved-with-suggestions",
+    "explanation": "Justification based on findings and scorecard."
+  },
+  "limitations": ["Analysis based solely on supplied source code."],
+  "improvedCode": {
+    "available": false,
+    "code": null,
+    "notes": "No safe focused patch can be produced from the supplied context."
+  },
+  "linkedin_post": "Professional summary, max 300 characters."
+}
+
 ==================== REQUIRED ANALYSIS DIMENSIONS ====================
 
 1. CORRECTNESS & LOGICAL FLAWS:
@@ -66,10 +118,9 @@ Keep identifiers, code, enum values, IDs, and schema keys unchanged.
    - Hardcoded secrets or keys
 
 3. PERFORMANCE & SCALABILITY:
-   - Time complexity (Big O)
-   - Space complexity (Big O)
+   - Time complexity (Big O) with defined variables
+   - Space complexity (Big O) with defined variables
    - Bottlenecks or inefficient algorithms
-   - Scalability with larger inputs
    - Memory leaks or excessive allocations
 
 4. RESOURCE MANAGEMENT & LIFECYCLE:
@@ -136,15 +187,15 @@ Before accepting each candidate finding:
 5. Reduce confidence if the counterargument depends on missing external context.
 6. Include a concise confidence justification.
 
-==================== SCORECARD (0-100 OBJECT) ====================
+==================== SCORECARD (0-100 OBJECT WITH APPLICABLE FLAG) ====================
 
-All scores MUST be integers between 0 and 100. DO NOT use a 0–10 scale.
+Each category is an object with the following structure:
 
-Each category is an object:
 {
-  "score": number,      // 0-100
-  "reason": string,     // evidence-based justification
-  "relatedFindings": [] // array of finding IDs
+  "applicable": boolean,  // true if this dimension was evaluated
+  "score": number | null, // 0-100 if applicable, null if not applicable
+  "reason": string,       // evidence-based justification
+  "relatedFindings": []   // array of finding IDs
 }
 
 Categories:
@@ -157,17 +208,11 @@ Categories:
 - productionReadiness
 
 **Rules:**
-- Score every category independently based on evidence relevant to that category.
+- Score every applicable category independently based on evidence.
 - Do NOT lower unrelated categories because one severe finding exists.
-- Do NOT assign 100 solely because findings array is empty.
+- Do NOT force a fake score of 100 for a dimension that was not applicable.
+- If a category cannot be meaningfully evaluated, set applicable: false.
 - Scores below 20 are reserved for catastrophic failure with direct evidence.
-- Every score must include a concise evidence-based reason.
-- relatedFindings must reference only existing finding IDs.
-
-**Critical Calibration:**
-- Code that compiles, runs, and has at least one correct functionality: at least 40
-- Code with 1-2 logical/architectural issues: 45-75
-- Code that is well-structured with minor issues: 65-80
 
 ==================== VERDICT (6 STATUSES) ====================
 
@@ -184,14 +229,21 @@ Use one of these verdict statuses:
 - High severity findings normally require major changes.
 - Multiple interacting medium findings may justify a stronger verdict.
 - Explain the verdict with reference to findings, remediation scope, and production risk.
-- Empty findings does not automatically imply approval if scope is limited.
 
-==================== IMPROVED CODE ====================
+==================== IMPROVED CODE (DISCRIMINATED UNION) ====================
 
+Valid State A (available):
 {
-  "available": boolean,  // true only if safe patch can be created from context
-  "code": string | null, // non-empty if available === true, null otherwise
-  "notes": string        // explanation of changes and tradeoffs
+  "available": true,
+  "code": "non-empty improved code",
+  "notes": "explanation or null"
+}
+
+Valid State B (unavailable):
+{
+  "available": false,
+  "code": null,
+  "notes": "explanation why unavailable or null"
 }
 
 **Rules:**
@@ -199,6 +251,31 @@ Use one of these verdict statuses:
 - Prefer minimal, targeted fixes over broad rewrites.
 - Preserve public APIs and intended behavior where possible.
 - If safe fix depends on missing context, set available to false.
+
+==================== COMPLEXITY (DISCRIMINATED UNION) ====================
+
+Valid State A (applicable):
+{
+  "applicable": true,
+  "expression": "O(n)",
+  "explanation": "Derived from loop over input array.",
+  "variables": [{ "symbol": "n", "definition": "length of input array" }],
+  "assumptions": ["Input is non-empty."]
+}
+
+Valid State B (not applicable):
+{
+  "applicable": false,
+  "expression": null,
+  "explanation": null,
+  "variables": [],
+  "assumptions": ["Code is declarative/configuration only."]
+}
+
+**Rules:**
+- Define every variable used in Big-O notation.
+- Return "unknown" only when complexity cannot be meaningfully inferred.
+- Do not invent O(n) merely to fill the field.
 
 ==================== LINKEDIN POST ====================
 
@@ -214,8 +291,13 @@ Use one of these verdict statuses:
 The following fields are MANDATORY:
 - schemaVersion
 - auditType
-- status
+- appliedSpecializations
+- completionStatus
+- repairApplied
+- title
 - language
+- responseLanguage
+- analysisCoverage (all 15 dimensions)
 - summary
 - executionOverview
 - findings
@@ -230,6 +312,7 @@ The following fields are MANDATORY:
 - linkedin_post
 
 All string fields must be non-empty. Arrays must be present (use [] when empty).
+analysisCoverage must contain all 15 required dimensions.
 
 ==================== OUTPUT ====================
 

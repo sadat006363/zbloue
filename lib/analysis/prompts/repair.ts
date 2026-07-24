@@ -10,12 +10,6 @@ import {
 
 /**
  * ساخت پرامپت تعمیر برای تصحیح خروجی نامعتبر
- * 
- * @param context - تنظیمات پرامپت
- * @param previousAudit - خروجی قبلی (نامعتبر)
- * @param validationIssues - خطاهای اعتبارسنجی
- * @param missingCoverage - پوشش‌های گم‌شده
- * @returns پرامپت کامل برای ارسال به مدل
  */
 export function buildRepairPrompt(
   context: PromptContext,
@@ -72,6 +66,13 @@ The previous response failed validation or needs refinement.
 Do NOT restart with a generic review.
 Correct the specified defects and return the complete corrected JSON object.
 
+**IMPORTANT: CANONICAL SCHEMA RULES**
+- auditType must be "comprehensive"
+- completionStatus must be "complete" (or "partially-complete" if issues remain)
+- repairApplied must be true
+- appliedSpecializations must be set based on the audit type (["concurrency"] if concurrency was analyzed)
+- All other fields follow the canonical AdvancedAuditResult schema
+
 ==================== ORIGINAL SOURCE CODE ====================
 
 ${buildUntrustedDataSection('source-code-json', serializedCode)}
@@ -95,14 +96,13 @@ ${buildUntrustedDataSection('missing-coverage', serializedCoverage)}
 
 ==================== REPAIR RULES (MANDATORY) ====================
 
-1. PRESERVE THE PREVIOUS AUDIT IDENTITY
-   - Preserve every valid existing finding ID exactly as it appears in the previous audit.
+1. PRESERVE VALID CONTENT
+   - Preserve every valid existing finding ID exactly as it appears.
    - Do NOT renumber, re-index, or reuse existing IDs.
-   - Preserve auditType from previous audit if it is valid (generic or concurrency).
+   - Keep all valid findings, their original IDs, and their evidence intact.
 
 2. REPAIR ONLY INVALID CONTENT
    - Add or correct only what is necessary to fix the validation failures.
-   - Keep all valid findings, their original IDs, and their evidence intact.
    - However, analyze all explicitly listed missing-coverage areas and add any
      source-supported findings required to complete them.
 
@@ -110,8 +110,7 @@ ${buildUntrustedDataSection('missing-coverage', serializedCoverage)}
    - Find the highest syntactically valid finding ID appearing anywhere in the
      previous audit, including findings that may be removed during repair.
    - Assign new IDs above that number.
-   - Never reuse any ID that appeared in the previous audit, even if the finding was removed.
-   - Example: if highest ID is F-009, the next new ID must be F-010.
+   - Never reuse any ID that appeared in the previous audit.
 
 4. VALIDATE FINDINGS AND EVIDENCE
    - Verify EVERY finding against the supplied numbered source code.
@@ -135,70 +134,72 @@ ${buildUntrustedDataSection('missing-coverage', serializedCoverage)}
    - Every relatedFindingId must point to an existing finding in the final output.
    - No dangling IDs, duplicate IDs, or invented IDs.
 
-6. ENFORCE SCHEMA FIELDS AND ENUMS
-   - Use exactly the canonical enums from AdvancedAuditResultSchema.
-   - Confidence: definite, likely, conditional
-   - Severity: critical, high, medium, low, info
-   - Finding categories: liveness, thread-starvation, deadlock, queue-misuse, duplicate-submission, race-condition, shared-state, configuration, resource-lifecycle, timeout, interruption, cancellation, retry, error-handling, architectural-duplication, api-semantics, performance, security, maintainability, other
-   - Verdict statuses: not-production-ready, requires-major-changes, requires-changes, requires-minor-changes, approved-with-suggestions, approved
+6. ENSURE CANONICAL FIELDS ARE CORRECT
+   - auditType: "comprehensive"
+   - completionStatus: "complete" (if all errors fixed) or "partially-complete"
+   - repairApplied: true
+   - appliedSpecializations: [] or ["concurrency"]
    - schemaVersion: "1.0"
-   - status: "repaired"
-   - All required text fields must be non-empty.
-   - evidence arrays must have at least one item.
-   - executionPath and triggerConditions must each have at least one item.
 
-7. SCORECARD (0-100 OBJECT)
-   - Each category MUST be an object: { score, reason, relatedFindings }
-   - Scores: 0-100 (NOT 0-10)
-   - Every category must have a reason string.
-   - relatedFindings must reference existing finding IDs.
+7. SCORECARD (0-100 OBJECT WITH APPLICABLE FLAG)
+   - Each category is an object: { applicable, score, reason, relatedFindings }
+   - If applicable: true → score is 0-100, reason is required
+   - If applicable: false → score is null, reason explains why
+   - relatedFindings must reference existing finding IDs
 
-8. IMPROVED CODE (MANDATORY)
+8. IMPROVED CODE (DISCRIMINATED UNION)
    - Must always be present:
-     {
-       "available": boolean,
-       "code": string | null,
-       "notes": string
-     }
+     { "available": true, "code": "...", "notes": "..." }
+     or
+     { "available": false, "code": null, "notes": "..." }
    - available === true → code must be non-empty
    - available === false → code must be null
-   - notes must explain the decision
 
-9. LINKEDIN POST
-   - Max 300 characters, min 1 character.
-   - Must be a trimmed string.
-   - Must be derived from actual findings.
+9. COMPLEXITY (DISCRIMINATED UNION)
+   - { "applicable": true, "expression": "...", "explanation": "...", "variables": [], "assumptions": [] }
+   - or { "applicable": false, "expression": null, "explanation": null, "variables": [], "assumptions": [] }
 
-10. INTERNAL PRE-OUTPUT VALIDATION
+10. LINKEDIN POST
+    - Max 300 characters, min 1 character.
+    - Must be a trimmed string.
+
+11. INTERNAL PRE-OUTPUT VALIDATION
     Before returning the JSON, ensure:
     - All required fields are present.
-    - No required field is null (unless schema explicitly allows null).
     - No required string is empty after trimming.
     - All enums match the schema.
     - All finding IDs are valid and unique.
     - All references point to existing findings.
     - Every finding has at least one evidence item.
     - All line numbers are within the source bounds.
-    - executionPath and triggerConditions meet the minimum length.
-    - Scorecard values are 0-100 objects with reason and relatedFindings.
+    - Scorecard values are 0-100 objects with applicable flag.
     - Verdict status is one of the 6 canonical values.
     - improvedCode is present with correct invariants.
+    - complexity follows the discriminated union.
     - linkedin_post length is between 1 and 300.
     - The output is parseable JSON.
     - No Markdown fences, comments, or extra text.
 
-11. RETURN JSON ONLY
+12. RETURN JSON ONLY
     - Output only valid JSON.
-    - Do NOT include Markdown code fences, comments, or any text before or after the JSON.
+    - Do NOT include Markdown fences, comments, or any text before or after the JSON.
     - Do NOT explain the changes in the output.
 
 ==================== CANONICAL OUTPUT CONTRACT ====================
 
 {
   "schemaVersion": "1.0",
-  "auditType": "generic" | "concurrency",
-  "status": "repaired",
+  "auditType": "comprehensive",
+  "appliedSpecializations": [],
+  "completionStatus": "complete",
+  "repairApplied": true,
+  "title": "Concise audit title",
   "language": "javascript",
+  "responseLanguage": "English",
+  "analysisCoverage": [
+    { "dimension": "correctness", "status": "analyzed", "summary": "Analysis of correctness dimension.", "limitation": null },
+    // ... all 15 dimensions
+  ],
   "summary": "Concise summary of findings.",
   "executionOverview": {
     "entryPoints": [],
@@ -212,19 +213,20 @@ ${buildUntrustedDataSection('missing-coverage', serializedCoverage)}
   "recommendedActions": [],
   "suggestedTests": [],
   "complexity": {
-    "time": "O(1)",
-    "space": "O(1)",
-    "resourceGrowth": "O(1)",
-    "assumptions": []
+    "applicable": true,
+    "expression": "O(1)",
+    "explanation": "Constant time complexity.",
+    "variables": [{ "symbol": "n", "definition": "size of input" }],
+    "assumptions": ["Input size is bounded."]
   },
   "scorecard": {
-    "correctness": { "score": 0, "reason": "", "relatedFindings": [] },
-    "concurrencySafety": { "score": 0, "reason": "", "relatedFindings": [] },
-    "liveness": { "score": 0, "reason": "", "relatedFindings": [] },
-    "errorHandling": { "score": 0, "reason": "", "relatedFindings": [] },
-    "resourceManagement": { "score": 0, "reason": "", "relatedFindings": [] },
-    "maintainability": { "score": 0, "reason": "", "relatedFindings": [] },
-    "productionReadiness": { "score": 0, "reason": "", "relatedFindings": [] }
+    "correctness": { "applicable": true, "score": 80, "reason": "Good", "relatedFindings": [] },
+    "concurrencySafety": { "applicable": false, "score": null, "reason": "No concurrency", "relatedFindings": [] },
+    "liveness": { "applicable": false, "score": null, "reason": "No liveness issues", "relatedFindings": [] },
+    "errorHandling": { "applicable": true, "score": 70, "reason": "Basic error handling", "relatedFindings": [] },
+    "resourceManagement": { "applicable": true, "score": 80, "reason": "Resources managed", "relatedFindings": [] },
+    "maintainability": { "applicable": true, "score": 85, "reason": "Simple and readable", "relatedFindings": [] },
+    "productionReadiness": { "applicable": true, "score": 75, "reason": "Ready for production", "relatedFindings": [] }
   },
   "verdict": {
     "status": "requires-changes",
@@ -243,7 +245,8 @@ ${buildUntrustedDataSection('missing-coverage', serializedCoverage)}
 
 Confidence: definite, likely, conditional
 Severity: critical, high, medium, low, info
-Finding categories: liveness, thread-starvation, deadlock, queue-misuse, duplicate-submission, race-condition, shared-state, configuration, resource-lifecycle, timeout, interruption, cancellation, retry, error-handling, architectural-duplication, api-semantics, performance, security, maintainability, other
+Finding categories: correctness, concurrency, security, reliability, error-handling, resource-management, performance, data-integrity, input-validation, api-design, configuration, architecture, maintainability, testability, observability, compatibility, other
+Mechanisms: deadlock, thread-starvation, race-condition, duplicate-submission, queue-misuse, blocking-wait, shared-state, configuration-collision, resource-leak, timeout-misuse, interruption-loss, cancellation-failure, retry-amplification
 Verdict statuses: not-production-ready, requires-major-changes, requires-changes, requires-minor-changes, approved-with-suggestions, approved
 
 ==================== ANTI-HALLUCINATION (CRITICAL) ====================
@@ -254,7 +257,6 @@ Verdict statuses: not-production-ready, requires-major-changes, requires-changes
 - Use "definite" only when the defect follows directly from the supplied source.
 - Findings without evidence are invalid and must not be returned.
 - Only cite code and line ranges present in the provided source.
-- Return null for testToReproduce when evidence is insufficient.
 
 ==================== REPAIR OUTPUT ====================
 
