@@ -1,3 +1,4 @@
+// components/Editor.tsx
 'use client';
 
 import { useEffect, useCallback, useState, useRef } from 'react';
@@ -79,6 +80,118 @@ const EXTENSION_TO_LANGUAGE: Record<string, string> = {
 };
 
 // ============================================================
+// 🔥 تشخیص زبان از محتوای کد (بدون پسوند فایل)
+// ============================================================
+
+function detectLanguageFromContent(code: string): string | null {
+  if (!code || code.trim().length === 0) return null;
+
+  const trimmed = code.trim();
+
+  // ===== Java =====
+  if (/public\s+class\s+\w+/.test(trimmed) ||
+      /System\.out\.println/.test(trimmed) ||
+      /public\s+static\s+void\s+main/.test(trimmed) ||
+      /String\[\]\s+args/.test(trimmed)) {
+    return 'java';
+  }
+
+  // ===== Python =====
+  if (/^import\s+\w+/.test(trimmed) ||
+      /^from\s+\w+\s+import/.test(trimmed) ||
+      /def\s+\w+\s*\(/.test(trimmed) ||
+      /class\s+\w+\s*:/.test(trimmed) ||
+      /if\s+__name__\s*==\s*['"]__main__['"]/.test(trimmed)) {
+    return 'python';
+  }
+
+  // ===== JavaScript / TypeScript =====
+  if (/function\s+\w+\s*\(/.test(trimmed) ||
+      /const\s+\w+\s*=\s*\(/.test(trimmed) ||
+      /let\s+\w+\s*=\s*\(/.test(trimmed) ||
+      /=>/.test(trimmed) ||
+      /async\s+function/.test(trimmed) ||
+      /await\s+/.test(trimmed) ||
+      /console\.log/.test(trimmed) ||
+      /module\.exports/.test(trimmed) ||
+      /export\s+(default|const|function)/.test(trimmed)) {
+    // تشخیص TypeScript با وجود type annotation
+    if (/:\s*(string|number|boolean|void|any|Array<|\[\])/.test(trimmed) ||
+        /interface\s+\w+/.test(trimmed) ||
+        /type\s+\w+\s*=/.test(trimmed)) {
+      return 'typescript';
+    }
+    return 'javascript';
+  }
+
+  // ===== Go =====
+  if (/package\s+main/.test(trimmed) ||
+      /func\s+main\s*\(/.test(trimmed) ||
+      /fmt\.Println/.test(trimmed) ||
+      /go\s+func/.test(trimmed)) {
+    return 'go';
+  }
+
+  // ===== Rust =====
+  if (/fn\s+main\s*\(/.test(trimmed) ||
+      /println!/.test(trimmed) ||
+      /let\s+mut\s+\w+/.test(trimmed) ||
+      /fn\s+\w+\s*\(/.test(trimmed)) {
+    return 'rust';
+  }
+
+  // ===== PHP =====
+  if (/<\?php/.test(trimmed) ||
+      /\$[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*/.test(trimmed) &&
+      /echo\s+/.test(trimmed)) {
+    return 'php';
+  }
+
+  // ===== C / C++ =====
+  if (/#include\s*<[^>]+>/.test(trimmed) ||
+      /int\s+main\s*\(/.test(trimmed) &&
+      /printf/.test(trimmed)) {
+    return 'cpp';
+  }
+
+  // ===== HTML =====
+  if (/<!DOCTYPE\s+html/.test(trimmed) ||
+      /<html[^>]*>/.test(trimmed) ||
+      /<body[^>]*>/.test(trimmed) ||
+      /<div[^>]*>/.test(trimmed)) {
+    return 'html';
+  }
+
+  // ===== CSS =====
+  if (/^[.#][a-zA-Z_-]+\s*{/.test(trimmed) ||
+      /@media/.test(trimmed) ||
+      /@keyframes/.test(trimmed)) {
+    return 'css';
+  }
+
+  // ===== JSON =====
+  if (trimmed.startsWith('{') && trimmed.endsWith('}') ||
+      trimmed.startsWith('[') && trimmed.endsWith(']')) {
+    try {
+      JSON.parse(trimmed);
+      return 'json';
+    } catch {
+      // Not valid JSON
+    }
+  }
+
+  // ===== Bash =====
+  if (/^#!\/bin\/bash/.test(trimmed) ||
+      /^#!\/usr\/bin\/env\s+bash/.test(trimmed) ||
+      /^export\s+/.test(trimmed) ||
+      /^echo\s+/.test(trimmed)) {
+    return 'bash';
+  }
+
+  return null;
+}
+
+// ============================================================
 // 🔥 اکستنشن هایلایت خط
 // ============================================================
 
@@ -109,7 +222,7 @@ const highlightLineExtension = (lineNumber: number | null) => {
 };
 
 // ============================================================
-// 🔥 پراپ‌های کامپوننت (فقط توابع)
+// 🔥 پراپ‌های کامپوننت
 // ============================================================
 
 interface EditorProps {
@@ -147,9 +260,11 @@ export default function Editor({
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const dragCounter = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const userSelectedLanguageRef = useRef(false);
+  const previousCodeRef = useRef('');
 
   // ============================================================
-  // 🔥 توابع dispatch برای تغییر state
+  // 🔥 توابع dispatch
   // ============================================================
 
   const setCode = useCallback((newCode: string) => {
@@ -157,11 +272,8 @@ export default function Editor({
   }, [dispatch]);
 
   const setLanguage = useCallback((newLang: string) => {
+    userSelectedLanguageRef.current = true;
     dispatch({ type: 'SET_LANGUAGE', payload: newLang });
-  }, [dispatch]);
-
-  const setMode = useCallback((newMode: 'simple' | 'medium' | 'advanced') => {
-    dispatch({ type: 'SET_MODE', payload: newMode });
   }, [dispatch]);
 
   const setConvertLanguage = useCallback((val: string) => {
@@ -181,7 +293,29 @@ export default function Editor({
   }, [dispatch]);
 
   // ============================================================
-  // 🔥 تشخیص خودکار زبان از پسوند فایل
+  // 🔥 تشخیص خودکار زبان هنگام تغییر کد
+  // ============================================================
+
+  useEffect(() => {
+    // اگر کد خالی است، کاری نکن
+    if (!code || code.trim().length === 0) {
+      userSelectedLanguageRef.current = false;
+      return;
+    }
+
+    // اگر کاربر قبلاً خودش زبان را انتخاب کرده، تشخیص خودکار را غیرفعال کن
+    if (userSelectedLanguageRef.current) {
+      return;
+    }
+
+    const detected = detectLanguageFromContent(code);
+    if (detected && detected !== language) {
+      dispatch({ type: 'SET_LANGUAGE', payload: detected });
+    }
+  }, [code, language, dispatch]);
+
+  // ============================================================
+  // 🔥 تشخیص زبان از پسوند فایل (برای آپلود)
   // ============================================================
 
   const detectLanguageFromExtension = useCallback((filename: string): string | null => {
@@ -209,6 +343,7 @@ export default function Editor({
         setCode(content);
         const detectedLang = detectLanguageFromExtension(file.name);
         if (detectedLang) {
+          userSelectedLanguageRef.current = true;
           setLanguage(detectedLang);
         }
         setUploadProgress(100);
@@ -293,6 +428,7 @@ export default function Editor({
     if (code.trim()) {
       if (confirm('Are you sure you want to clear all code and results?')) {
         setCode('');
+        userSelectedLanguageRef.current = false;
         setUploadProgress(null);
         onClear();
       }
@@ -405,6 +541,11 @@ export default function Editor({
               </option>
             ))}
           </select>
+          {language && code.trim().length > 0 && (
+            <span className="text-[10px] text-[#6c7086]">
+              {userSelectedLanguageRef.current ? '(manually selected)' : '(auto-detected)'}
+            </span>
+          )}
         </div>
 
         {/* ===== Row 2: Mode Selector ===== */}
@@ -414,7 +555,7 @@ export default function Editor({
             {modes.map((m) => (
               <button
                 key={m.value}
-                onClick={() => setMode(m.value)}
+                onClick={() => dispatch({ type: 'SET_MODE', payload: m.value })}
                 className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
                   mode === m.value
                     ? 'bg-[#4a86f7] text-white shadow-sm'
