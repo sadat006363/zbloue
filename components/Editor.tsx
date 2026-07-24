@@ -260,8 +260,6 @@ export default function Editor({
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const dragCounter = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const userSelectedLanguageRef = useRef(false);
-  const previousCodeRef = useRef('');
 
   // ============================================================
   // 🔥 توابع dispatch
@@ -272,7 +270,6 @@ export default function Editor({
   }, [dispatch]);
 
   const setLanguage = useCallback((newLang: string) => {
-    userSelectedLanguageRef.current = true;
     dispatch({ type: 'SET_LANGUAGE', payload: newLang });
   }, [dispatch]);
 
@@ -293,18 +290,11 @@ export default function Editor({
   }, [dispatch]);
 
   // ============================================================
-  // 🔥 تشخیص خودکار زبان هنگام تغییر کد
+  // 🔥 تشخیص خودکار زبان هنگام تغییر کد (همیشه فعال)
   // ============================================================
 
   useEffect(() => {
-    // اگر کد خالی است، کاری نکن
     if (!code || code.trim().length === 0) {
-      userSelectedLanguageRef.current = false;
-      return;
-    }
-
-    // اگر کاربر قبلاً خودش زبان را انتخاب کرده، تشخیص خودکار را غیرفعال کن
-    if (userSelectedLanguageRef.current) {
       return;
     }
 
@@ -341,10 +331,14 @@ export default function Editor({
       const content = e.target?.result as string;
       if (content) {
         setCode(content);
-        const detectedLang = detectLanguageFromExtension(file.name);
-        if (detectedLang) {
-          userSelectedLanguageRef.current = true;
-          setLanguage(detectedLang);
+        const detectedFromExt = detectLanguageFromExtension(file.name);
+        if (detectedFromExt) {
+          dispatch({ type: 'SET_LANGUAGE', payload: detectedFromExt });
+        } else {
+          const detectedFromContent = detectLanguageFromContent(content);
+          if (detectedFromContent) {
+            dispatch({ type: 'SET_LANGUAGE', payload: detectedFromContent });
+          }
         }
         setUploadProgress(100);
         setTimeout(() => setUploadProgress(null), 1500);
@@ -356,7 +350,7 @@ export default function Editor({
       setUploadProgress(null);
     };
     reader.readAsText(file);
-  }, [setCode, setLanguage, detectLanguageFromExtension]);
+  }, [setCode, dispatch, detectLanguageFromExtension]);
 
   // ============================================================
   // 🔥 رویدادهای Drag & Drop
@@ -428,7 +422,6 @@ export default function Editor({
     if (code.trim()) {
       if (confirm('Are you sure you want to clear all code and results?')) {
         setCode('');
-        userSelectedLanguageRef.current = false;
         setUploadProgress(null);
         onClear();
       }
@@ -541,11 +534,7 @@ export default function Editor({
               </option>
             ))}
           </select>
-          {language && code.trim().length > 0 && (
-            <span className="text-[10px] text-[#6c7086]">
-              {userSelectedLanguageRef.current ? '(manually selected)' : '(auto-detected)'}
-            </span>
-          )}
+          <span className="text-[10px] text-[#6c7086]">(auto-detected)</span>
         </div>
 
         {/* ===== Row 2: Mode Selector ===== */}
