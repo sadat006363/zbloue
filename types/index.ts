@@ -84,7 +84,6 @@ export const GenerateRequestSchema = z.object({
   mode: AnalysisModeSchema,
 });
 
-// Derive the request type from the runtime schema
 export type GenerateRequest = z.infer<typeof GenerateRequestSchema>;
 
 // ============================================================
@@ -92,21 +91,11 @@ export type GenerateRequest = z.infer<typeof GenerateRequestSchema>;
 // ============================================================
 
 export interface PromptInfo {
-  /** UI mode selected when this analysis was run */
   mode: AnalysisMode;
-  /** Canonical audit type (currently always 'comprehensive') */
   auditType: AdvancedAuditResult['auditType'];
-  /** Specializations applied during analysis */
   appliedSpecializations: AdvancedAuditResult['appliedSpecializations'];
-  /** Whether the canonical output was fully completed (not pipeline execution) */
   completionStatus: AdvancedAuditResult['completionStatus'];
-  /** Whether repair logic was applied to the final result */
   repairApplied: AdvancedAuditResult['repairApplied'];
-  /**
-   * Internal pipeline execution status.
-   * Actual values from implementation (verified in pipeline.ts):
-   * - 'completed' | 'failed' | 'fallback'
-   */
   pipelineStatus: 'completed' | 'failed' | 'fallback';
 }
 
@@ -122,7 +111,7 @@ const LegacyCodeWalkthroughItemSchema = z.object({
 const LegacyBugAndRiskyCaseSchema = z.object({
   issue: z.string(),
   impact: z.string(),
-  example: z.string().optional(), // 🔥 optional to match actual data
+  example: z.string(), // 🔥 required – will be provided as empty string if missing
 });
 
 const LegacyEdgeCaseSchema = z.object({
@@ -185,44 +174,26 @@ const LegacyScorecardSchema = z.object({
 // 8. SnippetDataSchema – persistence contract
 // ============================================================
 
-/**
- * Persistence model for Supabase snippets table.
- * Database column names are snake_case.
- * JSONB values must match canonical camelCase schemas (no automatic transformation).
- * Unknown columns are stripped by z.object() (intentional).
- *
- * This schema is used to parse raw rows from Supabase.
- * It is not the normalized Domain model; see PersistedSnippetRow below.
- *
- * All fields use .optional() – null values from the database are converted to
- * undefined in the read path (app/snippet/[slug]/page.tsx) using `?? undefined`.
- */
 export const SnippetDataSchema = z.object({
-  // Primary identifiers
   id: z.string(),
   slug: z.string(),
   raw_code: z.string(),
   language: z.string(),
-
-  // Display fields
   card_title: z.string(),
   key_concept: z.string(),
   what_this_code_does: z.string(),
   debug_analysis: z.string(),
   optimization: z.string(),
   linkedin_post: z.string(),
-
-  // Metadata
   is_public: z.boolean(),
   created_at: z.string(),
 
-  // User info
   username: z.string().optional(),
   github_username: z.string().optional(),
   avatar_url: z.string().optional(),
   card_image_url: z.string().optional(),
 
-  // ===== Legacy fields (historical rows) =====
+  // Legacy fields – all optional, but nested objects must match exact schemas
   code_walkthrough: z.array(LegacyCodeWalkthroughItemSchema).optional(),
   what_works_well: z.array(z.string()).optional(),
   bugs_and_risky_cases: z.array(LegacyBugAndRiskyCaseSchema).optional(),
@@ -237,14 +208,10 @@ export const SnippetDataSchema = z.object({
   final_verdict_summary: z.string().optional(),
   final_verdict_approved: z.boolean().optional(),
   final_verdict_next_steps: z.string().optional(),
-
-  // ===== Line explanations (deferred) =====
   line_explanations: z.unknown().optional(),
-
-  // ===== Generated prompt (simple string) =====
   generated_prompt: z.string().optional(),
 
-  // ===== Canonical fields (JSONB) =====
+  // Canonical fields
   findings: z.array(AuditFindingSchema).optional(),
   execution_overview: ExecutionOverviewSchema.optional(),
   architectural_observations: z.array(ArchitecturalObservationSchema).optional(),
@@ -255,31 +222,18 @@ export const SnippetDataSchema = z.object({
   verdict: CanonicalVerdictSchema.optional(),
   limitations: z.array(z.string()).optional(),
 
-  // ===== Full canonical audit result =====
   audit_result: AdvancedAuditResultSchema.optional(),
-
-  // ===== Debug/diagnostic (unstructured) =====
   debug_trace: z.unknown().optional(),
 });
 
-// Persistence row type (raw Supabase row)
 export type PersistedSnippetRow = z.infer<typeof SnippetDataSchema>;
-
-/**
- * @deprecated This is a raw transitional Supabase row, not the normalized Domain model.
- * Use PersistedSnippetRow for explicit persistence boundaries.
- * The normalized Domain model is AdvancedAuditResult (from the canonical schema).
- */
 export type Snippet = PersistedSnippetRow;
 
-/**
- * Alias for Snippet to match component expectations.
- * Some UI components (e.g., SnippetFullAnalysis) reference this type.
- */
+// Alias for component compatibility
 export type SnippetData = Snippet;
 
 // ============================================================
-// 9. Legacy generate response (historical API shape)
+// 9. Legacy generate response
 // ============================================================
 
 export const LegacyGenerateResponseSchema = z.object({
@@ -316,7 +270,7 @@ export const LegacyGenerateResponseSchema = z.object({
 export type LegacyGenerateResponse = z.infer<typeof LegacyGenerateResponseSchema>;
 
 // ============================================================
-// 10. CreateSnippetResponse (discriminated union)
+// 10. CreateSnippetResponse
 // ============================================================
 
 export type CreateSnippetResponse =
@@ -334,7 +288,7 @@ export type CreateSnippetResponse =
     };
 
 // ============================================================
-// 11. Legacy types (exported for historical data access only)
+// 11. Legacy types (exported for historical data access)
 // ============================================================
 
 export type LegacyCodeWalkthroughItem = z.infer<typeof LegacyCodeWalkthroughItemSchema>;
@@ -353,7 +307,7 @@ export interface LegacyImprovedCode {
 }
 
 // ============================================================
-// 12. UI State contracts
+// 12. UI State
 // ============================================================
 
 export interface LineExplanation {
@@ -396,7 +350,7 @@ export interface AppState {
 }
 
 // ============================================================
-// 13. Future canonical API contract (not yet active)
+// 13. Future canonical API contract
 // ============================================================
 
 export type CanonicalGenerateResponse =
