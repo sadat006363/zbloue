@@ -32,7 +32,6 @@ function formatText(text: string): string {
     try {
       const parsed = JSON.parse(trimmed);
       if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
-        // Comprehensive list of possible keys that might contain the answer
         const possibleKeys = [
           'analysis', 'summary', 'explanation', 'text',
           'response', 'output', 'result', 'content', 'message',
@@ -44,12 +43,10 @@ function formatText(text: string): string {
             return parsed[key];
           }
         }
-        // If only one key exists and it's a string, return it
         const keys = Object.keys(parsed);
         if (keys.length === 1 && typeof parsed[keys[0]] === 'string') {
           return parsed[keys[0]];
         }
-        // Otherwise, return a pretty-printed JSON as a fallback
         return `<pre class="bg-[#1a1a2e] text-[#cdd6f4] p-4 rounded-md overflow-x-auto text-sm font-mono">${JSON.stringify(parsed, null, 2)}</pre>`;
       }
       return `<pre class="bg-[#1a1a2e] text-[#cdd6f4] p-4 rounded-md overflow-x-auto text-sm font-mono">${JSON.stringify(parsed, null, 2)}</pre>`;
@@ -244,7 +241,8 @@ export default function AnalysisTab({
       // Suggested Tests
       if (fullAnalysis.suggestedTests && fullAnalysis.suggestedTests.length > 0) {
         text += `🧪 Suggested Tests:\n`;
-        fullAnalysis.suggestedTests.forEach((test: LegacySuggestedTest) => {
+        // 🔥 استفاده از تایپ صریح با safeArray
+        safeArray<LegacySuggestedTest>(fullAnalysis.suggestedTests).forEach((test) => {
           text += `  • ${safeString(test.name)}\n`;
           if (test.input) text += `    Input: ${safeString(test.input)}\n`;
           if (test.expectedOutput) text += `    Expected: ${safeString(test.expectedOutput)}\n`;
@@ -542,11 +540,11 @@ export default function AnalysisTab({
         )}
 
         {/* ===== Suggested Tests ===== */}
-        {safeArray(fullAnalysis.suggestedTests).length > 0 && (
+        {safeArray<LegacySuggestedTest>(fullAnalysis.suggestedTests).length > 0 && (
           <div>
             <h3 className="text-lg font-semibold text-[#1a1a2e] mb-3">🧪 Suggested Tests</h3>
             <div className="space-y-2">
-              {safeArray(fullAnalysis.suggestedTests).map((test: LegacySuggestedTest, idx: number) => (
+              {safeArray<LegacySuggestedTest>(fullAnalysis.suggestedTests).map((test: LegacySuggestedTest, idx: number) => (
                 <div key={idx} className="p-3 bg-[#f8f9fa] rounded-lg border border-[#d0d0d8]">
                   <p className="font-medium text-[#1a1a2e]">{safeString(test.name)}</p>
                   {test.input && <p className="text-sm text-[#4a4a6a]"><span className="font-medium">Input:</span> {safeString(test.input)}</p>}
