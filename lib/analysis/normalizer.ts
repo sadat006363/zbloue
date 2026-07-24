@@ -199,7 +199,7 @@ function normalizeAnalysisCoverage(source: unknown): AnalysisCoverageItem[] {
 }
 
 // ============================================================
-// Score Normalization (0-100 Object)
+// Score Normalization (0-100 Object with applicable flag)
 // ============================================================
 
 function normalizeScore(value: unknown, fallback: number = 0): number {
@@ -226,21 +226,50 @@ function normalizeScoreItem(
   fallback: number = 0,
   defaultReason: string = ''
 ): ScoreItem {
+  // If value is an object with score/reason/relatedFindings
   if (isObject(value)) {
     const score = normalizeScore(value.score, fallback);
     const reason = typeof value.reason === 'string' ? value.reason.trim() : defaultReason;
     const relatedFindings = Array.isArray(value.relatedFindings)
       ? value.relatedFindings.filter((id): id is string => typeof id === 'string')
       : [];
-    return { score, reason, relatedFindings };
+
+    // If score is a valid number (not NaN and > 0), mark as applicable
+    // Otherwise mark as not applicable
+    if (typeof score === 'number' && !isNaN(score) && score >= 0) {
+      return {
+        applicable: true,
+        score,
+        reason: reason || 'Score derived from data.',
+        relatedFindings,
+      };
+    } else {
+      return {
+        applicable: false,
+        score: null,
+        reason: reason || 'No score available.',
+        relatedFindings: [],
+      };
+    }
   }
 
+  // If value is a raw number
   const score = normalizeScore(value, fallback);
-  return {
-    score,
-    reason: defaultReason || 'Score derived from legacy data.',
-    relatedFindings: [],
-  };
+  if (typeof score === 'number' && !isNaN(score) && score >= 0) {
+    return {
+      applicable: true,
+      score,
+      reason: defaultReason || 'Score derived from legacy data.',
+      relatedFindings: [],
+    };
+  } else {
+    return {
+      applicable: false,
+      score: null,
+      reason: defaultReason || 'No score available.',
+      relatedFindings: [],
+    };
+  }
 }
 
 function normalizeScorecard(source: unknown): AuditScorecard {
