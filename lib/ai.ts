@@ -70,7 +70,7 @@ function safeSlice(value: unknown, start: number, end?: number): string {
 }
 
 // ============================================================
-// 3. Helper: extract text from possible JSON response
+// 3. Helper: extract text from possible JSON response (improved)
 // ============================================================
 
 function extractTextFromResponse(content: unknown): string {
@@ -78,17 +78,38 @@ function extractTextFromResponse(content: unknown): string {
     return String(content);
   }
   const trimmed = content.trim();
-  // If it looks like JSON, try to parse and extract analysis/summary
+
+  // اگر با { یا [ شروع شد، سعی می‌کنیم JSON را parse کنیم
   if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
     try {
       const parsed = JSON.parse(trimmed);
-      // If it has analysis or summary fields, extract them
-      if (parsed.analysis && typeof parsed.analysis === 'string') return parsed.analysis;
-      if (parsed.summary && typeof parsed.summary === 'string') return parsed.summary;
-      // Otherwise return the whole JSON pretty-printed (for debugging)
+
+      // اگر یک آبجکت بود
+      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+        // لیست کلیدهای احتمالی برای استخراج متن
+        const possibleKeys = ['analysis', 'summary', 'explanation', 'text', 'response', 'output', 'result', 'content', 'message'];
+
+        // کلید اولی که پیدا شد و مقدارش رشته است را برمی‌گردانیم
+        for (const key of possibleKeys) {
+          if (parsed[key] && typeof parsed[key] === 'string') {
+            return parsed[key];
+          }
+        }
+
+        // اگر آبجکت فقط یک کلید داشت و مقدارش رشته بود، آن را برمی‌گردانیم
+        const keys = Object.keys(parsed);
+        if (keys.length === 1 && typeof parsed[keys[0]] === 'string') {
+          return parsed[keys[0]];
+        }
+
+        // در غیر این صورت، برای دیباگ، JSON را به‌صورت خوانا نشان می‌دهیم
+        return `[Analysis Result]\n${JSON.stringify(parsed, null, 2)}`;
+      }
+
+      // اگر آرایه بود یا هر چیز دیگری، pretty-print می‌کنیم
       return JSON.stringify(parsed, null, 2);
     } catch {
-      // Not valid JSON, return as is
+      // اگر JSON معتبر نبود، همان متن را برگردان
       return content;
     }
   }

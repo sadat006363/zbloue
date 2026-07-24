@@ -24,25 +24,35 @@ interface AnalysisTabProps {
   onDownloadFullAnalysis?: () => void;
 }
 
-// ===== Helper: detect JSON and extract readable text =====
+// ===== Helper: detect JSON and extract readable text (improved) =====
 function formatText(text: string): string {
   if (!text) return '';
   const trimmed = text.trim();
-  // If it looks like JSON, try to parse it
   if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
     try {
       const parsed = JSON.parse(trimmed);
-      // If it has analysis or summary fields, extract them
-      if (parsed.analysis && typeof parsed.analysis === 'string') {
-        return parsed.analysis;
+      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+        // لیست کلیدهای احتمالی برای استخراج متن
+        const possibleKeys = [
+          'analysis', 'summary', 'explanation', 'text',
+          'response', 'output', 'result', 'content', 'message',
+          'description', 'details', 'answer'
+        ];
+        for (const key of possibleKeys) {
+          if (parsed[key] && typeof parsed[key] === 'string') {
+            return parsed[key];
+          }
+        }
+        // اگر فقط یک کلید داشت و مقدارش رشته بود
+        const keys = Object.keys(parsed);
+        if (keys.length === 1 && typeof parsed[keys[0]] === 'string') {
+          return parsed[keys[0]];
+        }
+        // در غیر این صورت، JSON را pretty-print می‌کنیم
+        return `<pre class="bg-[#1a1a2e] text-[#cdd6f4] p-4 rounded-md overflow-x-auto text-sm font-mono">${JSON.stringify(parsed, null, 2)}</pre>`;
       }
-      if (parsed.summary && typeof parsed.summary === 'string') {
-        return parsed.summary;
-      }
-      // Otherwise return the whole JSON pretty-printed as a code block
       return `<pre class="bg-[#1a1a2e] text-[#cdd6f4] p-4 rounded-md overflow-x-auto text-sm font-mono">${JSON.stringify(parsed, null, 2)}</pre>`;
     } catch {
-      // Not valid JSON, return as is
       return text;
     }
   }
@@ -52,9 +62,7 @@ function formatText(text: string): string {
 // ===== Clean markdown (with JSON detection) =====
 const cleanMarkdown = (text: string) => {
   if (!text) return '';
-  // First, format the text to handle JSON
   const formatted = formatText(text);
-  // If it's already HTML (starts with <pre), return as-is
   if (formatted.startsWith('<pre')) {
     return formatted;
   }
@@ -69,8 +77,7 @@ const cleanMarkdown = (text: string) => {
 const cleanTextForCopy = (text: string) => {
   if (!text) return '';
   const formatted = formatText(text);
-  // If formatted is HTML, return raw text (original)
-  if (formatted.startsWith('<pre')) {
+  if (formatted.startsWith('<pre>')) {
     return text;
   }
   let cleaned = formatted.replace(/^###\s*/gm, '');

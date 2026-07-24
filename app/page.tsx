@@ -39,7 +39,7 @@ function safeSlice(value: unknown, start: number, end?: number): string {
 }
 
 // ============================================================
-// 🔥 Helper: extract text from possible JSON response
+// 🔥 Helper: extract text from possible JSON response (improved)
 // ============================================================
 function extractTextFromAnalysis(value: unknown): string {
   if (typeof value !== 'string') {
@@ -49,13 +49,26 @@ function extractTextFromAnalysis(value: unknown): string {
   if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
     try {
       const parsed = JSON.parse(trimmed);
-      if (parsed.analysis && typeof parsed.analysis === 'string') {
-        return parsed.analysis;
+      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+        // لیست کلیدهای احتمالی برای استخراج متن
+        const possibleKeys = [
+          'analysis', 'summary', 'explanation', 'text',
+          'response', 'output', 'result', 'content', 'message',
+          'description', 'details', 'answer'
+        ];
+        for (const key of possibleKeys) {
+          if (parsed[key] && typeof parsed[key] === 'string') {
+            return parsed[key];
+          }
+        }
+        // اگر فقط یک کلید داشت و مقدارش رشته بود
+        const keys = Object.keys(parsed);
+        if (keys.length === 1 && typeof parsed[keys[0]] === 'string') {
+          return parsed[keys[0]];
+        }
+        // در غیر این صورت، برای دیباگ JSON را نشان می‌دهیم
+        return `[Analysis Result]\n${JSON.stringify(parsed, null, 2)}`;
       }
-      if (parsed.summary && typeof parsed.summary === 'string') {
-        return parsed.summary;
-      }
-      // Return the pretty-printed JSON as a readable fallback
       return JSON.stringify(parsed, null, 2);
     } catch {
       return value;
@@ -121,7 +134,7 @@ function buildPromptInfo(
   pipelineStatus: 'completed' | 'failed' | 'fallback' = 'completed'
 ): PromptInfo {
   const analysisText = typeof data.analysis === 'string' ? data.analysis : '';
-  const hasConcurrency = 
+  const hasConcurrency =
     analysisText.toLowerCase().includes('concurrency') ||
     data.bugsAndRiskyCases?.some((b: any) => {
       const issue = typeof b.issue === 'string' ? b.issue : '';
