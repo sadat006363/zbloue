@@ -212,6 +212,9 @@ export default function HomePage() {
       const normalizedGithubUsername = githubUsername && githubUsername.trim() !== '' ? githubUsername : undefined;
       const normalizedAvatarUrl = avatarUrl && avatarUrl.trim() !== '' ? avatarUrl : undefined;
 
+      // ============================================================
+      // 🔥 ساخت saveData با اضافه کردن audit_result
+      // ============================================================
       const saveData = {
         code: cleanedCode,
         language,
@@ -238,6 +241,21 @@ export default function HomePage() {
         final_verdict_summary: normalized.finalVerdict?.summary,
         final_verdict_approved: normalized.finalVerdict?.approved,
         final_verdict_next_steps: normalized.finalVerdict?.nextSteps,
+
+        // ===== فیلدهای Advanced (کانونیکال) =====
+        findings: genData.findings,
+        execution_overview: genData.executionOverview,
+        architectural_observations: genData.architecturalObservations,
+        recommended_actions: genData.recommendedActions,
+        suggested_tests_new: genData.suggestedTests,
+        complexity: genData.complexity,
+        scorecard_new: genData.scorecard,
+        verdict: genData.verdict,
+        limitations: genData.limitations,
+        debug_trace: genData.debug_trace,
+
+        // ===== 🔥 مهم: audit_result را اضافه کنید =====
+        audit_result: genData.audit_result,
       };
 
       const saveResult = await snippetService.save(saveData);
@@ -277,17 +295,17 @@ export default function HomePage() {
         final_verdict_summary: normalized.finalVerdict?.summary,
         final_verdict_approved: normalized.finalVerdict?.approved,
         final_verdict_next_steps: normalized.finalVerdict?.nextSteps,
-        findings: (genData as any).findings,
-        execution_overview: (genData as any).executionOverview,
-        architectural_observations: (genData as any).architecturalObservations,
-        recommended_actions: (genData as any).recommendedActions,
-        suggested_tests_new: (genData as any).suggestedTests,
-        complexity: (genData as any).complexity,
-        scorecard_new: (genData as any).scorecard,
-        verdict: (genData as any).verdict,
-        limitations: (genData as any).limitations,
-        audit_result: genData as any,
-        debug_trace: (genData as any).debug_trace,
+        findings: genData.findings,
+        execution_overview: genData.executionOverview,
+        architectural_observations: genData.architecturalObservations,
+        recommended_actions: genData.recommendedActions,
+        suggested_tests_new: genData.suggestedTests,
+        complexity: genData.complexity,
+        scorecard_new: genData.scorecard,
+        verdict: genData.verdict,
+        limitations: genData.limitations,
+        audit_result: genData.audit_result,
+        debug_trace: genData.debug_trace,
         line_explanations: undefined,
         generated_prompt: undefined,
       };
