@@ -57,6 +57,9 @@ const CreateSnippetRequestSchema = z
 
     // ===== فیلدهای Debug =====
     debug_trace: z.any().optional().nullable(),
+
+    // ===== فیلد جدید: audit_result (خروجی کامل Pipeline) =====
+    audit_result: z.any().optional().nullable(),
   })
   .catchall(z.any());
 
@@ -144,10 +147,9 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
   }
 
   // ============================================================
-  // 🔥 استفاده از Mapper جدید (toSnippetInsert)
+  // 🔥 ساخت Context برای Mapper
   // ============================================================
 
-  // 1. ساخت Context برای Mapper
   const context = {
     rawCode: body.code,
     sourceLanguage: body.language,
@@ -158,7 +160,7 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
     isPublic: true,
   };
 
-  // 2. اعتبارسنجی Context
+  // اعتبارسنجی Context
   try {
     isValidSnippetContext(context);
   } catch (error) {
@@ -169,32 +171,54 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
     );
   }
 
-  // 3. ساخت Audit Result از داده‌های ورودی (در صورت وجود)
-  // برای سازگاری با Mapper، اگر فیلدهای Advanced وجود دارند، یک Audit Result می‌سازیم
+  // ============================================================
+  // 🔥 ساخت Audit Result از داده‌های ورودی (با اولویت audit_result)
+  // ============================================================
+
   let auditResult: any = null;
-  if (body.findings || body.scorecard_new || body.verdict) {
+
+  // 1️⃣ اولویت اول: استفاده از audit_result (اگر موجود باشد)
+  if (body.audit_result) {
     try {
-      // ساخت یک شیء شبیه به AdvancedAuditResult از داده‌های ورودی
+      const validated = AdvancedAuditResultSchema.safeParse(body.audit_result);
+      if (validated.success) {
+        auditResult = validated.data;
+        logger.info('[create-snippet] Using audit_result from request');
+      } else {
+        logger.warn('[create-snippet] audit_result validation failed:', validated.error.issues);
+        // اگر validation fail شد، به سراغ روش بعدی می‌رویم
+      }
+    } catch (error) {
+      logger.warn('[create-snippet] Failed to parse audit_result:', error);
+    }
+  }
+
+  // 2️⃣ اگر audit_result موجود نبود یا نامعتبر بود، از فیلدهای جداگانه بساز
+  if (!auditResult && (body.findings || body.scorecard_new || body.verdict)) {
+    try {
       auditResult = {
         schemaVersion: '1.0',
         auditType: body.execution_overview ? 'concurrency' : 'generic',
-        status: 'complete',
+        completionStatus: 'complete',
+        repairApplied: false,
+        appliedSpecializations: body.execution_overview ? ['concurrency'] : [],
         language: body.language,
+        responseLanguage: 'English',
         summary: body.key_concept || '',
         executionOverview: body.execution_overview || { entryPoints: [], taskSubmissionPoints: [], blockingWaitPoints: [], sharedResources: [], resourceLifecycle: [] },
         findings: body.findings || [],
         architecturalObservations: body.architectural_observations || [],
         recommendedActions: body.recommended_actions || [],
         suggestedTests: body.suggested_tests_new || [],
-        complexity: body.complexity || { time: 'unknown', space: 'unknown', resourceGrowth: 'unknown', assumptions: [] },
+        complexity: body.complexity || { applicable: false, expression: null, explanation: null, variables: [], assumptions: [] },
         scorecard: body.scorecard_new || {
-          correctness: { score: 0, reason: '', relatedFindings: [] },
-          concurrencySafety: { score: 0, reason: '', relatedFindings: [] },
-          liveness: { score: 0, reason: '', relatedFindings: [] },
-          errorHandling: { score: 0, reason: '', relatedFindings: [] },
-          resourceManagement: { score: 0, reason: '', relatedFindings: [] },
-          maintainability: { score: 0, reason: '', relatedFindings: [] },
-          productionReadiness: { score: 0, reason: '', relatedFindings: [] },
+          correctness: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
+          concurrencySafety: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
+          liveness: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
+          errorHandling: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
+          resourceManagement: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
+          maintainability: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
+          productionReadiness: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
         },
         verdict: body.verdict || { status: 'requires-changes', explanation: '' },
         limitations: body.limitations || [],
@@ -204,30 +228,46 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
           notes: body.improved_code ? 'Migrated from improved_code' : 'No improved code provided',
         },
         linkedin_post: body.linkedin_post || 'Check out this code analysis! #Zbloue',
+        title: body.card_title || 'Code Analysis',
+        analysisCoverage: [
+          'correctness', 'security', 'concurrency', 'liveness', 'performance',
+          'resource-management', 'error-handling', 'input-validation', 'data-integrity',
+          'api-design', 'architecture', 'maintainability', 'testability', 'observability',
+          'compatibility'
+        ].map(dim => ({
+          dimension: dim as any,
+          status: 'analyzed',
+          summary: `Analysis of ${dim} dimension.`,
+          limitation: null,
+        })),
       };
 
-      // اعتبارسنجی Audit Result با Schema اصلی
       const validated = AdvancedAuditResultSchema.safeParse(auditResult);
       if (!validated.success) {
-        logger.warn('[create-snippet] Audit result validation failed, using fallback:', validated.error.issues);
+        logger.warn('[create-snippet] Built audit result validation failed:', validated.error.issues);
         auditResult = null;
       } else {
         auditResult = validated.data;
+        logger.info('[create-snippet] Built auditResult from separate fields');
       }
     } catch (error) {
-      logger.warn('[create-snippet] Failed to build audit result:', error);
+      logger.warn('[create-snippet] Failed to build audit result from fields:', error);
       auditResult = null;
     }
   }
 
+  // ============================================================
   // 4. استفاده از Mapper
+  // ============================================================
+
   let row: any;
   try {
     if (auditResult) {
-      // اگر Audit Result موجود است، از Mapper استفاده کن
+      // استفاده از Mapper با auditResult کامل
       row = toSnippetInsert(auditResult, context);
+      logger.info('[create-snippet] Mapper used with auditResult');
     } else {
-      // Fallback: استفاده از داده‌های Legacy
+      // Fallback: استفاده از داده‌های Legacy (با اضافه کردن audit_result در صورت وجود)
       const now = new Date().toISOString();
       row = {
         slug,
@@ -261,7 +301,7 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
         final_verdict_approved: body.final_verdict_approved ?? null,
         final_verdict_next_steps: body.final_verdict_next_steps ?? null,
 
-        // Advanced fields
+        // Advanced fields (از body گرفته می‌شوند)
         findings: body.findings ?? null,
         execution_overview: body.execution_overview ?? null,
         architectural_observations: body.architectural_observations ?? null,
@@ -272,7 +312,10 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
         verdict: body.verdict ?? null,
         limitations: body.limitations ?? null,
         debug_trace: body.debug_trace ?? null,
+        // 🔥 اگر audit_result در body وجود داشت، آن را نیز ذخیره کن
+        audit_result: body.audit_result ?? null,
       };
+      logger.info('[create-snippet] Fallback to legacy row (no auditResult)');
     }
   } catch (error) {
     logger.error('[create-snippet] Mapper failed:', error);

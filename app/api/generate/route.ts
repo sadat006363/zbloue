@@ -176,6 +176,8 @@ function mapCanonicalToLegacy(canonical: any): LegacyGenerateResponse {
     title: canonical.title || 'Code Analysis',
     summary: canonical.summary || '',
     debug_trace: canonical.debug_trace || undefined,
+    // 🔥 اضافه کردن audit_result برای ذخیره‌سازی کامل
+    audit_result: canonical,
   };
 }
 
