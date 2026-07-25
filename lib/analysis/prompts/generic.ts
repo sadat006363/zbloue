@@ -191,7 +191,7 @@ Each finding MUST include:
 - id: Sequential starting from F-001, F-002, ...
 - title: A concise, descriptive title (max 10 words). Example: "Semaphore Leak on Exception", "Potential Thread Starvation". NEVER use "Untitled Finding".
 - category: One of: correctness, concurrency, security, reliability, error-handling, resource-management, performance, data-integrity, input-validation, api-design, configuration, architecture, maintainability, testability, observability, compatibility, other.
-- mechanisms: Array of applicable mechanisms (e.g., ["resource-leak", "deadlock"]). Use [] if none.
+- mechanisms: Array of applicable mechanisms (e.g., ["resource-leak", "deadlock", "thread-starvation"]). Use [] if none.
 - severity: critical, high, medium, low, or info.
 - confidence: definite, likely, or conditional.
 - evidence: 🔥 MUST contain at least ONE object with startLine, endLine (exact line numbers from the numbered source), code (exact excerpt), and explanation. If you cannot find exact line numbers, use reasonable estimates based on the code structure.
@@ -210,66 +210,134 @@ Each finding MUST include:
 - If you cannot find a defect, produce a finding about a potential improvement or edge case.
 - The startLine and endLine must be valid line numbers from the numbered source code.
 
-==================== DEADLOCK DETECTION (CRITICAL - NEW) ====================
+==================== STARVATION DEADLOCK / SELF-DEADLOCK DETECTION (CRITICAL - NEW) ====================
 
-🔥 **DEADLOCK DETECTION RULES:**
+🔥 **STARVATION DEADLOCK / SELF-DEADLOCK DETECTION:**
 
-If you detect a potential deadlock in the code (cyclic dependency, lock-ordering issue, nested blocking waits, or circular wait-for graph), you MUST create a separate finding with the following specifications:
+This is a critical concurrency issue that occurs when a task running in a thread pool submits another task to the SAME thread pool and then waits for its completion (e.g., Future.get()).
 
-- **severity**: "critical" (deadlock is a critical issue)
-- **confidence**: "definite" (if the cycle is proven by visible code) or "likely" (if strongly implied)
-- **title**: "Potential Deadlock Detected" (or a more specific title if possible)
-- **category**: "concurrency"
-- **mechanisms**: ["deadlock"] (must include this mechanism)
-- **technicalExplanation**: Explain the circular wait condition, participants, resources, and the wait-for cycle.
-- **remediation**: Suggest specific steps to break the cycle, such as:
-  - Reordering locks to a consistent order
-  - Using tryLock with timeout
-  - Avoiding nested locks
-  - Using higher-level concurrency utilities
-- **evidence**: Must include at least one code snippet showing the conflicting lock acquisition order or blocking wait.
-- **executionPath**: Show the path that leads to the deadlock.
-- **triggerConditions**: Conditions required for the deadlock to occur.
+**When to report:**
+- You see a task (e.g., in createTask()) that uses executor.submit() to submit another task to the SAME executor.
+- The outer task then calls future.get() (or similar blocking wait) and waits for the inner task to complete.
+- If the thread pool is bounded (fixed size) and all threads are busy with outer tasks, the inner tasks will wait indefinitely → STARVATION DEADLOCK.
 
-**When to report a deadlock:**
+**Example pattern:**
+if (timeLimitMillis > 0) {
+Future<T> future = executor.submit(block::body); // ← same executor
+return future.get(timeLimitMillis, ...); // ← waiting on the same pool
+}*Severity:**
+- If maxConcurrentThreads = 1 → **critical** (certain deadlock)
+- If maxConcurrentThreads > 1 → **high** (risk under load when all threads are busy with outer tasks)
+
+**Finding specifications:**
+- title: "Thread Starvation Deadlock in Same-Executor Submission" (or similar)
+- severity: "critical" (if maxConcurrentThreads = 1) or "high"
+- confidence: "definite" (if proven by code) or "likely"
+- mechanisms: ["deadlock", "thread-starvation"]
+- category: "concurrency"
+- remediation: "Refactor to use a separate executor for timeout, or avoid submitting inner tasks to the same pool. Consider using a dedicated timeout mechanism outside the executor."
+
+**If you find this pattern, create a separate finding with the above specifications.**
+
+==================== DUPLICATE SUBMISSION DETECTION (HIGH PRIORITY - NEW) ====================
+
+🔥 **DUPLICATE SUBMISSION DETECTION:**
+
+This occurs when the same task (Runnable/FutureTask) is submitted to the executor more than once, causing queue pollution and unpredictable behavior.
+
+**When to report:**
+- You see a task being added to the queue via executor.getQueue().offer(...) and then also submitted via executor.execute(...).
+- Or you see a task submitted twice through any combination of methods.
+
+**Example pattern:**
+if (!executor.getQueue().offer(futureTask, maxWaitMillis, ...)) { ... }
+executor.execute(futureTask); // ← same task submitted again!
+
+text
+**Severity:** high (can cause queue capacity exhaustion and rejection errors)
+
+**Finding specifications:**
+- title: "Duplicate Task Submission to Executor" (or similar)
+- severity: "high"
+- confidence: "definite"
+- mechanisms: ["queue-misuse"]
+- category: "concurrency"
+- remediation: "Use only one submission method. Either use executor.execute() directly, or manage the queue manually with offer() and then submit via the executor's internal mechanism (but not both)."
+
+**If you find this pattern, create a separate finding with the above specifications.**
+
+==================== CODE SMELL / DUPLICATE LOGIC DETECTION (NEW) ====================
+
+🔥 **CODE SMELL / DUPLICATE LOGIC DETECTION:**
+
+Detect patterns where logic is repeated, inconsistent, or poorly structured.
+
+**When to report:**
+- Multiple map.get() calls on the same key without storing the result in a local variable (repeated lookups).
+- The same logic (e.g., pool creation/retrieval) is spread across multiple methods (scattered logic).
+- Configuration fields (e.g., maxWaitMillis, maxConcurrentThreads) are not updated consistently across overloaded methods.
+- Inconsistent design patterns (e.g., using AbortPolicy + manual offer on the same queue).
+
+**Example patterns:**
+// Repeated map lookups
+if (Objects.nonNull(poolMap.get(poolId)) && Objects.nonNull(semaphoreMap.get(poolId))) {
+this.executor = poolMap.get(poolId); // ← second lookup
+this.semaphore = semaphoreMap.get(poolId); // ← second lookup
+}**Severity:** medium (reduces maintainability)
+
+**Finding specifications:**
+- title: "Repeated Map Lookups / Inconsistent Configuration" (or similar)
+- severity: "medium"
+- confidence: "definite"
+- category: "maintainability"
+- remediation: "Store the result of poolMap.get() and semaphoreMap.get() in local variables before checking conditions. Centralize pool creation/retrieval logic in a helper method."
+
+**If you find this pattern, create a separate finding with the above specifications.**
+
+==================== INCONSISTENT DESIGN DETECTION (NEW) ====================
+
+🔥 **INCONSISTENT DESIGN DETECTION:**
+
+Detect when the code uses conflicting patterns that make behavior unpredictable.
+
+**When to report:**
+- Using ThreadPoolExecutor.AbortPolicy (or any rejection policy) while manually managing the queue with offer().
+- This creates inconsistency because the executor's rejection policy is bypassed by manual queue management.
+
+**Example pattern:**
+new ThreadPoolExecutor(..., new ThreadPoolExecutor.AbortPolicy());
+// Later:
+executor.getQueue().offer(futureTask, ...); // ← manual queue management
+executor.execute(futureTask);
+**Severity:** medium (may cause unexpected rejection behavior and confusion)
+
+**Finding specifications:**
+- title: "Inconsistent Queue Management with AbortPolicy" (or similar)
+- severity: "medium"
+- confidence: "definite"
+- category: "configuration"
+- remediation: "Either rely entirely on the executor's internal queue management (remove manual offer()) or use a custom RejectedExecutionHandler if manual control is needed. Do not mix both approaches."
+
+**If you find this pattern, create a separate finding with the above specifications.**
+
+==================== DEADLOCK DETECTION (LOCK-BASED - EXISTING) ====================
+
+🔥 **LOCK-BASED DEADLOCK DETECTION:**
+
+If you detect a potential deadlock due to lock ordering (synchronized, ReentrantLock, etc.), create a finding with severity "critical" and mechanisms ["deadlock"].
+
+**When to report:**
 - Two or more threads/tasks acquiring locks in different orders.
 - A thread holding a lock while waiting for another resource that is held by a thread waiting for the first lock.
-- Nested blocking waits (e.g., Future.get inside a synchronized block while holding a lock).
 
-**If deadlock is not proven but strongly possible:**
-- Set confidence to "likely" and explain the conditions needed.
-- If deadlock depends on external factors, use "conditional".
+**Finding specifications:**
+- severity: "critical"
+- confidence: "definite" or "likely"
+- title: "Potential Deadlock Detected" (or more specific)
+- category: "concurrency"
+- mechanisms: ["deadlock"]
 
-🔥 **Example of a deadlock finding:**
-{
-  "id": "F-003",
-  "title": "Potential Deadlock Due to Lock Ordering",
-  "category": "concurrency",
-  "mechanisms": ["deadlock"],
-  "severity": "critical",
-  "confidence": "likely",
-  "evidence": [
-    {
-      "startLine": 45,
-      "endLine": 52,
-      "code": "synchronized(lockA) { synchronized(lockB) { ... } }",
-      "explanation": "Lock A acquired before lock B in this path."
-    },
-    {
-      "startLine": 78,
-      "endLine": 85,
-      "code": "synchronized(lockB) { synchronized(lockA) { ... } }",
-      "explanation": "Lock B acquired before lock A in another path, creating a cycle."
-    }
-  ],
-  "executionPath": ["method1", "method2"],
-  "triggerConditions": ["Both methods are called concurrently"],
-  "consequence": "Threads may deadlock indefinitely, causing application hang.",
-  "technicalExplanation": "The code acquires locks in different orders in different methods, creating a circular wait condition that can lead to deadlock under concurrent execution.",
-  "remediation": "Refactor the code to acquire locks in a consistent order (e.g., always acquire lockA before lockB). Consider using tryLock with timeout to avoid indefinite blocking.",
-  "relatedSymbols": ["lockA", "lockB"],
-  "testToReproduce": null
-}
+**If you find this pattern, create a separate finding with the above specifications.**
 
 ==================== EXECUTION OVERVIEW (MANDATORY - COMPLETE ALL FIELDS) ====================
 
@@ -419,7 +487,10 @@ Do not use placeholder text like "Untitled Finding" or "No ... provided".
 🔥 Each finding MUST have a descriptive title, detailed technical explanation, and actionable remediation.
 🔥 Each finding MUST have at least ONE evidence item with startLine, endLine, code, and explanation.
 🔥 executionOverview MUST have ALL fields filled (entryPoints, taskSubmissionPoints, blockingWaitPoints, sharedResources, resourceLifecycle).
-🔥 If a deadlock is detected, create a separate finding with severity "critical" and mechanism ["deadlock"].
+🔥 **CRITICAL: Check for Starvation Deadlock (same-executor submit + wait).**
+🔥 **CRITICAL: Check for Duplicate Submission (offer + execute).**
+🔥 **CRITICAL: Check for Code Smells (repeated lookups, inconsistent config).**
+🔥 If a lock-based deadlock is detected, create a separate finding with severity "critical" and mechanism ["deadlock"].
 🔥 NEVER use placeholder text. Generate all content from the actual source code.
 
 ==================== OUTPUT ====================
