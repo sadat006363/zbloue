@@ -118,18 +118,8 @@ function validateResponse(result: unknown): LegacyGenerateResponse {
  * while also preserving all canonical fields for storage and UI.
  */
 function mapCanonicalToLegacy(canonical: any): LegacyGenerateResponse {
-  // ============================================================
-  // 🔥 لاگ ورودی (مرحله ۱)
-  // ============================================================
-  console.log('🔍 [mapCanonicalToLegacy] canonical:', canonical);
-  console.log('🔍 [mapCanonicalToLegacy] canonical.findings:', canonical?.findings);
-  console.log('🔍 [mapCanonicalToLegacy] canonical.scorecard:', canonical?.scorecard);
-  console.log('🔍 [mapCanonicalToLegacy] canonical.verdict:', canonical?.verdict);
-  console.log('🔍 [mapCanonicalToLegacy] canonical.executionOverview:', canonical?.executionOverview);
-
-  // ===== ساخت یک شیء واحد با تمام فیلدها (بدون تکرار نام) =====
-  const result: LegacyGenerateResponse = {
-    // ===== فیلدهای Legacy اصلی =====
+  // فیلدهای Legacy اصلی
+  const legacy: LegacyGenerateResponse = {
     analysis: canonical.summary || '',
     card_title: canonical.title || 'Code Analysis',
     key_concept: canonical.summary?.slice(0, 2000) || '',
@@ -154,8 +144,8 @@ function mapCanonicalToLegacy(canonical: any): LegacyGenerateResponse {
           notes: canonical.improvedCode.notes || '',
         }
       : undefined,
-    suggestedTests: canonical.suggestedTests || [],
-    scorecard: canonical.scorecard || undefined,
+    suggestedTests: [],
+    scorecard: undefined,
     finalVerdict: canonical.verdict
       ? {
           summary: canonical.verdict.explanation,
@@ -164,13 +154,19 @@ function mapCanonicalToLegacy(canonical: any): LegacyGenerateResponse {
         }
       : undefined,
     error: undefined,
+  };
 
-    // ===== فیلدهای Canonical (برای ذخیره‌سازی و نمایش Full Analysis) =====
+  // 🔥 اضافه کردن فیلدهای کانونیکال (برای ذخیره‌سازی در دیتابیس و نمایش Full Analysis)
+  return {
+    ...legacy,
+    // فیلدهای Advanced (کانونیکال)
     findings: canonical.findings || [],
     executionOverview: canonical.executionOverview || null,
     architecturalObservations: canonical.architecturalObservations || [],
     recommendedActions: canonical.recommendedActions || [],
+    suggestedTests: canonical.suggestedTests || [],
     complexity: canonical.complexity || null,
+    scorecard: canonical.scorecard || null,
     verdict: canonical.verdict || null,
     limitations: canonical.limitations || [],
     analysisCoverage: canonical.analysisCoverage || [],
@@ -180,18 +176,9 @@ function mapCanonicalToLegacy(canonical: any): LegacyGenerateResponse {
     title: canonical.title || 'Code Analysis',
     summary: canonical.summary || '',
     debug_trace: canonical.debug_trace || undefined,
+    // 🔥 اضافه کردن audit_result برای ذخیره‌سازی کامل
     audit_result: canonical,
   };
-
-  // ============================================================
-  // 🔥 لاگ خروجی (مرحله ۲)
-  // ============================================================
-  console.log('🔍 [mapCanonicalToLegacy] result.findings:', result.findings);
-  console.log('🔍 [mapCanonicalToLegacy] result.scorecard:', result.scorecard);
-  console.log('🔍 [mapCanonicalToLegacy] result.verdict:', result.verdict);
-  console.log('🔍 [mapCanonicalToLegacy] result.audit_result:', result.audit_result);
-
-  return result;
 }
 
 // ============================================================
@@ -280,26 +267,12 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
     logger.info(`[generate] Running advanced pipeline for IP ${ip}`);
     try {
       const pipelineResult = await runAdvancedPipeline(code, language);
-
-      // ============================================================
-      // 🔥 لاگ خروجی Pipeline (مرحله ۳)
-      // ============================================================
-      console.log('🔍 [generate] pipelineResult.result:', pipelineResult.result);
-      console.log('🔍 [generate] pipelineResult.result?.findings:', pipelineResult.result?.findings);
-      console.log('🔍 [generate] pipelineResult.result?.scorecard:', pipelineResult.result?.scorecard);
-      console.log('🔍 [generate] pipelineResult.result?.verdict:', pipelineResult.result?.verdict);
+      pipelineTrace = pipelineResult.trace || null;
 
       if (pipelineResult.result) {
         // Validate the canonical result
         const validated = AdvancedAuditResultSchema.safeParse(pipelineResult.result);
         if (validated.success) {
-          // ============================================================
-          // 🔥 لاگ داده‌های اعتبارسنجی‌شده (مرحله ۴)
-          // ============================================================
-          console.log('🔍 [generate] validated.data.findings:', validated.data.findings);
-          console.log('🔍 [generate] validated.data.scorecard:', validated.data.scorecard);
-          console.log('🔍 [generate] validated.data.verdict:', validated.data.verdict);
-
           // Map to legacy shape for now
           legacyResult = mapCanonicalToLegacy(validated.data);
           // Add debug trace if available
@@ -314,14 +287,34 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
           legacyResult = validateResponse(legacyData);
         }
       } else {
+        // Pipeline failed
         logger.warn(`[generate] Advanced pipeline failed: ${pipelineResult.error}`);
         const legacyData = await generateEducationalContent(code, language, mode);
         legacyResult = validateResponse(legacyData);
+      }
+
+      // ============================================================
+      // 🔥 اضافه کردن trace به legacyResult در همه حالت‌ها
+      // ============================================================
+      if (pipelineResult.trace) {
+        (legacyResult as any).debug_trace = pipelineResult.trace;
+        logger.info('[generate] Pipeline trace attached to response (even on fallback)');
+      } else if (pipelineResult.error) {
+        // اگر trace وجود نداشت، حداقل error را ذخیره کن
+        (legacyResult as any).debug_trace = {
+          error: pipelineResult.error,
+          status: pipelineResult.status,
+        };
       }
     } catch (error) {
       logger.error('[generate] Pipeline error, falling back to legacy:', error);
       const legacyData = await generateEducationalContent(code, language, mode);
       legacyResult = validateResponse(legacyData);
+      // در صورت خطای غیرمنتظره، یک trace حداقلی اضافه کن
+      (legacyResult as any).debug_trace = {
+        error: error instanceof Error ? error.message : 'Unknown pipeline error',
+        timestamp: new Date().toISOString(),
+      };
     }
   } else {
     // Simple / Medium modes
@@ -330,15 +323,7 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
     legacyResult = validateResponse(legacyData);
   }
 
-  // ============================================================
-  // 🔥 لاگ نهایی (مرحله ۵)
-  // ============================================================
-  console.log('🔍 [generate] Final legacyResult.findings:', legacyResult.findings);
-  console.log('🔍 [generate] Final legacyResult.scorecard:', legacyResult.scorecard);
-  console.log('🔍 [generate] Final legacyResult.verdict:', legacyResult.verdict);
-  console.log('🔍 [generate] Final legacyResult.audit_result:', (legacyResult as any).audit_result);
-
-  // Cache the result
+  // Cache the result (همراه با trace در صورت وجود)
   setCacheResult(cacheKey, legacyResult, pipelineTrace);
 
   const duration = Date.now() - startTime;
