@@ -198,10 +198,10 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
     try {
       auditResult = {
         schemaVersion: '1.0',
-        auditType: body.execution_overview ? 'concurrency' : 'generic',
+        auditType: 'comprehensive',
+        appliedSpecializations: body.execution_overview ? ['concurrency'] : [],
         completionStatus: 'complete',
         repairApplied: false,
-        appliedSpecializations: body.execution_overview ? ['concurrency'] : [],
         language: body.language,
         responseLanguage: 'English',
         summary: body.key_concept || '',
@@ -267,7 +267,7 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
       row = toSnippetInsert(auditResult, context);
       logger.info('[create-snippet] Mapper used with auditResult');
     } else {
-      // Fallback: استفاده از داده‌های Legacy (با اضافه کردن audit_result در صورت وجود)
+      // ===== Fallback: استفاده از داده‌های Legacy =====
       const now = new Date().toISOString();
       row = {
         slug,
@@ -312,8 +312,60 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
         verdict: body.verdict ?? null,
         limitations: body.limitations ?? null,
         debug_trace: body.debug_trace ?? null,
-        // 🔥 اگر audit_result در body وجود داشت، آن را نیز ذخیره کن
-        audit_result: body.audit_result ?? null,
+
+        // ===== 🔥 مهم: audit_result را از body.audit_result بگیرید =====
+        // اگر body.audit_result وجود نداشت، از داده‌های موجود یک audit_result بسازید
+        audit_result: body.audit_result ?? (() => {
+          // اگر فیلدهای Advanced وجود دارند، یک audit_result بساز
+          if (body.findings || body.scorecard_new || body.verdict) {
+            return {
+              schemaVersion: '1.0',
+              auditType: 'comprehensive',
+              appliedSpecializations: body.execution_overview ? ['concurrency'] : [],
+              completionStatus: 'complete',
+              repairApplied: false,
+              language: body.language,
+              responseLanguage: 'English',
+              summary: body.key_concept || '',
+              executionOverview: body.execution_overview || { entryPoints: [], taskSubmissionPoints: [], blockingWaitPoints: [], sharedResources: [], resourceLifecycle: [] },
+              findings: body.findings || [],
+              architecturalObservations: body.architectural_observations || [],
+              recommendedActions: body.recommended_actions || [],
+              suggestedTests: body.suggested_tests_new || [],
+              complexity: body.complexity || { applicable: false, expression: null, explanation: null, variables: [], assumptions: [] },
+              scorecard: body.scorecard_new || {
+                correctness: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
+                concurrencySafety: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
+                liveness: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
+                errorHandling: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
+                resourceManagement: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
+                maintainability: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
+                productionReadiness: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
+              },
+              verdict: body.verdict || { status: 'requires-changes', explanation: '' },
+              limitations: body.limitations || [],
+              improvedCode: {
+                available: !!body.improved_code,
+                code: body.improved_code || null,
+                notes: body.improved_code ? 'Migrated from improved_code' : 'No improved code provided',
+              },
+              linkedin_post: body.linkedin_post || 'Check out this code analysis! #Zbloue',
+              title: body.card_title || 'Code Analysis',
+              analysisCoverage: [
+                'correctness', 'security', 'concurrency', 'liveness', 'performance',
+                'resource-management', 'error-handling', 'input-validation', 'data-integrity',
+                'api-design', 'architecture', 'maintainability', 'testability', 'observability',
+                'compatibility'
+              ].map(dim => ({
+                dimension: dim as any,
+                status: 'analyzed',
+                summary: `Analysis of ${dim} dimension.`,
+                limitation: null,
+              })),
+            };
+          }
+          return null;
+        })(),
       };
       logger.info('[create-snippet] Fallback to legacy row (no auditResult)');
     }
