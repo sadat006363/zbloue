@@ -165,6 +165,36 @@ export default async function SnippetPage({ params }: PageProps) {
     snippet = await getSnippet(slug);
     if (snippet) {
       normalizedAudit = normalizeSnippetAudit(snippet);
+
+      // ============================================================
+      // 🔥 اضافه کردن داده‌های Advanced از normalizedAudit به snippet
+      // ============================================================
+      if (normalizedAudit && (normalizedAudit.status.type === 'valid' || normalizedAudit.status.type === 'legacy')) {
+        const auditData = normalizedAudit.status.audit;
+        if (auditData) {
+          // ادغام داده‌های Advanced به snippet
+          snippet = {
+            ...snippet,
+            // فیلدهای اصلی Advanced
+            findings: auditData.findings ?? snippet.findings,
+            scorecard_new: auditData.scorecard ?? snippet.scorecard_new,
+            verdict: auditData.verdict ?? snippet.verdict,
+            execution_overview: auditData.executionOverview ?? snippet.execution_overview,
+            architectural_observations: auditData.architecturalObservations ?? snippet.architectural_observations,
+            recommended_actions: auditData.recommendedActions ?? snippet.recommended_actions,
+            suggested_tests_new: auditData.suggestedTests ?? snippet.suggested_tests_new,
+            complexity: auditData.complexity ?? snippet.complexity,
+            limitations: auditData.limitations ?? snippet.limitations,
+            improved_code: auditData.improvedCode?.code ?? snippet.improved_code,
+            linkedin_post: auditData.linkedin_post ?? snippet.linkedin_post,
+            summary: auditData.summary ?? snippet.key_concept,
+            // فیلدهای متفرقه برای نمایش بهتر
+            card_title: auditData.title ?? snippet.card_title,
+            key_concept: auditData.summary ?? snippet.key_concept,
+            what_this_code_does: auditData.executionOverview?.entryPoints?.join(', ') ?? snippet.what_this_code_does,
+          };
+        }
+      }
     }
   } catch (err) {
     error = err as Error;
@@ -179,6 +209,7 @@ export default async function SnippetPage({ params }: PageProps) {
   const shareUrl = `${baseUrl}/snippet/${snippet.slug}`;
   const highlightedHtml = await highlightCode(snippet.raw_code, snippet.language);
 
+  // 🔥 استفاده از normalizedAudit برای تشخیص وجود تحلیل کامل
   const fullAnalysisExists = normalizedAudit ? normalizedAudit.hasFullAnalysis : false;
 
   const debugData = {
@@ -216,7 +247,6 @@ export default async function SnippetPage({ params }: PageProps) {
           <SnippetShareButtons slug={snippet.slug} title={snippet.card_title} />
           <SnippetTabLinks shareUrl={shareUrl} />
 
-          {/* ===== اصلاح این بخش ===== */}
           <div id="snippet-code">
             <SnippetCode
               code={snippet.raw_code ?? ''}
