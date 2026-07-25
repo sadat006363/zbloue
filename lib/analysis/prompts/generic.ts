@@ -183,35 +183,33 @@ You must return a JSON object with the following structure. **All fields are man
 
 ==================== FINDINGS GENERATION (CRITICAL - HIGHEST PRIORITY) ====================
 
-🔥 **THIS IS THE MOST IMPORTANT SECTION. FOLLOW IT EXACTLY.**
+🔥 THIS IS THE MOST IMPORTANT SECTION. FOLLOW IT EXACTLY.
 
 You MUST generate findings that are:
-- **At least 2 findings** for non-trivial code (like the one you are analyzing).
-- **At least 1 finding** for trivial code.
+- At least 2 findings for non-trivial code (like the one you are analyzing).
+- At least 1 finding for trivial code.
 
-Each finding **MUST** include:
+Each finding MUST include:
 
-| Field | Requirement |
-|-------|-------------|
-| `id` | Sequential: F-001, F-002, ... |
-| `title` | A concise, descriptive title (max 10 words). Example: "Semaphore Leak on Exception", "Potential Thread Starvation". **NEVER** use "Untitled Finding". |
-| `category` | One of: correctness, concurrency, security, reliability, error-handling, resource-management, performance, data-integrity, input-validation, api-design, configuration, architecture, maintainability, testability, observability, compatibility, other. |
-| `mechanisms` | Array of applicable mechanisms (e.g., ["resource-leak", "deadlock"]). Use [] if none. |
-| `severity` | critical, high, medium, low, or info. |
-| `confidence` | definite, likely, or conditional. |
-| `evidence` | **MUST contain at least one object** with `startLine`, `endLine`, `code` (exact excerpt), and `explanation`. |
-| `executionPath` | Array of method/function names leading to the issue. |
-| `triggerConditions` | Array of conditions that trigger the issue. |
-| `consequence` | What happens if the issue is not fixed (min 20 characters). |
-| `technicalExplanation` | Detailed technical explanation (min 50 characters). **NEVER** use "No technical explanation provided." |
-| `remediation` | Specific, actionable fix (min 50 characters). **NEVER** use "No remediation provided." |
-| `relatedSymbols` | Array of relevant variable/method names. |
-| `testToReproduce` | Either null or an object with title, setup, steps, expectedResult. |
+- id: Sequential starting from F-001, F-002, ...
+- title: A concise, descriptive title (max 10 words). Example: "Semaphore Leak on Exception", "Potential Thread Starvation". NEVER use "Untitled Finding".
+- category: One of: correctness, concurrency, security, reliability, error-handling, resource-management, performance, data-integrity, input-validation, api-design, configuration, architecture, maintainability, testability, observability, compatibility, other.
+- mechanisms: Array of applicable mechanisms (e.g., ["resource-leak", "deadlock"]). Use [] if none.
+- severity: critical, high, medium, low, or info.
+- confidence: definite, likely, or conditional.
+- evidence: MUST contain at least one object with startLine, endLine, code (exact excerpt), and explanation.
+- executionPath: Array of method/function names leading to the issue.
+- triggerConditions: Array of conditions that trigger the issue.
+- consequence: What happens if the issue is not fixed (min 20 characters).
+- technicalExplanation: Detailed technical explanation (min 50 characters). NEVER use "No technical explanation provided."
+- remediation: Specific, actionable fix (min 50 characters). NEVER use "No remediation provided."
+- relatedSymbols: Array of relevant variable/method names.
+- testToReproduce: Either null or an object with title, setup, steps, expectedResult.
 
-🔥 **RULES:**
-- **DO NOT** use placeholder text like "Untitled Finding", "No technical explanation provided.", or "No remediation provided."
-- **DO NOT** leave `evidence` empty.
-- **DO NOT** copy the example finding verbatim. Generate findings based on the actual source code.
+🔥 RULES:
+- DO NOT use placeholder text like "Untitled Finding", "No technical explanation provided.", or "No remediation provided."
+- DO NOT leave evidence empty.
+- DO NOT copy the example finding verbatim. Generate findings based on the actual source code.
 - If you cannot find a defect, produce a finding about a potential improvement or edge case.
 
 ==================== ARCHITECTURAL OBSERVATIONS (MANDATORY) ====================
@@ -346,9 +344,9 @@ Do not use placeholder text like "Untitled Finding" or "No ... provided".
 
 ==================== FINAL REMINDER (DO NOT IGNORE) ====================
 
-🔥 **You MUST produce at least 2 findings for non-trivial code.**
-🔥 **Each finding MUST have a descriptive title, detailed technical explanation, and actionable remediation.**
-🔥 **NEVER use placeholder text. Generate all content from the actual source code.**
+🔥 You MUST produce at least 2 findings for non-trivial code.
+🔥 Each finding MUST have a descriptive title, detailed technical explanation, and actionable remediation.
+🔥 NEVER use placeholder text. Generate all content from the actual source code.
 
 ==================== OUTPUT ====================
 
