@@ -222,10 +222,7 @@ This is a critical concurrency issue that occurs when a task running in a thread
 - If the thread pool is bounded (fixed size) and all threads are busy with outer tasks, the inner tasks will wait indefinitely → STARVATION DEADLOCK.
 
 **Example pattern:**
-if (timeLimitMillis > 0) {
-Future<T> future = executor.submit(block::body); // ← same executor
-return future.get(timeLimitMillis, ...); // ← waiting on the same pool
-}*Severity:**
+**Severity:**
 - If maxConcurrentThreads = 1 → **critical** (certain deadlock)
 - If maxConcurrentThreads > 1 → **high** (risk under load when all threads are busy with outer tasks)
 
@@ -241,34 +238,31 @@ return future.get(timeLimitMillis, ...); // ← waiting on the same pool
 
 ==================== DUPLICATE SUBMISSION DETECTION (HIGH PRIORITY - NEW) ====================
 
-🔥 **DUPLICATE SUBMISSION DETECTION:**
+🔥 **DUPLICATE SUBMISSION DETECTION - MUST BE REPORTED AS SEPARATE FINDING:**
 
 This occurs when the same task (Runnable/FutureTask) is submitted to the executor more than once, causing queue pollution and unpredictable behavior.
 
 **When to report:**
 - You see a task being added to the queue via executor.getQueue().offer(...) and then also submitted via executor.execute(...).
-- Or you see a task submitted twice through any combination of methods.
+- Or you see a task submitted twice through any combination of methods (e.g., submit() called twice on the same task, or execute() called after offer()).
 
 **Example pattern:**
-if (!executor.getQueue().offer(futureTask, maxWaitMillis, ...)) { ... }
-executor.execute(futureTask); // ← same task submitted again!
-
-text
 **Severity:** high (can cause queue capacity exhaustion and rejection errors)
 
-**Finding specifications:**
-- title: "Duplicate Task Submission to Executor" (or similar)
-- severity: "high"
-- confidence: "definite"
-- mechanisms: ["queue-misuse"]
-- category: "concurrency"
-- remediation: "Use only one submission method. Either use executor.execute() directly, or manage the queue manually with offer() and then submit via the executor's internal mechanism (but not both)."
+**Finding specifications (MUST USE THESE):**
+- **id**: Sequential (e.g., F-003)
+- **title**: "Duplicate Task Submission to Executor" (or similar)
+- **severity**: "high"
+- **confidence**: "definite"
+- **mechanisms**: ["queue-misuse"]
+- **category**: "concurrency"
+- **remediation**: "Use only one submission method. Either use executor.execute() directly, or manage the queue manually with offer() and then submit via the executor's internal mechanism (but not both)."
 
-**If you find this pattern, create a separate finding with the above specifications.**
+🔥 **YOU MUST CREATE A SEPARATE FINDING FOR DUPLICATE SUBMISSION.** Do NOT merge it with other findings.
 
 ==================== CODE SMELL / DUPLICATE LOGIC DETECTION (NEW) ====================
 
-🔥 **CODE SMELL / DUPLICATE LOGIC DETECTION:**
+🔥 **CODE SMELL / DUPLICATE LOGIC DETECTION - MUST BE REPORTED AS SEPARATE FINDING:**
 
 Detect patterns where logic is repeated, inconsistent, or poorly structured.
 
@@ -279,20 +273,17 @@ Detect patterns where logic is repeated, inconsistent, or poorly structured.
 - Inconsistent design patterns (e.g., using AbortPolicy + manual offer on the same queue).
 
 **Example patterns:**
-// Repeated map lookups
-if (Objects.nonNull(poolMap.get(poolId)) && Objects.nonNull(semaphoreMap.get(poolId))) {
-this.executor = poolMap.get(poolId); // ← second lookup
-this.semaphore = semaphoreMap.get(poolId); // ← second lookup
-}**Severity:** medium (reduces maintainability)
+**Severity:** medium (reduces maintainability)
 
-**Finding specifications:**
-- title: "Repeated Map Lookups / Inconsistent Configuration" (or similar)
-- severity: "medium"
-- confidence: "definite"
-- category: "maintainability"
-- remediation: "Store the result of poolMap.get() and semaphoreMap.get() in local variables before checking conditions. Centralize pool creation/retrieval logic in a helper method."
+**Finding specifications (MUST USE THESE):**
+- **id**: Sequential (e.g., F-004)
+- **title**: "Repeated Map Lookups / Scattered Configuration Logic" (or similar)
+- **severity**: "medium"
+- **confidence**: "definite"
+- **category**: "maintainability"
+- **remediation**: "Store the result of poolMap.get() and semaphoreMap.get() in local variables before checking conditions. Centralize pool creation/retrieval logic in a helper method."
 
-**If you find this pattern, create a separate finding with the above specifications.**
+🔥 **YOU MUST CREATE A SEPARATE FINDING FOR CODE SMELL.** Do NOT merge it with other findings.
 
 ==================== INCONSISTENT DESIGN DETECTION (NEW) ====================
 
@@ -305,10 +296,6 @@ Detect when the code uses conflicting patterns that make behavior unpredictable.
 - This creates inconsistency because the executor's rejection policy is bypassed by manual queue management.
 
 **Example pattern:**
-new ThreadPoolExecutor(..., new ThreadPoolExecutor.AbortPolicy());
-// Later:
-executor.getQueue().offer(futureTask, ...); // ← manual queue management
-executor.execute(futureTask);
 **Severity:** medium (may cause unexpected rejection behavior and confusion)
 
 **Finding specifications:**
@@ -488,8 +475,8 @@ Do not use placeholder text like "Untitled Finding" or "No ... provided".
 🔥 Each finding MUST have at least ONE evidence item with startLine, endLine, code, and explanation.
 🔥 executionOverview MUST have ALL fields filled (entryPoints, taskSubmissionPoints, blockingWaitPoints, sharedResources, resourceLifecycle).
 🔥 **CRITICAL: Check for Starvation Deadlock (same-executor submit + wait).**
-🔥 **CRITICAL: Check for Duplicate Submission (offer + execute).**
-🔥 **CRITICAL: Check for Code Smells (repeated lookups, inconsistent config).**
+🔥 **CRITICAL: Check for Duplicate Submission (offer + execute) and create a SEPARATE finding for it.**
+🔥 **CRITICAL: Check for Code Smells (repeated lookups, scattered logic) and create a SEPARATE finding for it.**
 🔥 If a lock-based deadlock is detected, create a separate finding with severity "critical" and mechanism ["deadlock"].
 🔥 NEVER use placeholder text. Generate all content from the actual source code.
 
