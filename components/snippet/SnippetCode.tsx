@@ -8,14 +8,18 @@ interface SnippetCodeProps {
 }
 
 export default function SnippetCode({ code, language, highlightedHtml }: SnippetCodeProps) {
+  const safeCode = code ?? '';
+  const safeLanguage = language ?? 'text';
+  const safeHtml = highlightedHtml ?? '';
+
   return (
     <div className="space-y-2">
       <div className="flex justify-between items-center">
         <span className="text-sm font-semibold text-[#89b4fa]">💻 Source Code</span>
-        <CopyButton text={code} label="📄 Copy Code" tooltip="Copy source code" />
+        <CopyButton text={safeCode} label="📄 Copy Code" tooltip="Copy source code" />
       </div>
       <div className="bg-[#11111b] rounded-lg overflow-x-auto max-h-[500px] border border-[#313244] font-mono text-sm leading-relaxed">
-        <div dangerouslySetInnerHTML={{ __html: highlightedHtml }} className="p-4" />
+        <div dangerouslySetInnerHTML={{ __html: safeHtml }} className="p-4" />
       </div>
     </div>
   );

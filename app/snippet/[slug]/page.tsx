@@ -216,10 +216,11 @@ export default async function SnippetPage({ params }: PageProps) {
           <SnippetShareButtons slug={snippet.slug} title={snippet.card_title} />
           <SnippetTabLinks shareUrl={shareUrl} />
 
+          {/* ===== اصلاح این بخش ===== */}
           <div id="snippet-code">
             <SnippetCode
-              code={snippet.raw_code}
-              language={snippet.language}
+              code={snippet.raw_code ?? ''}
+              language={snippet.language ?? 'text'}
               highlightedHtml={highlightedHtml}
             />
           </div>

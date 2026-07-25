@@ -58,7 +58,7 @@ export default function LinkedInTab({ linkedinPost, shareUrl, showToast }: Linke
   // ============================================================
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(linkedinPost);
+      await navigator.clipboard.writeText(linkedinPost ?? '');
       showToast('✅ LinkedIn post copied!');
     } catch (error) {
       console.error('Copy failed:', error);

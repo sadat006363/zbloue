@@ -1,10 +1,11 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
 import { CopyButton, DownloadButton } from '@/components/common';
+import type { Snippet } from '@/types';
 
 interface PromptTabProps {
-  snippet: any;
-  generatedPrompt: string | undefined;
+  snippet: Snippet | null;
+  generatedPrompt?: string;
   isGeneratingPrompt?: boolean;
   showToast: (message: string) => void;
   appUrl: string;
@@ -37,8 +38,10 @@ export default function PromptTab({
   // ===== تابع اشتراک‌گذاری =====
   const handleShare = (platform: string) => {
     setShowShareDropdown(false);
-    const url = `${appUrl}/snippet/${snippet?.slug}`;
-    const title = snippet?.card_title || 'Check out this code analysis on Zbloue!';
+    const slug = snippet?.slug ?? '';
+    const cardTitle = snippet?.card_title ?? 'Check out this code analysis on Zbloue!';
+    const url = `${appUrl}/snippet/${slug}`;
+    const title = cardTitle;
     const fullText = `${title} - Analyze your code with AI and share it with the world! #Zbloue #CodeReview #AI #Developer`;
 
     switch (platform) {
@@ -106,13 +109,13 @@ export default function PromptTab({
 
         <div className="flex items-center gap-2 flex-wrap">
           <CopyButton 
-            text={generatedPrompt || ''}
+            text={generatedPrompt ?? ''}
             label="Copy" 
             tooltip="Copy prompt to clipboard"
             onCopy={handleCopy}
           />
           <DownloadButton 
-            content={generatedPrompt || ''}
+            content={generatedPrompt ?? ''}
             filename={`prompt-${Date.now()}`}
             extension="md"
             label="Download .md" 

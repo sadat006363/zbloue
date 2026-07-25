@@ -3,7 +3,7 @@
 // ============================================================
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface SnippetShareButtonsProps {
   slug: string;
@@ -12,7 +12,16 @@ interface SnippetShareButtonsProps {
 
 export default function SnippetShareButtons({ slug, title }: SnippetShareButtonsProps) {
   const [copied, setCopied] = useState(false);
-  const url = typeof window !== 'undefined' ? `${window.location.origin}/snippet/${slug}` : '';
+  const [url, setUrl] = useState('');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setUrl(`${window.location.origin}/snippet/${slug ?? ''}`);
+    }
+  }, [slug]);
+
+  const safeTitle = title ?? 'Code Analysis';
+  const safeSlug = slug ?? '';
 
   const handleCopyLink = async () => {
     try {
@@ -28,7 +37,7 @@ export default function SnippetShareButtons({ slug, title }: SnippetShareButtons
     {
       name: 'Twitter',
       icon: '🐦',
-      url: `https://twitter.com/intent/tweet?text=${encodeURIComponent(title)}&url=${encodeURIComponent(url)}`,
+      url: `https://twitter.com/intent/tweet?text=${encodeURIComponent(safeTitle)}&url=${encodeURIComponent(url)}`,
     },
     {
       name: 'LinkedIn',
@@ -38,7 +47,7 @@ export default function SnippetShareButtons({ slug, title }: SnippetShareButtons
     {
       name: 'Reddit',
       icon: '🤖',
-      url: `https://www.reddit.com/submit?title=${encodeURIComponent(title)}&url=${encodeURIComponent(url)}`,
+      url: `https://www.reddit.com/submit?title=${encodeURIComponent(safeTitle)}&url=${encodeURIComponent(url)}`,
     },
     {
       name: 'Facebook',
