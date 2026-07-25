@@ -279,6 +279,9 @@ export const LegacyGenerateResponseSchema = z.object({
   title: z.any().optional(),
   summary: z.any().optional(),
   debug_trace: z.any().optional(),
+
+  // ===== New: audit_result (full Pipeline output) =====
+  audit_result: z.any().optional(),
 });
 
 export type LegacyGenerateResponse = z.infer<typeof LegacyGenerateResponseSchema>;
