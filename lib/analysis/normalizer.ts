@@ -409,7 +409,7 @@ function normalizeImprovedCode(source: unknown): ImprovedCode {
 }
 
 // ============================================================
-// Finding Normalization (with validated mechanisms)
+// Finding Normalization (with fallbacks to avoid placeholder text)
 // ============================================================
 
 function normalizeFinding(finding: unknown, index: number, usedIds: Set<string>): AuditFinding {
@@ -471,9 +471,18 @@ function normalizeFinding(finding: unknown, index: number, usedIds: Set<string>)
       return result.success;
     });
 
+  // 🔥 Ensure we have meaningful values, avoid placeholders
+  const title = getSafeString(f.title, getSafeString(f.name, 'Untitled Finding'));
+  const consequence = getSafeString(f.consequence, getSafeString(f.impact, getSafeString(f.effect, 'No consequence provided.')));
+  const technicalExplanation = getSafeString(f.technicalExplanation, getSafeString(f.details, 'No technical explanation provided.'));
+  const remediation = getSafeString(f.remediation, getSafeString(f.fix, getSafeString(f.solution, 'No remediation provided.')));
+  const executionPath = getStringArray(f.executionPath) || getStringArray(f.path) || [];
+  const triggerConditions = getStringArray(f.triggerConditions) || getStringArray(f.conditions) || [];
+  const relatedSymbols = getStringArray(f.relatedSymbols) || getStringArray(f.symbols) || [];
+
   return {
     id: finalId,
-    title: getSafeString(f.title, getSafeString(f.name, 'Untitled Finding')),
+    title,
     category: broadCategory,
     mechanisms: validMechanisms,
     severity: sanitizeEnum(
@@ -487,12 +496,12 @@ function normalizeFinding(finding: unknown, index: number, usedIds: Set<string>)
       'conditional'
     ),
     evidence: normalizedEvidence,
-    executionPath: getStringArray(f.executionPath) || getStringArray(f.path) || [],
-    triggerConditions: getStringArray(f.triggerConditions) || getStringArray(f.conditions) || [],
-    consequence: getSafeString(f.consequence, getSafeString(f.impact, getSafeString(f.effect, 'No consequence provided.'))),
-    technicalExplanation: getSafeString(f.technicalExplanation, getSafeString(f.details, 'No technical explanation provided.')),
-    remediation: getSafeString(f.remediation, getSafeString(f.fix, getSafeString(f.solution, 'No remediation provided.'))),
-    relatedSymbols: getStringArray(f.relatedSymbols) || getStringArray(f.symbols) || [],
+    executionPath,
+    triggerConditions,
+    consequence,
+    technicalExplanation,
+    remediation,
+    relatedSymbols,
     testToReproduce,
   };
 }
@@ -665,7 +674,7 @@ function normalizeResponseLanguage(source: unknown): 'English' | 'Persian' | nul
 }
 
 // ============================================================
-// 🔥 Helper: Create minimal audit from partial data
+// Helper: Create minimal audit from partial data
 // ============================================================
 
 function createMinimalAuditFromPartial(
@@ -678,7 +687,6 @@ function createMinimalAuditFromPartial(
     const title = normalizeTitle(input.title, summary);
     const language = normalizeLanguage(input.language);
 
-    // ساخت یک ساختار حداقلی با داده‌های موجود
     const minimal: AdvancedAuditResult = {
       schemaVersion: '1.0',
       auditType: 'comprehensive',

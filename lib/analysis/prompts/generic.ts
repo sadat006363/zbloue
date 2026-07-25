@@ -49,7 +49,7 @@ Keep identifiers, code, enum values, IDs, and schema keys unchanged.
 
 ==================== CANONICAL OUTPUT CONTRACT ====================
 
-You must return a JSON object with the following structure:
+You must return a JSON object with the following structure. **All fields are mandatory and must contain meaningful values.**
 
 {
   "schemaVersion": "1.0",
@@ -61,9 +61,21 @@ You must return a JSON object with the following structure:
   "language": "${context.sourceLanguage}",
   "responseLanguage": "${context.responseLanguage}",
   "analysisCoverage": [
-    { "dimension": "correctness", "status": "analyzed", "summary": "...", "limitation": null },
-    { "dimension": "security", "status": "analyzed", "summary": "...", "limitation": null },
-    // ... all 15 dimensions
+    { "dimension": "correctness", "status": "analyzed", "summary": "Analysis of correctness dimension.", "limitation": null },
+    { "dimension": "security", "status": "analyzed", "summary": "Analysis of security dimension.", "limitation": null },
+    { "dimension": "concurrency", "status": "analyzed", "summary": "Analysis of concurrency dimension.", "limitation": null },
+    { "dimension": "liveness", "status": "analyzed", "summary": "Analysis of liveness dimension.", "limitation": null },
+    { "dimension": "performance", "status": "analyzed", "summary": "Analysis of performance dimension.", "limitation": null },
+    { "dimension": "resource-management", "status": "analyzed", "summary": "Analysis of resource management dimension.", "limitation": null },
+    { "dimension": "error-handling", "status": "analyzed", "summary": "Analysis of error handling dimension.", "limitation": null },
+    { "dimension": "input-validation", "status": "analyzed", "summary": "Analysis of input validation dimension.", "limitation": null },
+    { "dimension": "data-integrity", "status": "analyzed", "summary": "Analysis of data integrity dimension.", "limitation": null },
+    { "dimension": "api-design", "status": "analyzed", "summary": "Analysis of API design dimension.", "limitation": null },
+    { "dimension": "architecture", "status": "analyzed", "summary": "Analysis of architecture dimension.", "limitation": null },
+    { "dimension": "maintainability", "status": "analyzed", "summary": "Analysis of maintainability dimension.", "limitation": null },
+    { "dimension": "testability", "status": "analyzed", "summary": "Analysis of testability dimension.", "limitation": null },
+    { "dimension": "observability", "status": "analyzed", "summary": "Analysis of observability dimension.", "limitation": null },
+    { "dimension": "compatibility", "status": "analyzed", "summary": "Analysis of compatibility dimension.", "limitation": null }
   ],
   "summary": "Concise summary of findings and code quality.",
   "executionOverview": {
@@ -73,7 +85,34 @@ You must return a JSON object with the following structure:
     "sharedResources": ["poolMap", "semaphoreMap"],
     "resourceLifecycle": ["created in bulkhead", "released in finally"]
   },
-  "findings": [],
+  "findings": [
+    // 🔥 CRITICAL: You MUST generate at least 2 findings for non-trivial code.
+    // Each finding MUST have a descriptive title, technical explanation, remediation, and evidence.
+    // Example of a GOOD finding (do not copy, generate from the actual code):
+    {
+      "id": "F-001",
+      "title": "Semaphore leak on exception path",
+      "category": "resource-management",
+      "mechanisms": ["resource-leak"],
+      "severity": "high",
+      "confidence": "definite",
+      "evidence": [
+        {
+          "startLine": 120,
+          "endLine": 130,
+          "code": "if (!semaphore.tryAcquire(...)) throw ...",
+          "explanation": "Semaphore acquired but not released on exception path."
+        }
+      ],
+      "executionPath": ["submitWithBulkhead", "tryAcquire", "exception"],
+      "triggerConditions": ["Exception occurs after acquire"],
+      "consequence": "Permit leak, eventual thread starvation",
+      "technicalExplanation": "Semaphore permit is not released if an exception occurs after acquisition.",
+      "remediation": "Move semaphore.release() to a finally block.",
+      "relatedSymbols": ["semaphore", "tryAcquire"],
+      "testToReproduce": null
+    }
+  ],
   "architecturalObservations": [
     {
       "title": "Bulkhead Pattern Implementation",
@@ -115,7 +154,11 @@ You must return a JSON object with the following structure:
   "scorecard": {
     "correctness": { "applicable": true, "score": 85, "reason": "Good", "relatedFindings": [] },
     "concurrencySafety": { "applicable": false, "score": null, "reason": "No concurrency primitives", "relatedFindings": [] },
-    // ... all 7 categories
+    "liveness": { "applicable": false, "score": null, "reason": "No liveness issues", "relatedFindings": [] },
+    "errorHandling": { "applicable": true, "score": 70, "reason": "Basic error handling", "relatedFindings": [] },
+    "resourceManagement": { "applicable": true, "score": 80, "reason": "Resources managed", "relatedFindings": [] },
+    "maintainability": { "applicable": true, "score": 85, "reason": "Simple and readable", "relatedFindings": [] },
+    "productionReadiness": { "applicable": true, "score": 75, "reason": "Ready for production", "relatedFindings": [] }
   },
   "verdict": {
     "status": "approved-with-suggestions",
@@ -132,168 +175,117 @@ You must return a JSON object with the following structure:
 
 ==================== REQUIRED ANALYSIS DIMENSIONS ====================
 
-1. CORRECTNESS & LOGICAL FLAWS:
-   - Runtime bugs or logical errors
-   - Edge cases: null, undefined, empty inputs, boundary values
-   - Input validation comprehensiveness
-   - Off-by-one errors or type coercion issues
+1. CORRECTNESS & LOGICAL FLAWS
+2. SECURITY (if applicable)
+3. PERFORMANCE & SCALABILITY
+4. RESOURCE MANAGEMENT & LIFECYCLE
+5. PRODUCTION READINESS
 
-2. SECURITY (if applicable):
-   - Sensitive data protection
-   - Injection vulnerabilities (SQL, XSS, command injection)
-   - Cryptographic practices
-   - Authentication/authorization
-   - Hardcoded secrets or keys
+==================== FINDINGS GENERATION (CRITICAL - HIGHEST PRIORITY) ====================
 
-3. PERFORMANCE & SCALABILITY:
-   - Time complexity (Big O) with defined variables
-   - Space complexity (Big O) with defined variables
-   - Bottlenecks or inefficient algorithms
-   - Memory leaks or excessive allocations
+🔥 **THIS IS THE MOST IMPORTANT SECTION. FOLLOW IT EXACTLY.**
 
-4. RESOURCE MANAGEMENT & LIFECYCLE:
-   - Resource acquisition and release
-   - Cleanup in error paths
-   - Resource leaks
-   - Proper shutdown/cleanup logic
+You MUST generate findings that are:
+- **At least 2 findings** for non-trivial code (like the one you are analyzing).
+- **At least 1 finding** for trivial code.
 
-5. PRODUCTION READINESS:
-   - Logging and monitoring
-   - Configuration externalization
-   - Dependency management
-   - Error recovery and retry logic
-   - Testability
+Each finding **MUST** include:
+
+| Field | Requirement |
+|-------|-------------|
+| `id` | Sequential: F-001, F-002, ... |
+| `title` | A concise, descriptive title (max 10 words). Example: "Semaphore Leak on Exception", "Potential Thread Starvation". **NEVER** use "Untitled Finding". |
+| `category` | One of: correctness, concurrency, security, reliability, error-handling, resource-management, performance, data-integrity, input-validation, api-design, configuration, architecture, maintainability, testability, observability, compatibility, other. |
+| `mechanisms` | Array of applicable mechanisms (e.g., ["resource-leak", "deadlock"]). Use [] if none. |
+| `severity` | critical, high, medium, low, or info. |
+| `confidence` | definite, likely, or conditional. |
+| `evidence` | **MUST contain at least one object** with `startLine`, `endLine`, `code` (exact excerpt), and `explanation`. |
+| `executionPath` | Array of method/function names leading to the issue. |
+| `triggerConditions` | Array of conditions that trigger the issue. |
+| `consequence` | What happens if the issue is not fixed (min 20 characters). |
+| `technicalExplanation` | Detailed technical explanation (min 50 characters). **NEVER** use "No technical explanation provided." |
+| `remediation` | Specific, actionable fix (min 50 characters). **NEVER** use "No remediation provided." |
+| `relatedSymbols` | Array of relevant variable/method names. |
+| `testToReproduce` | Either null or an object with title, setup, steps, expectedResult. |
+
+🔥 **RULES:**
+- **DO NOT** use placeholder text like "Untitled Finding", "No technical explanation provided.", or "No remediation provided."
+- **DO NOT** leave `evidence` empty.
+- **DO NOT** copy the example finding verbatim. Generate findings based on the actual source code.
+- If you cannot find a defect, produce a finding about a potential improvement or edge case.
 
 ==================== ARCHITECTURAL OBSERVATIONS (MANDATORY) ====================
 
-You MUST identify and report architectural patterns in the code:
-- Bulkhead pattern: using Semaphore + ThreadPoolExecutor
-- Retry pattern: while loop with retryCount
-- Circuit Breaker pattern (if present)
-- Timeout pattern: Future.get with timeout
-- Producer-Consumer pattern (if present)
-- Any other design patterns or architectural decisions
-
-For each pattern found, provide:
-- title: Name of the pattern
+You MUST identify architectural patterns in the code. For each pattern found, provide:
+- title: Name of the pattern (e.g., "Bulkhead Pattern Implementation")
 - explanation: How it is implemented in the code
 - relatedFindingIds: IDs of findings related to this pattern
 
-🔥 **You MUST output architecturalObservations even if no findings exist.**
 If no architectural patterns are found, output an empty array.
 
 ==================== RECOMMENDED ACTIONS (MANDATORY) ====================
 
 For each finding with severity "critical" or "high", you MUST provide a recommended action.
-For each finding with severity "medium", you SHOULD provide a recommended action.
+For "medium" findings, you SHOULD provide one.
 
-Each action must include:
-- priority: number from 1 (highest) to 10 (lowest)
+Each action:
+- priority: number from 1 (highest) to 10
 - severity: same as the finding
-- title: short title of the action
-- action: specific, actionable step to fix the issue
+- title: short title
+- action: specific, actionable step
 - relatedFindingIds: array of finding IDs
 
-🔥 **You MUST output recommendedActions even if no findings exist.**
 If no findings exist, output an empty array.
 
 ==================== SUGGESTED TESTS (MANDATORY) ====================
 
-For each finding, you SHOULD provide a suggested test to reproduce the issue.
-For findings with severity "critical" or "high", you MUST provide a suggested test.
+For each finding with severity "critical" or "high", you MUST provide a suggested test.
+For "medium" findings, you SHOULD provide one.
 
-Each test must include:
-- title: short title of the test
+Each test:
+- title: short title
 - purpose: why this test is needed
 - setup: array of setup steps
 - steps: array of test steps (at least 1)
 - expectedResult: what should happen
 - relatedFindingIds: array of finding IDs
 
-🔥 **You MUST output suggestedTests even if no findings exist.**
 If no findings exist, output an empty array.
 
 ==================== EVIDENCE REQUIREMENTS ====================
 
-- Report a finding only when supported by concrete evidence.
-- Every finding must contain at least one evidence object.
-- Each evidence object must include:
-  • startLine: integer (line number in the numbered source)
-  • endLine: integer (>= startLine)
-  • code: exact source excerpt (no ellipses, no abbreviations)
-  • explanation: how this excerpt proves the finding
-- Do not invent files, methods, classes, symbols, dependencies, configurations,
-  runtime behavior, or execution paths.
-- If required context is missing, lower confidence or add a limitation.
-- An empty findings array is valid when no supported defect is visible.
-- Do not duplicate the same root cause across multiple findings.
-
-Finding IDs must:
-- match F-001, F-002, F-003, etc.
-- be unique and sequential
-- not skip numbers
-- not be duplicated
+- Every finding must have at least one evidence object.
+- Evidence code must be an exact excerpt from the provided source (no ellipses).
+- Line numbers must be valid (1-indexed).
+- Do not invent code or line numbers.
 
 ==================== CONFIDENCE CALIBRATION ====================
 
-Use one of the following confidence values:
-
-- definite: The defect follows directly from the submitted code without requiring
-  unshown configuration or external assumptions.
-- likely: A realistic and well-supported execution path exists, but runtime scheduling
-  or configuration affects reproduction.
-- conditional: The defect requires explicitly stated external conditions or missing
-  surrounding context.
-
-If the causal chain cannot be established:
-- do not report the finding, or
-- reduce confidence and clearly list the required conditions.
+- definite: The defect follows directly from the submitted code.
+- likely: A realistic path exists but depends on runtime factors.
+- conditional: The defect requires explicitly stated external conditions.
 
 ==================== COUNTERARGUMENT GATE ====================
 
-Before accepting each candidate finding:
-
-1. State the candidate invariant violation internally.
-2. Construct the strongest source-supported explanation under which the code is correct.
-3. Search the supplied source for:
-   - guards, finally blocks, idempotency, deduplication
-   - timeout exits, cancellation, alternate executors
-   - caller-runs behavior, compensation workers
-   - ownership transfer, interrupt restoration, cleanup by lifecycle owner
-4. Reject the finding if the counterargument is established by visible code.
-5. Reduce confidence if the counterargument depends on missing external context.
-6. Include a concise confidence justification.
+Before accepting a finding, consider if the code could be correct under some circumstances.
+If a counterargument is strong, reduce confidence or reject the finding.
 
 ==================== SCORECARD (0-100 OBJECT WITH APPLICABLE FLAG) ====================
 
-Each category is an object with the following structure:
+Each category is an object with:
+- applicable: boolean (true if evaluated)
+- score: number (0-100) or null if not applicable
+- reason: string
+- relatedFindings: array of finding IDs
 
-{
-  "applicable": boolean,  // true if this dimension was evaluated
-  "score": number | null, // 0-100 if applicable, null if not applicable
-  "reason": string,       // evidence-based justification
-  "relatedFindings": []   // array of finding IDs
-}
-
-Categories:
-- correctness
-- concurrencySafety
-- liveness
-- errorHandling
-- resourceManagement
-- maintainability
-- productionReadiness
+Categories: correctness, concurrencySafety, liveness, errorHandling, resourceManagement, maintainability, productionReadiness
 
 **Rules:**
-- Score every applicable category independently based on evidence.
-- Do NOT lower unrelated categories because one severe finding exists.
-- Do NOT force a fake score of 100 for a dimension that was not applicable.
-- If a category cannot be meaningfully evaluated, set applicable: false.
-- Scores below 20 are reserved for catastrophic failure with direct evidence.
+- Score each applicable category independently.
+- If a category cannot be evaluated, set applicable: false and score: null.
 
 ==================== VERDICT (6 STATUSES) ====================
 
-Use one of these verdict statuses:
 - not-production-ready
 - requires-major-changes
 - requires-changes
@@ -302,94 +294,61 @@ Use one of these verdict statuses:
 - approved
 
 **Rules:**
-- Critical findings cannot result in approved, approved-with-suggestions, or requires-minor-changes.
-- High severity findings normally require major changes.
-- Multiple interacting medium findings may justify a stronger verdict.
-- Explain the verdict with reference to findings, remediation scope, and production risk.
+- Critical findings → cannot be approved or requires-minor-changes.
+- High findings → typically requires-major-changes or requires-changes.
 
 ==================== IMPROVED CODE (DISCRIMINATED UNION) ====================
 
-Valid State A (available):
 {
   "available": true,
-  "code": "non-empty improved code",
-  "notes": "explanation or null"
+  "code": "...",
+  "notes": "..."
 }
-
-Valid State B (unavailable):
+or
 {
   "available": false,
   "code": null,
-  "notes": "explanation why unavailable or null"
+  "notes": "..."
 }
 
-**Rules:**
-- Do NOT invent missing APIs, types, imports, configuration, or dependencies.
-- Prefer minimal, targeted fixes over broad rewrites.
-- Preserve public APIs and intended behavior where possible.
-- If safe fix depends on missing context, set available to false.
+Only provide code if you can confidently fix the issues.
 
 ==================== COMPLEXITY (DISCRIMINATED UNION) ====================
 
-Valid State A (applicable):
 {
   "applicable": true,
   "expression": "O(n)",
-  "explanation": "Derived from loop over input array.",
-  "variables": [{ "symbol": "n", "definition": "length of input array" }],
-  "assumptions": ["Input is non-empty."]
+  "explanation": "...",
+  "variables": [{ "symbol": "n", "definition": "..." }],
+  "assumptions": ["..."]
 }
-
-Valid State B (not applicable):
+or
 {
   "applicable": false,
   "expression": null,
   "explanation": null,
   "variables": [],
-  "assumptions": ["Code is declarative/configuration only."]
+  "assumptions": []
 }
-
-**Rules:**
-- Define every variable used in Big-O notation.
-- Return "unknown" only when complexity cannot be meaningfully inferred.
-- Do not invent O(n) merely to fill the field.
 
 ==================== LINKEDIN POST ====================
 
 - Max 300 characters, min 1 character.
-- Must be derived from actual findings.
-- If no findings, do not imply a bug was discovered.
-- Do not include fabricated metrics.
-- Do not expose sensitive source content or secrets.
-- Keep it technically accurate and professional.
+- Derived from actual findings.
+- No fabricated metrics.
 
 ==================== MANDATORY FIELDS ====================
 
-The following fields are MANDATORY:
-- schemaVersion
-- auditType
-- appliedSpecializations
-- completionStatus
-- repairApplied
-- title
-- language
-- responseLanguage
-- analysisCoverage (all 15 dimensions)
-- summary
-- executionOverview
-- findings
-- architecturalObservations
-- recommendedActions
-- suggestedTests
-- complexity
-- scorecard
-- verdict
-- limitations
-- improvedCode
-- linkedin_post
+All fields in the output contract are mandatory.
+Arrays must be present (use [] when empty).
+Strings must be non-empty.
+Do not use placeholder text like "Untitled Finding" or "No ... provided".
 
-All string fields must be non-empty. Arrays must be present (use [] when empty).
-analysisCoverage must contain all 15 required dimensions.
+==================== FINAL REMINDER (DO NOT IGNORE) ====================
+
+🔥 **You MUST produce at least 2 findings for non-trivial code.**
+🔥 **Each finding MUST have a descriptive title, detailed technical explanation, and actionable remediation.**
+🔥 **NEVER use placeholder text. Generate all content from the actual source code.**
 
 ==================== OUTPUT ====================
 
@@ -397,8 +356,6 @@ Return exactly one valid JSON object. Do not wrap it in Markdown fences.
 Do not output any text before or after the JSON object.
 
 Base all findings, scores, remediations, and conclusions on the supplied source code.
-Do not copy placeholder values.
-Do not invent code, dependencies, configuration, or runtime behavior.
 Be constructive, clear, and specific.
 Make every recommendation actionable.
 `;

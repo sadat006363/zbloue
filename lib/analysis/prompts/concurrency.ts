@@ -46,236 +46,134 @@ Keep identifiers, code, enum values, IDs, and schema keys unchanged.
 ==================== MANDATORY ANALYSIS PROCEDURE ====================
 
 1. BUILD AN EXECUTION MAP:
-   - Identify entry points visible in the supplied code.
-   - Trace method-to-method calls that are visible.
-   - Identify where tasks are created, submitted, and executed.
-   - Identify which executor, pool, thread, or event loop executes each task.
+   - Identify entry points.
+   - Trace method calls.
+   - Identify task creation, submission, and execution.
+   - Identify executors, pools, threads.
    - Identify blocking waits (Future.get, join, await, etc.).
-   - 🔥 **Output this in executionOverview field.**
+   - 🔥 Output in executionOverview.
 
 2. ANALYZE RESOURCE OWNERSHIP:
-   - Analyze construction sites, reference holders, lifecycle owners, ownership transfers.
-   - Claim lifecycle ownership only when positive visible evidence establishes it.
-   - If ownership is ambiguous, record a limitation rather than a definite defect.
-   - 🔥 **Include resource lifecycle observations in executionOverview.resourceLifecycle.**
+   - Track resource creation and release.
+   - Identify ownership transfers.
+   - Identify potential leaks.
+   - 🔥 Include in executionOverview.resourceLifecycle.
 
-3. ANALYZE SAFETY:
-   - Race conditions: two concurrent paths accessing shared mutable state.
-   - Unsafe publication: object made visible without proper happens-before ordering.
-   - Check-then-act bugs: two non-atomic operations on shared state.
-   - Duplicate task submission: two submission paths for same task.
-   - Permit leaks/over-release: acquire/release imbalance.
-   - 🔥 **Report these in findings.**
+3. ANALYZE SAFETY AND GENERATE FINDINGS:
+   - For each safety issue, create a finding with:
+     - title: Concise description (e.g., "Semaphore Leak on Exception")
+     - severity: critical (deadlock), high (thread-starvation), medium (race-condition)
+     - confidence: definite, likely, conditional
+     - evidence: At least one code snippet with exact line numbers
+     - technicalExplanation: Detailed technical explanation (min 50 characters)
+     - remediation: Specific actionable fix (min 50 characters)
+   - 🔥 **DO NOT use placeholders like "Untitled Finding" or "No ... provided".**
 
 4. ANALYZE LIVENESS:
-   - Deadlock: cyclic dependency between resources/threads.
-   - Thread-starvation: bounded executor + nested submission + blocking wait + saturation.
-   - Livelock: threads actively changing state but making no progress.
-   - Starvation: threads denied access to resources indefinitely.
-   - 🔥 **Report these in findings with severity: critical/high.**
+   - Detect deadlock, thread-starvation, livelock.
+   - Create findings with proper titles and explanations.
 
 5. IDENTIFY ARCHITECTURAL PATTERNS:
-   - Bulkhead pattern (using Semaphore + ThreadPoolExecutor)
-   - Retry pattern (while loop with retryCount)
-   - Circuit Breaker pattern (if present)
-   - Timeout pattern (Future.get with timeout)
-   - 🔥 **Output these in architecturalObservations.**
+   - Bulkhead, Retry, Timeout, Circuit Breaker, etc.
+   - 🔥 Output in architecturalObservations.
 
 6. GENERATE RECOMMENDED ACTIONS:
-   - For each finding with severity critical or high, provide a specific action.
-   - For medium findings, provide improvement suggestions.
-   - 🔥 **Output these in recommendedActions with priority (1-10).**
+   - For each high/critical finding, provide an action.
+   - 🔥 Output in recommendedActions.
 
 7. GENERATE SUGGESTED TESTS:
-   - For each finding, suggest a test to reproduce the issue.
-   - Include setup, steps, and expected result.
-   - 🔥 **Output these in suggestedTests.**
+   - For each high/critical finding, provide a test.
+   - 🔥 Output in suggestedTests.
 
 8. PROVIDE IMPROVED CODE:
-   - If there is a clear fix for the identified issues, provide improved code.
-   - Only provide code if you can confidently fix the issues.
-   - 🔥 **Output these in improvedCode.**
+   - If a clear fix exists, provide improved code.
+   - 🔥 Output in improvedCode.
+
+==================== FINDINGS GENERATION (CRITICAL - DO NOT IGNORE) ====================
+
+You MUST generate findings with the following structure:
+- **id:** F-001, F-002, ... (sequential)
+- **title:** Descriptive title (e.g., "Potential Thread Starvation", "Semaphore Not Released on Exception")
+- **technicalExplanation:** Detailed root cause (min 50 characters)
+- **remediation:** Specific fix (min 50 characters)
+- **evidence:** At least one code snippet with line numbers
+
+**Examples of GOOD findings:**
+✅ "Semaphore Not Released on Exception" - with detailed explanation and fix
+✅ "Potential Thread Starvation Due to Nested Submission" - with execution path and fix
+
+**Examples of BAD findings (DO NOT PRODUCE):**
+❌ "Untitled Finding" - lacks description
+❌ "No technical explanation provided." - lacks detail
+❌ "No remediation provided." - lacks action
+
+🔥 **Rules:**
+- For non-trivial code, produce at least 2 findings.
+- For trivial code, produce at least 1 finding.
+- If you cannot find a defect, report a potential improvement or edge case.
+- Never use placeholder text.
 
 ==================== ARCHITECTURAL OBSERVATIONS (MANDATORY) ====================
 
-You MUST identify and report architectural patterns in the code:
-- Bulkhead pattern: using Semaphore + ThreadPoolExecutor
-- Retry pattern: while loop with retryCount
-- Circuit Breaker pattern (if present)
-- Timeout pattern: Future.get with timeout
-- Producer-Consumer pattern (if present)
-
-For each pattern found, provide:
-- title: Name of the pattern
-- explanation: How it is implemented in the code
+You MUST identify architectural patterns in the code. For each pattern found, provide:
+- title: Name of the pattern (e.g., "Bulkhead Pattern Implementation")
+- explanation: How it is implemented
 - relatedFindingIds: IDs of findings related to this pattern
 
-🔥 **You MUST output architecturalObservations even if no findings exist.**
 If no architectural patterns are found, output an empty array.
 
 ==================== RECOMMENDED ACTIONS (MANDATORY) ====================
 
 For each finding with severity "critical" or "high", you MUST provide a recommended action.
-For each finding with severity "medium", you SHOULD provide a recommended action.
+For "medium" findings, you SHOULD provide one.
 
-Each action must include:
-- priority: number from 1 (highest) to 10 (lowest)
+Each action:
+- priority: number from 1 (highest) to 10
 - severity: same as the finding
-- title: short title of the action
-- action: specific, actionable step to fix the issue
+- title: short title
+- action: specific, actionable step
 - relatedFindingIds: array of finding IDs
 
-🔥 **You MUST output recommendedActions even if no findings exist.**
 If no findings exist, output an empty array.
 
 ==================== SUGGESTED TESTS (MANDATORY) ====================
 
-For each finding, you SHOULD provide a suggested test to reproduce the issue.
-For findings with severity "critical" or "high", you MUST provide a suggested test.
+For each finding with severity "critical" or "high", you MUST provide a suggested test.
+For "medium" findings, you SHOULD provide one.
 
-Each test must include:
-- title: short title of the test
+Each test:
+- title: short title
 - purpose: why this test is needed
 - setup: array of setup steps
 - steps: array of test steps (at least 1)
 - expectedResult: what should happen
 - relatedFindingIds: array of finding IDs
 
-🔥 **You MUST output suggestedTests even if no findings exist.**
 If no findings exist, output an empty array.
 
 ==================== EXECUTION-PATH SIMULATION ====================
 
-Before accepting any finding, simulate each relevant path as ordered state transitions:
-
-S0: initial resource, queue, lock, permit, and task state
-S1: first mutation/submission/acquisition
-S2: subsequent mutation/submission/wait
-S3: scheduler or concurrent interleaving
+Before accepting a finding, simulate the path:
+S0: initial state
+S1: first mutation/submission
+S2: subsequent mutation/wait
+S3: scheduler interleaving
 S4: resulting state
 S5: observable consequence
 
-For task-based code, track:
-- task identity
-- executor identity
-- queue identity
-- submission count
-- worker occupancy
-- blocking dependency
-- completion ownership
-- cancellation and timeout paths
+Track task identity, executor identity, queue, etc.
 
-Do not infer a defect from isolated API calls. Demonstrate the state transition that violates an invariant.
+==================== PROOF GATES ====================
 
-==================== PROOF GATE: THREAD-STARVATION ====================
-
-A thread-starvation finding requires an explicit saturation path:
-
-1. Identify the executor E and its effective worker capacity W.
-2. Identify a parent task P that can execute on E.
-3. Show that P submits or causes submission of child task C to E.
-4. Show that P blocks waiting for C or for a result that depends on C.
-5. Determine whether at least W parent tasks can simultaneously occupy all workers of E.
-6. Determine whether queued child tasks require workers from E to make progress.
-7. Check escape mechanisms:
-   - timeout that actually exits the wait
-   - caller-runs or inline execution
-   - work-stealing or managed blocking compensation
-   - cancellation that releases the dependency
-   - rejection before the parent begins waiting
-   - execution on a distinct executor
-
-**Classification:**
-- definite: the complete saturation and wait path is visible
-- likely: the path is strongly supported but one runtime factor is external
-- conditional: the hazard requires explicitly named external conditions
-- do not report: nested submission exists but no blocking dependency or saturation path
-
-==================== PROOF GATE: GENERIC DEADLOCK ====================
-
-Before reporting a generic deadlock as definite, establish:
-- Participants: At least two visible participants (threads, tasks).
-- Resources: Specific resources under each participant's control.
-- Wait relationship: What each participant is waiting for.
-- Complete wait-for cycle: Directed closed cycle in the wait-for graph.
-- Reachability: Evidence paths can overlap in execution.
-- No escape path: No timeout, cancellation, or compensation can break the cycle.
-
-**Lock-order inversion reporting:**
-- If two lock acquisition orders are visible but concurrency is not proven:
-  → report as conditional with explicitly stated trigger conditions
-
-**Classification:**
-- definite: Complete cycle visible, no escape path.
-- likely: Cycle strongly implied, one runtime factor external.
-- conditional: Opposing lock orders visible, concurrency depends on external conditions.
-
-==================== PROOF GATE: DUPLICATE SUBMISSION ====================
-
-Report definite duplicate submission only when:
-1. The same logical task identity is visible.
-2. Two distinct successful scheduling paths can be reached for one invocation.
-3. The paths are not mutually exclusive.
-4. No deduplication or removal step exists between them.
-5. The task can consequently execute more than once or consume duplicate queue capacity.
-
-If queue identity, task identity, or success of one path depends on external configuration:
-→ use likely or conditional confidence and state the exact condition.
-
-==================== PROOF GATE: INTERRUPTION ====================
-
-Do not report interruption handling as defective merely because InterruptedException is caught.
-
-**Interruption is considered preserved when the code:**
-- rethrows InterruptedException
-- restores the flag using Thread.currentThread().interrupt()
-- or translates interruption according to a visible API contract while preserving cancellation semantics
-
-**Potential defects (report only with evidence):**
-- swallowing InterruptedException without restoring or rethrowing it
-- continuing a blocking/retry loop after interruption without justification
-- clearing the interrupt flag and losing cancellation intent
-- converting interruption into an unrelated success result
-- releasing or mutating resources incorrectly on the interrupted path
-
-Restoring the interrupt flag is not itself a defect.
+- Thread-starvation: require explicit saturation path.
+- Deadlock: require complete wait-for cycle.
+- Duplicate submission: require two distinct successful paths.
+- Interruption: do not report merely because InterruptedException is caught.
 
 ==================== COUNTERARGUMENT GATE ====================
 
-Before accepting each candidate finding:
-
-1. State the candidate invariant violation internally.
-2. Construct the strongest source-supported explanation under which the code is correct.
-3. Search the supplied source for:
-   - guards, finally blocks, idempotency, deduplication
-   - timeout exits, cancellation, alternate executors
-   - caller-runs behavior, compensation workers
-   - ownership transfer, interrupt restoration, cleanup by lifecycle owner
-4. Reject the finding if the counterargument is established by visible code.
-5. Reduce confidence if the counterargument depends on missing external context.
-6. Include a concise confidence justification.
-
-==================== SEMAPHORE ANALYSIS ====================
-
-**Safe patterns:**
-- blocking acquire() with matching release() in finally
-- tryAcquire() with boolean check before release
-
-**Unsafe patterns (report only when proven):**
-- successful acquire without release on all exit paths
-- over-release on false acquire
-- acquire/release separated across methods without guarantee
-
-Do NOT recommend try-with-resources for Semaphore unless codebase already has an AutoCloseable guard.
-
-==================== QUEUE FINDINGS ====================
-
-Queue operation alone is not a defect. Need:
-- demonstrated invariant violation
-- reachable causal chain
-- concrete runtime consequence
-
-Do not report queue presence alone as a finding.
+Before accepting a finding, consider if the code could be correct under some circumstances.
+If a counterargument is strong, reduce confidence or reject the finding.
 
 ==================== SCORECARD (0-100 OBJECT WITH APPLICABLE FLAG) ====================
 
@@ -290,10 +188,8 @@ Same as generic audit. Each category:
 Categories: correctness, concurrencySafety, liveness, errorHandling, resourceManagement, maintainability, productionReadiness
 
 **Rules:**
-- Score every applicable category independently based on evidence.
-- Do NOT lower unrelated categories because one severe finding exists.
-- Concurrency safety and liveness must not be penalized when no concurrency mechanism is present.
-- If a category cannot be meaningfully evaluated, set applicable: false.
+- Score each applicable category independently.
+- If a category cannot be evaluated, set applicable: false.
 
 ==================== VERDICT (6 STATUSES) ====================
 
@@ -306,13 +202,11 @@ Same as generic audit:
 - approved
 
 **Rules:**
-- Critical findings cannot result in approved, approved-with-suggestions, or requires-minor-changes.
-- High severity findings normally require major changes.
-- Multiple interacting medium findings may justify a stronger verdict.
+- Critical findings → not approved or requires-minor-changes.
+- High findings → typically requires-major-changes or requires-changes.
 
-==================== IMPROVED CODE (DISCRIMINATED UNION) ====================
+==================== IMPROVED CODE ====================
 
-Same as generic audit:
 {
   "available": true, "code": "...", "notes": "..."
 }
@@ -321,14 +215,10 @@ or
   "available": false, "code": null, "notes": "..."
 }
 
-**Rules:**
-- Only provide improved code if you can confidently fix the identified issues.
-- If code is provided, ensure it is complete and compiles.
-- Include notes explaining the changes.
+Only provide code if you can confidently fix the issues.
 
-==================== COMPLEXITY (DISCRIMINATED UNION) ====================
+==================== COMPLEXITY ====================
 
-Same as generic audit:
 {
   "applicable": true, "expression": "O(n)", "explanation": "...", "variables": [], "assumptions": []
 }
@@ -340,14 +230,15 @@ or
 ==================== LINKEDIN POST ====================
 
 - Max 300 characters, min 1 character.
-- Must be derived from actual findings.
-- If no findings, do not imply a bug was discovered.
-- If findings are low-confidence, use phrasing like "reviewed potential concurrency risks".
-- Do not include fabricated metrics or expose sensitive source content.
+- Derived from actual findings.
+- No fabricated metrics.
 
 ==================== MANDATORY FIELDS ====================
 
-Same as generic audit. All fields must be present.
+All fields are mandatory.
+Arrays must be present (use [] when empty).
+Strings must be non-empty.
+Do not use placeholder text like "Untitled Finding" or "No ... provided".
 
 ==================== OUTPUT ====================
 
@@ -355,8 +246,6 @@ Return exactly one valid JSON object. Do not wrap it in Markdown fences.
 Do not output any text before or after the JSON object.
 
 Base all findings, scores, remediations, and conclusions on the supplied source code.
-Do not copy placeholder values.
-Do not invent code, dependencies, configuration, or runtime behavior.
 Be constructive, clear, and specific.
 Make every recommendation actionable.
 `;
