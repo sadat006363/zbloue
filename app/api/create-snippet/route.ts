@@ -118,16 +118,16 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
   let rawBody: unknown;
   try {
     rawBody = await req.json();
-    console.log('🔍 [create-snippet] Received body:', JSON.stringify(rawBody, null, 2));
-  } catch {
+    logger.info('[create-snippet] Received body (first 500 chars):', JSON.stringify(rawBody).slice(0, 500));
+  } catch (error) {
+    logger.error('[create-snippet] Failed to parse JSON:', error);
     return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
   }
 
   // ===== Validation =====
   const validation = CreateSnippetRequestSchema.safeParse(rawBody);
   if (!validation.success) {
-    console.error('❌ [create-snippet] Validation failed:', validation.error.issues);
-    logger.warn('[create-snippet] Validation failed:', validation.error.issues);
+    logger.error('[create-snippet] Validation failed:', validation.error.issues);
     const firstError = validation.error.issues[0];
     return NextResponse.json(
       { error: `Validation error: ${firstError.path.join('.')} - ${firstError.message}` },
@@ -138,21 +138,26 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
   const body = validation.data;
 
   // ============================================================
-  // 🔥 لاگ‌های سمت سرور (مرحله ۲)
+  // 🔥 لاگ‌های سمت سرور - مرحله ۱: بررسی داده‌های دریافتی
   // ============================================================
-  console.log('🔍 [Server] ===== START DEBUG =====');
-  console.log('🔍 [Server] body.audit_result:', body.audit_result);
-  console.log('🔍 [Server] body.findings:', body.findings);
-  console.log('🔍 [Server] body.scorecard_new:', body.scorecard_new);
-  console.log('🔍 [Server] body.verdict:', body.verdict);
-  console.log('🔍 [Server] body.execution_overview:', body.execution_overview);
-  console.log('🔍 [Server] body.complexity:', body.complexity);
-  console.log('🔍 [Server] ===== END DEBUG =====');
+  logger.info('[Server] ===== START DEBUG =====');
+  logger.info('[Server] body.audit_result exists?', !!body.audit_result);
+  logger.info('[Server] body.audit_result type:', typeof body.audit_result);
+  if (body.audit_result) {
+    logger.info('[Server] body.audit_result keys:', Object.keys(body.audit_result));
+    logger.info('[Server] body.audit_result.findings?', !!body.audit_result.findings);
+    logger.info('[Server] body.audit_result.findings length:', body.audit_result.findings?.length || 0);
+  }
+  logger.info('[Server] body.findings exists?', !!body.findings);
+  logger.info('[Server] body.scorecard_new exists?', !!body.scorecard_new);
+  logger.info('[Server] body.verdict exists?', !!body.verdict);
+  logger.info('[Server] ===== END DEBUG =====');
 
   // ===== Generate Slug =====
   let slug: string;
   try {
     slug = await generateUniqueSlug();
+    logger.info(`[Server] Generated slug: ${slug}`);
   } catch (error) {
     logger.error('[create-snippet] Slug generation failed:', error);
     return NextResponse.json({ error: 'Failed to generate unique identifier' }, { status: 500 });
@@ -175,6 +180,7 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
   // اعتبارسنجی Context
   try {
     isValidSnippetContext(context);
+    logger.info('[Server] Context validation passed');
   } catch (error) {
     logger.error('[create-snippet] Invalid context:', error);
     return NextResponse.json(
@@ -191,22 +197,24 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
 
   // 1️⃣ اولویت اول: استفاده از audit_result (اگر موجود باشد)
   if (body.audit_result) {
+    logger.info('[Server] Attempting to use body.audit_result');
     try {
       const validated = AdvancedAuditResultSchema.safeParse(body.audit_result);
       if (validated.success) {
         auditResult = validated.data;
-        logger.info('[create-snippet] Using audit_result from request');
+        logger.info('[Server] ✅ audit_result validation passed');
+        logger.info('[Server] auditResult.findings length:', auditResult.findings?.length || 0);
       } else {
-        logger.warn('[create-snippet] audit_result validation failed:', validated.error.issues);
-        // اگر validation fail شد، به سراغ روش بعدی می‌رویم
+        logger.warn('[Server] ❌ audit_result validation failed:', validated.error.issues);
       }
     } catch (error) {
-      logger.warn('[create-snippet] Failed to parse audit_result:', error);
+      logger.warn('[Server] ❌ Failed to parse audit_result:', error);
     }
   }
 
   // 2️⃣ اگر audit_result موجود نبود یا نامعتبر بود، از فیلدهای جداگانه بساز
   if (!auditResult && (body.findings || body.scorecard_new || body.verdict)) {
+    logger.info('[Server] Building auditResult from separate fields');
     try {
       auditResult = {
         schemaVersion: '1.0',
@@ -256,16 +264,21 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
 
       const validated = AdvancedAuditResultSchema.safeParse(auditResult);
       if (!validated.success) {
-        logger.warn('[create-snippet] Built audit result validation failed:', validated.error.issues);
+        logger.warn('[Server] ❌ Built audit result validation failed:', validated.error.issues);
         auditResult = null;
       } else {
         auditResult = validated.data;
-        logger.info('[create-snippet] Built auditResult from separate fields');
+        logger.info('[Server] ✅ Built auditResult from separate fields');
       }
     } catch (error) {
-      logger.warn('[create-snippet] Failed to build audit result from fields:', error);
+      logger.warn('[Server] ❌ Failed to build audit result from fields:', error);
       auditResult = null;
     }
+  }
+
+  logger.info('[Server] Final auditResult exists?', !!auditResult);
+  if (auditResult) {
+    logger.info('[Server] auditResult.findings length:', auditResult.findings?.length || 0);
   }
 
   // ============================================================
@@ -275,12 +288,66 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
   let row: any;
   try {
     if (auditResult) {
-      // استفاده از Mapper با auditResult کامل
+      logger.info('[Server] Using toSnippetInsert with auditResult');
       row = toSnippetInsert(auditResult, context);
-      logger.info('[create-snippet] Mapper used with auditResult');
+      logger.info('[Server] ✅ Mapper used with auditResult');
     } else {
       // ===== Fallback: استفاده از داده‌های Legacy =====
+      logger.info('[Server] Using Fallback (no auditResult)');
       const now = new Date().toISOString();
+
+      // ساخت audit_result برای Fallback
+      const fallbackAuditResult = body.audit_result ?? (() => {
+        if (body.findings || body.scorecard_new || body.verdict) {
+          return {
+            schemaVersion: '1.0',
+            auditType: 'comprehensive',
+            appliedSpecializations: body.execution_overview ? ['concurrency'] : [],
+            completionStatus: 'complete',
+            repairApplied: false,
+            language: body.language,
+            responseLanguage: 'English',
+            summary: body.key_concept || '',
+            executionOverview: body.execution_overview || { entryPoints: [], taskSubmissionPoints: [], blockingWaitPoints: [], sharedResources: [], resourceLifecycle: [] },
+            findings: body.findings || [],
+            architecturalObservations: body.architectural_observations || [],
+            recommendedActions: body.recommended_actions || [],
+            suggestedTests: body.suggested_tests_new || [],
+            complexity: body.complexity || { applicable: false, expression: null, explanation: null, variables: [], assumptions: [] },
+            scorecard: body.scorecard_new || {
+              correctness: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
+              concurrencySafety: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
+              liveness: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
+              errorHandling: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
+              resourceManagement: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
+              maintainability: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
+              productionReadiness: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
+            },
+            verdict: body.verdict || { status: 'requires-changes', explanation: '' },
+            limitations: body.limitations || [],
+            improvedCode: {
+              available: !!body.improved_code,
+              code: body.improved_code || null,
+              notes: body.improved_code ? 'Migrated from improved_code' : 'No improved code provided',
+            },
+            linkedin_post: body.linkedin_post || 'Check out this code analysis! #Zbloue',
+            title: body.card_title || 'Code Analysis',
+            analysisCoverage: [
+              'correctness', 'security', 'concurrency', 'liveness', 'performance',
+              'resource-management', 'error-handling', 'input-validation', 'data-integrity',
+              'api-design', 'architecture', 'maintainability', 'testability', 'observability',
+              'compatibility'
+            ].map(dim => ({
+              dimension: dim as any,
+              status: 'analyzed',
+              summary: `Analysis of ${dim} dimension.`,
+              limitation: null,
+            })),
+          };
+        }
+        return null;
+      })();
+
       row = {
         slug,
         raw_code: body.code,
@@ -313,7 +380,7 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
         final_verdict_approved: body.final_verdict_approved ?? null,
         final_verdict_next_steps: body.final_verdict_next_steps ?? null,
 
-        // Advanced fields (از body گرفته می‌شوند)
+        // Advanced fields
         findings: body.findings ?? null,
         execution_overview: body.execution_overview ?? null,
         architectural_observations: body.architectural_observations ?? null,
@@ -325,61 +392,10 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
         limitations: body.limitations ?? null,
         debug_trace: body.debug_trace ?? null,
 
-        // ===== 🔥 مهم: audit_result را از body.audit_result بگیرید =====
-        // اگر body.audit_result وجود نداشت، از داده‌های موجود یک audit_result بسازید
-        audit_result: body.audit_result ?? (() => {
-          // اگر فیلدهای Advanced وجود دارند، یک audit_result بساز
-          if (body.findings || body.scorecard_new || body.verdict) {
-            return {
-              schemaVersion: '1.0',
-              auditType: 'comprehensive',
-              appliedSpecializations: body.execution_overview ? ['concurrency'] : [],
-              completionStatus: 'complete',
-              repairApplied: false,
-              language: body.language,
-              responseLanguage: 'English',
-              summary: body.key_concept || '',
-              executionOverview: body.execution_overview || { entryPoints: [], taskSubmissionPoints: [], blockingWaitPoints: [], sharedResources: [], resourceLifecycle: [] },
-              findings: body.findings || [],
-              architecturalObservations: body.architectural_observations || [],
-              recommendedActions: body.recommended_actions || [],
-              suggestedTests: body.suggested_tests_new || [],
-              complexity: body.complexity || { applicable: false, expression: null, explanation: null, variables: [], assumptions: [] },
-              scorecard: body.scorecard_new || {
-                correctness: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
-                concurrencySafety: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
-                liveness: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
-                errorHandling: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
-                resourceManagement: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
-                maintainability: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
-                productionReadiness: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
-              },
-              verdict: body.verdict || { status: 'requires-changes', explanation: '' },
-              limitations: body.limitations || [],
-              improvedCode: {
-                available: !!body.improved_code,
-                code: body.improved_code || null,
-                notes: body.improved_code ? 'Migrated from improved_code' : 'No improved code provided',
-              },
-              linkedin_post: body.linkedin_post || 'Check out this code analysis! #Zbloue',
-              title: body.card_title || 'Code Analysis',
-              analysisCoverage: [
-                'correctness', 'security', 'concurrency', 'liveness', 'performance',
-                'resource-management', 'error-handling', 'input-validation', 'data-integrity',
-                'api-design', 'architecture', 'maintainability', 'testability', 'observability',
-                'compatibility'
-              ].map(dim => ({
-                dimension: dim as any,
-                status: 'analyzed',
-                summary: `Analysis of ${dim} dimension.`,
-                limitation: null,
-              })),
-            };
-          }
-          return null;
-        })(),
+        // 🔥 مهم: audit_result را با fallbackAuditResult پر کنید
+        audit_result: fallbackAuditResult,
       };
-      logger.info('[create-snippet] Fallback to legacy row (no auditResult)');
+      logger.info('[Server] ✅ Fallback row created');
     }
   } catch (error) {
     logger.error('[create-snippet] Mapper failed:', error);
@@ -390,19 +406,25 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
   }
 
   // ============================================================
-  // 🔥 لاگ‌های سمت سرور قبل از insert (مرحله ۳)
+  // 🔥 لاگ‌های سمت سرور - مرحله ۳: قبل از insert
   // ============================================================
-  console.log('🔍 [Server] ===== BEFORE INSERT =====');
-  console.log('🔍 [Server] row.audit_result:', row.audit_result);
-  console.log('🔍 [Server] row.findings:', row.findings);
-  console.log('🔍 [Server] row.scorecard_new:', row.scorecard_new);
-  console.log('🔍 [Server] row.verdict:', row.verdict);
-  console.log('🔍 [Server] ===== END BEFORE INSERT =====');
+  logger.info('[Server] ===== BEFORE INSERT =====');
+  logger.info('[Server] row.audit_result exists?', !!row.audit_result);
+  if (row.audit_result) {
+    logger.info('[Server] row.audit_result type:', typeof row.audit_result);
+    logger.info('[Server] row.audit_result.findings?', !!row.audit_result.findings);
+    logger.info('[Server] row.audit_result.findings length:', row.audit_result.findings?.length || 0);
+  }
+  logger.info('[Server] row.findings exists?', !!row.findings);
+  logger.info('[Server] row.scorecard_new exists?', !!row.scorecard_new);
+  logger.info('[Server] row.verdict exists?', !!row.verdict);
+  logger.info('[Server] ===== END BEFORE INSERT =====');
 
   // ============================================================
   // 5. Insert into Supabase
   // ============================================================
 
+  logger.info('[Server] Attempting to insert into Supabase...');
   const { data, error } = await supabase
     .from('snippets')
     .insert(row as any)
@@ -410,18 +432,28 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
     .single();
 
   if (error) {
-    logger.error('[create-snippet] Supabase insert error:', error);
+    logger.error('[create-snippet] ❌ Supabase insert error:', error);
+    logger.error('[create-snippet] Error details:', {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+    });
     return NextResponse.json({ error: 'Failed to save snippet' }, { status: 500 });
   }
 
   if (!data) {
-    logger.error('[create-snippet] Insert succeeded but returned no data');
+    logger.error('[create-snippet] ❌ Insert succeeded but returned no data');
     return NextResponse.json({ error: 'Snippet was not returned after creation' }, { status: 500 });
   }
 
   // ===== Response =====
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || '';
-  logger.info(`[create-snippet] Snippet created: ${data.slug} (IP ${ip})`);
+  logger.info(`[create-snippet] ✅ Snippet created: ${data.slug} (IP ${ip})`);
+
+  // لاگ نهایی برای تأیید ذخیره‌سازی
+  logger.info('[Server] ===== FINAL VERIFICATION =====');
+  logger.info('[Server] Created snippet slug:', data.slug);
+  logger.info('[Server] audit_result should be stored in database');
 
   return NextResponse.json(
     {
