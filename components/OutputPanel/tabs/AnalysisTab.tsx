@@ -240,18 +240,20 @@ export default function AnalysisTab({
 
       // Scorecard
       if (hasScorecardNew) {
-        text += `📊 Scorecard:\n`;
         const sc = fullAnalysis.scorecard;
-        const categories = ['correctness', 'concurrencySafety', 'liveness', 'errorHandling', 'resourceManagement', 'maintainability', 'productionReadiness'];
-        categories.forEach((cat) => {
-          const item = sc[cat];
-          if (item) {
-            const score = getScoreValue(item);
-            const label = cat.replace(/([A-Z])/g, ' $1').trim();
-            text += `  ${label}: ${score !== null ? `${score}/100` : 'N/A'}\n`;
-          }
-        });
-        text += `\n`;
+        if (sc && typeof sc === 'object') {
+          text += `📊 Scorecard:\n`;
+          const categories = ['correctness', 'concurrencySafety', 'liveness', 'errorHandling', 'resourceManagement', 'maintainability', 'productionReadiness'];
+          categories.forEach((cat) => {
+            const item = sc[cat];
+            if (item) {
+              const score = getScoreValue(item);
+              const label = cat.replace(/([A-Z])/g, ' $1').trim();
+              text += `  ${label}: ${score !== null ? `${score}/100` : 'N/A'}\n`;
+            }
+          });
+          text += `\n`;
+        }
       }
 
       // Verdict
@@ -680,7 +682,7 @@ export default function AnalysisTab({
         )}
 
         {/* ===== Scorecard (با پشتیبانی از scorecard_new) ===== */}
-        {hasScorecardNew && (
+        {hasScorecardNew && scorecardDisplay && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-2">📊 Scorecard</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
