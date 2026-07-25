@@ -67,16 +67,39 @@ You must return a JSON object with the following structure:
   ],
   "summary": "Concise summary of findings and code quality.",
   "executionOverview": {
-    "entryPoints": [],
-    "taskSubmissionPoints": [],
-    "blockingWaitPoints": [],
-    "sharedResources": [],
-    "resourceLifecycle": []
+    "entryPoints": ["method1", "method2"],
+    "taskSubmissionPoints": ["executor.submit", "executor.execute"],
+    "blockingWaitPoints": ["future.get", "semaphore.tryAcquire"],
+    "sharedResources": ["poolMap", "semaphoreMap"],
+    "resourceLifecycle": ["created in bulkhead", "released in finally"]
   },
   "findings": [],
-  "architecturalObservations": [],
-  "recommendedActions": [],
-  "suggestedTests": [],
+  "architecturalObservations": [
+    {
+      "title": "Bulkhead Pattern Implementation",
+      "explanation": "The code implements a bulkhead pattern using Semaphore and ThreadPoolExecutor to limit concurrent access.",
+      "relatedFindingIds": ["F-001"]
+    }
+  ],
+  "recommendedActions": [
+    {
+      "priority": 1,
+      "severity": "high",
+      "title": "Fix Semaphore Release on Exception",
+      "action": "Ensure semaphore is released in all code paths, including exceptions.",
+      "relatedFindingIds": ["F-001"]
+    }
+  ],
+  "suggestedTests": [
+    {
+      "title": "Test Bulkhead Rejection",
+      "purpose": "Verify that the bulkhead rejects tasks when the queue is full.",
+      "setup": ["Create a pool with maxConcurrentThreads=1, maxQueueSize=1"],
+      "steps": ["Submit 3 tasks concurrently", "Wait for rejection"],
+      "expectedResult": "Third task throws BulkheadRejectedExecutionException",
+      "relatedFindingIds": ["F-001"]
+    }
+  ],
   "complexity": {
     "applicable": true,
     "expression": "O(1)",
@@ -95,9 +118,9 @@ You must return a JSON object with the following structure:
   },
   "limitations": ["Analysis based solely on supplied source code."],
   "improvedCode": {
-    "available": false,
-    "code": null,
-    "notes": "No safe focused patch can be produced from the supplied context."
+    "available": true,
+    "code": "public class Try<T> { ... }",
+    "notes": "Improved version with proper semaphore release."
   },
   "linkedin_post": "Professional summary, max 300 characters."
 }

@@ -51,11 +51,13 @@ Keep identifiers, code, enum values, IDs, and schema keys unchanged.
    - Identify where tasks are created, submitted, and executed.
    - Identify which executor, pool, thread, or event loop executes each task.
    - Identify blocking waits (Future.get, join, await, etc.).
+   - 🔥 **Output this in executionOverview field.**
 
 2. ANALYZE RESOURCE OWNERSHIP:
    - Analyze construction sites, reference holders, lifecycle owners, ownership transfers.
    - Claim lifecycle ownership only when positive visible evidence establishes it.
    - If ownership is ambiguous, record a limitation rather than a definite defect.
+   - 🔥 **Include resource lifecycle observations in executionOverview.resourceLifecycle.**
 
 3. ANALYZE SAFETY:
    - Race conditions: two concurrent paths accessing shared mutable state.
@@ -63,12 +65,36 @@ Keep identifiers, code, enum values, IDs, and schema keys unchanged.
    - Check-then-act bugs: two non-atomic operations on shared state.
    - Duplicate task submission: two submission paths for same task.
    - Permit leaks/over-release: acquire/release imbalance.
+   - 🔥 **Report these in findings.**
 
 4. ANALYZE LIVENESS:
    - Deadlock: cyclic dependency between resources/threads.
    - Thread-starvation: bounded executor + nested submission + blocking wait + saturation.
    - Livelock: threads actively changing state but making no progress.
    - Starvation: threads denied access to resources indefinitely.
+   - 🔥 **Report these in findings with severity: critical/high.**
+
+5. IDENTIFY ARCHITECTURAL PATTERNS:
+   - Bulkhead pattern (using Semaphore + ThreadPoolExecutor)
+   - Retry pattern (while loop with retryCount)
+   - Circuit Breaker pattern (if present)
+   - Timeout pattern (Future.get with timeout)
+   - 🔥 **Output these in architecturalObservations.**
+
+6. GENERATE RECOMMENDED ACTIONS:
+   - For each finding with severity critical or high, provide a specific action.
+   - For medium findings, provide improvement suggestions.
+   - 🔥 **Output these in recommendedActions with priority (1-10).**
+
+7. GENERATE SUGGESTED TESTS:
+   - For each finding, suggest a test to reproduce the issue.
+   - Include setup, steps, and expected result.
+   - 🔥 **Output these in suggestedTests.**
+
+8. PROVIDE IMPROVED CODE:
+   - If there is a clear fix for the identified issues, provide improved code.
+   - Only provide code if you can confidently fix the issues.
+   - 🔥 **Output these in improvedCode.**
 
 ==================== EXECUTION-PATH SIMULATION ====================
 
@@ -246,6 +272,11 @@ or
 {
   "available": false, "code": null, "notes": "..."
 }
+
+**Rules:**
+- Only provide improved code if you can confidently fix the identified issues.
+- If code is provided, ensure it is complete and compiles.
+- Include notes explaining the changes.
 
 ==================== COMPLEXITY (DISCRIMINATED UNION) ====================
 
