@@ -90,6 +90,18 @@ const safeArray = <T,>(arr: T[] | undefined | null): T[] => {
   return Array.isArray(arr) ? arr : [];
 };
 
+// ===== Severity badge helper =====
+function severityBadge(severity: string): string {
+  const map: Record<string, string> = {
+    critical: 'bg-red-500/20 text-red-400 border border-red-500/30',
+    high: 'bg-orange-500/20 text-orange-400 border border-orange-500/30',
+    medium: 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30',
+    low: 'bg-blue-500/20 text-blue-400 border border-blue-500/30',
+    info: 'bg-gray-500/20 text-gray-400 border border-gray-500/30',
+  };
+  return map[severity] || map.info;
+}
+
 export default function AnalysisTab({
   fullAnalysis,
   isAdvanced,
@@ -100,12 +112,38 @@ export default function AnalysisTab({
 }: AnalysisTabProps) {
   const [copySuccess, setCopySuccess] = useState(false);
 
-  // ===== Generate full analysis text for copy/download =====
+  // ============================================================
+  // 🔥 تشخیص وجود فیلدهای کانونیکال
+  // ============================================================
+  const hasFindings = fullAnalysis?.findings && Array.isArray(fullAnalysis.findings) && fullAnalysis.findings.length > 0;
+  const hasExecutionOverview = fullAnalysis?.executionOverview && typeof fullAnalysis.executionOverview === 'object';
+  const hasArchitecturalObservations = fullAnalysis?.architecturalObservations && Array.isArray(fullAnalysis.architecturalObservations) && fullAnalysis.architecturalObservations.length > 0;
+  const hasRecommendedActions = fullAnalysis?.recommendedActions && Array.isArray(fullAnalysis.recommendedActions) && fullAnalysis.recommendedActions.length > 0;
+  const hasComplexity = fullAnalysis?.complexity && typeof fullAnalysis.complexity === 'object';
+  const hasLimitations = fullAnalysis?.limitations && Array.isArray(fullAnalysis.limitations) && fullAnalysis.limitations.length > 0;
+  const hasScorecardNew = fullAnalysis?.scorecard && typeof fullAnalysis.scorecard === 'object';
+
+  // ============================================================
+  // 🔥 استخراج امتیازات از scorecard_new
+  // ============================================================
+  const getScoreValue = (scoreItem: any): number | null => {
+    if (!scoreItem) return null;
+    if (typeof scoreItem === 'number') return scoreItem;
+    if (typeof scoreItem === 'object' && scoreItem !== null) {
+      if (typeof scoreItem.score === 'number') return scoreItem.score;
+    }
+    return null;
+  };
+
+  const scorecardDisplay = hasScorecardNew ? fullAnalysis.scorecard : null;
+
+  // ============================================================
+  // 🔥 تابع کپی و دانلود (ادغام با legacy)
+  // ============================================================
   const getAnalysisText = () => {
     if (!fullAnalysis) return '';
 
     let text = '';
-
     if (isAdvanced && fullAnalysis) {
       text += `📊 Zbloue Advanced Analysis Report\n`;
       text += `═══════════════════════════════════════\n\n`;
@@ -113,172 +151,124 @@ export default function AnalysisTab({
       if (fullAnalysis.key_concept) {
         text += `💡 Key Concept:\n${safeString(fullAnalysis.key_concept)}\n\n`;
       }
-      if (fullAnalysis.analysis) {
-        const analysisText = formatText(fullAnalysis.analysis);
-        text += `📝 Analysis:\n${analysisText}\n\n`;
+      if (fullAnalysis.summary) {
+        text += `📝 Summary:\n${safeString(fullAnalysis.summary)}\n\n`;
       }
 
-      // Code Walkthrough
-      if (fullAnalysis.codeWalkthrough && fullAnalysis.codeWalkthrough.length > 0) {
-        text += `🧩 Code Walkthrough:\n`;
-        fullAnalysis.codeWalkthrough.forEach((item: LegacyCodeWalkthroughItem) => {
-          text += `  • ${safeString(item.section)}: ${safeString(item.explanation)}\n`;
+      // Findings
+      if (hasFindings) {
+        text += `🔍 Findings:\n`;
+        fullAnalysis.findings.forEach((f: any) => {
+          text += `  • ${safeString(f.title)} [${safeString(f.severity)}] (${safeString(f.confidence)})\n`;
+          if (f.evidence && f.evidence.length > 0) {
+            f.evidence.forEach((ev: any) => {
+              text += `    Lines ${ev.startLine}-${ev.endLine}: ${safeString(ev.code)}\n`;
+            });
+          }
+          if (f.technicalExplanation) {
+            text += `    Technical: ${safeString(f.technicalExplanation)}\n`;
+          }
+          if (f.remediation) {
+            text += `    Fix: ${safeString(f.remediation)}\n`;
+          }
         });
         text += `\n`;
       }
 
-      // What Works Well
-      if (fullAnalysis.whatWorksWell && fullAnalysis.whatWorksWell.length > 0) {
-        text += `✅ What Works Well:\n`;
-        fullAnalysis.whatWorksWell.forEach((item: string) => {
-          text += `  • ${safeString(item)}\n`;
+      // Execution Overview
+      if (hasExecutionOverview) {
+        const eo = fullAnalysis.executionOverview;
+        text += `⚡ Execution Overview:\n`;
+        if (eo.entryPoints && eo.entryPoints.length > 0) {
+          text += `  Entry Points: ${eo.entryPoints.join(', ')}\n`;
+        }
+        if (eo.taskSubmissionPoints && eo.taskSubmissionPoints.length > 0) {
+          text += `  Task Submission Points: ${eo.taskSubmissionPoints.join(', ')}\n`;
+        }
+        if (eo.blockingWaitPoints && eo.blockingWaitPoints.length > 0) {
+          text += `  Blocking Wait Points: ${eo.blockingWaitPoints.join(', ')}\n`;
+        }
+        if (eo.sharedResources && eo.sharedResources.length > 0) {
+          text += `  Shared Resources: ${eo.sharedResources.join(', ')}\n`;
+        }
+        if (eo.resourceLifecycle && eo.resourceLifecycle.length > 0) {
+          text += `  Resource Lifecycle: ${eo.resourceLifecycle.join(', ')}\n`;
+        }
+        text += `\n`;
+      }
+
+      // Architectural Observations
+      if (hasArchitecturalObservations) {
+        text += `🏗️ Architectural Observations:\n`;
+        fullAnalysis.architecturalObservations.forEach((obs: any) => {
+          text += `  • ${safeString(obs.title)}: ${safeString(obs.explanation)}\n`;
         });
         text += `\n`;
       }
 
-      // Bugs and Risky Cases
-      if (fullAnalysis.bugsAndRiskyCases && fullAnalysis.bugsAndRiskyCases.length > 0) {
-        text += `🐛 Bugs and Risky Cases:\n`;
-        fullAnalysis.bugsAndRiskyCases.forEach((item: LegacyBugAndRiskyCase) => {
-          text += `  • ${safeString(item.issue)}\n`;
-          text += `    Impact: ${safeString(item.impact)}\n`;
-          if (item.example) text += `    Example: ${safeString(item.example)}\n`;
+      // Recommended Actions
+      if (hasRecommendedActions) {
+        text += `🔧 Recommended Actions:\n`;
+        fullAnalysis.recommendedActions.forEach((action: any) => {
+          text += `  • [Priority ${action.priority}] ${safeString(action.title)}\n`;
+          text += `    ${safeString(action.action)}\n`;
         });
         text += `\n`;
       }
 
-      // Edge Cases
-      if (fullAnalysis.edgeCases && fullAnalysis.edgeCases.length > 0) {
-        text += `🧪 Edge Cases:\n`;
-        fullAnalysis.edgeCases.forEach((item: LegacyEdgeCase) => {
-          text += `  • ${safeString(item.case)}\n`;
-          text += `    Current: ${safeString(item.currentBehavior)}\n`;
-          text += `    Expected: ${safeString(item.expectedBehavior)}\n`;
-          text += `    Risk: ${safeString(item.risk)}\n`;
-        });
-        text += `\n`;
-      }
-
-      // Performance Analysis
-      if (fullAnalysis.performanceAnalysis) {
-        text += `⚡ Performance Analysis:\n`;
-        const pa = fullAnalysis.performanceAnalysis;
-        if (pa.timeComplexity && pa.timeComplexity.length > 0) {
-          text += `  Time Complexity:\n`;
-          pa.timeComplexity.forEach((item) => {
-            text += `    • ${safeString(item.target)}: ${safeString(item.complexity)} (${safeString(item.explanation)})\n`;
-          });
+      // Complexity
+      if (hasComplexity) {
+        const c = fullAnalysis.complexity;
+        text += `📈 Complexity:\n`;
+        if (c.applicable) {
+          text += `  Expression: ${safeString(c.expression)}\n`;
+          text += `  Explanation: ${safeString(c.explanation)}\n`;
+          if (c.variables && c.variables.length > 0) {
+            text += `  Variables:\n`;
+            c.variables.forEach((v: any) => {
+              text += `    • ${safeString(v.symbol)}: ${safeString(v.definition)}\n`;
+            });
+          }
+          if (c.assumptions && c.assumptions.length > 0) {
+            text += `  Assumptions: ${c.assumptions.join('; ')}\n`;
+          }
+        } else {
+          text += `  Not applicable\n`;
         }
-        if (pa.spaceComplexity && pa.spaceComplexity.length > 0) {
-          text += `  Space Complexity:\n`;
-          pa.spaceComplexity.forEach((item) => {
-            text += `    • ${safeString(item.target)}: ${safeString(item.complexity)} (${safeString(item.explanation)})\n`;
-          });
-        }
-        if (pa.scalabilityNotes && pa.scalabilityNotes.length > 0) {
-          text += `  Scalability Notes:\n`;
-          pa.scalabilityNotes.forEach((item) => {
-            text += `    • ${safeString(item)}\n`;
-          });
-        }
-        text += `\n`;
-      }
-
-      // Security Analysis
-      if (fullAnalysis.securityAnalysis) {
-        text += `🔒 Security Analysis:\n`;
-        text += `  Severity: ${safeString(fullAnalysis.securityAnalysis.severity)}\n`;
-        if (fullAnalysis.securityAnalysis.issues && fullAnalysis.securityAnalysis.issues.length > 0) {
-          text += `  Issues:\n`;
-          fullAnalysis.securityAnalysis.issues.forEach((issue) => {
-            text += `    • ${safeString(issue)}\n`;
-          });
-        }
-        if (fullAnalysis.securityAnalysis.recommendations && fullAnalysis.securityAnalysis.recommendations.length > 0) {
-          text += `  Recommendations:\n`;
-          fullAnalysis.securityAnalysis.recommendations.forEach((rec) => {
-            text += `    • ${safeString(rec)}\n`;
-          });
-        }
-        text += `\n`;
-      }
-
-      // Production Readiness
-      if (fullAnalysis.productionReadiness) {
-        text += `🛡️ Production Readiness:\n`;
-        text += `  Ready: ${fullAnalysis.productionReadiness.isProductionReady ? 'Yes' : 'No'}\n`;
-        if (fullAnalysis.productionReadiness.reasons && fullAnalysis.productionReadiness.reasons.length > 0) {
-          fullAnalysis.productionReadiness.reasons.forEach((reason) => {
-            text += `    • ${safeString(reason)}\n`;
-          });
-        }
-        if (fullAnalysis.productionReadiness.requiredChanges && fullAnalysis.productionReadiness.requiredChanges.length > 0) {
-          text += `  Required Changes:\n`;
-          fullAnalysis.productionReadiness.requiredChanges.forEach((change) => {
-            text += `    • ${safeString(change)}\n`;
-          });
-        }
-        text += `\n`;
-      }
-
-      // Recommended Improvements
-      if (fullAnalysis.recommendedImprovements && fullAnalysis.recommendedImprovements.length > 0) {
-        text += `🔧 Recommended Improvements:\n`;
-        fullAnalysis.recommendedImprovements.forEach((item: LegacyRecommendedImprovement) => {
-          text += `  • [${safeString(item.priority)}] ${safeString(item.improvement)}\n`;
-          text += `    Reason: ${safeString(item.reason)}\n`;
-        });
-        text += `\n`;
-      }
-
-      // Improved Code
-      if (fullAnalysis.improvedCode && fullAnalysis.improvedCode.available) {
-        text += `✨ Improved Code:\n`;
-        text += `Notes: ${safeString(fullAnalysis.improvedCode.notes)}\n`;
-        text += `${safeString(fullAnalysis.improvedCode.code)}\n\n`;
-      }
-
-      // Suggested Tests
-      if (fullAnalysis.suggestedTests && fullAnalysis.suggestedTests.length > 0) {
-        text += `🧪 Suggested Tests:\n`;
-        // 🔥 استفاده از تایپ صریح با safeArray
-        safeArray<LegacySuggestedTest>(fullAnalysis.suggestedTests).forEach((test) => {
-          text += `  • ${safeString(test.name)}\n`;
-          if (test.input) text += `    Input: ${safeString(test.input)}\n`;
-          if (test.expectedOutput) text += `    Expected: ${safeString(test.expectedOutput)}\n`;
-          if (test.type) text += `    Type: ${safeString(test.type)}\n`;
-        });
         text += `\n`;
       }
 
       // Scorecard
-      if (fullAnalysis.scorecard) {
+      if (hasScorecardNew) {
         text += `📊 Scorecard:\n`;
         const sc = fullAnalysis.scorecard;
-        text += `  Correctness: ${safeString(sc.correctness)}/10\n`;
-        text += `  Readability: ${safeString(sc.readability)}/10\n`;
-        text += `  Performance: ${safeString(sc.performance)}/10\n`;
-        text += `  Maintainability: ${safeString(sc.maintainability)}/10\n`;
-        text += `  Production Readiness: ${safeString(sc.productionReadiness)}/10\n`;
-        if (sc.security !== undefined) text += `  Security: ${safeString(sc.security)}/10\n`;
-        if (sc.overall !== undefined) text += `  Overall: ${safeString(sc.overall)}/10\n`;
+        const categories = ['correctness', 'concurrencySafety', 'liveness', 'errorHandling', 'resourceManagement', 'maintainability', 'productionReadiness'];
+        categories.forEach((cat) => {
+          const item = sc[cat];
+          if (item) {
+            const score = getScoreValue(item);
+            const label = cat.replace(/([A-Z])/g, ' $1').trim();
+            text += `  ${label}: ${score !== null ? `${score}/100` : 'N/A'}\n`;
+          }
+        });
         text += `\n`;
       }
 
-      // Final Verdict
-      if (fullAnalysis.finalVerdict) {
-        text += `🏁 Final Verdict:\n`;
-        text += `  Summary: ${safeString(fullAnalysis.finalVerdict.summary)}\n`;
-        text += `  Approved: ${fullAnalysis.finalVerdict.approved ? '✅ Yes' : '❌ No'}\n`;
-        if (fullAnalysis.finalVerdict.nextSteps) {
-          text += `  Next Steps: ${safeString(fullAnalysis.finalVerdict.nextSteps)}\n`;
-        }
+      // Verdict
+      if (fullAnalysis.verdict) {
+        text += `🏁 Verdict:\n`;
+        text += `  Status: ${safeString(fullAnalysis.verdict.status)}\n`;
+        text += `  Explanation: ${safeString(fullAnalysis.verdict.explanation)}\n`;
         text += `\n`;
       }
 
-      // Debug / metadata if available
-      if ((fullAnalysis as any).debug_trace) {
-        text += `🔍 Debug Trace available (not displayed in text)\n`;
+      // Limitations
+      if (hasLimitations) {
+        text += `⚠️ Limitations:\n`;
+        fullAnalysis.limitations.forEach((lim: string) => {
+          text += `  • ${safeString(lim)}\n`;
+        });
+        text += `\n`;
       }
     } else if (fullAnalysis?.analysis) {
       text = formatText(fullAnalysis.analysis);
@@ -311,7 +301,9 @@ export default function AnalysisTab({
     URL.revokeObjectURL(url);
   };
 
-  // ===== Advanced mode with full legacy response =====
+  // ============================================================
+  // 🔥 نمایش Advanced (با فیلدهای کانونیکال)
+  // ============================================================
   if (isAdvanced && fullAnalysis) {
     return (
       <div className="space-y-6">
@@ -339,188 +331,66 @@ export default function AnalysisTab({
           </button>
         </div>
 
-        {/* ===== Title and Key Concept ===== */}
+        {/* ===== Title and Summary ===== */}
         <div>
-          <h2 className="text-2xl font-bold text-[#1a1a2e]">{safeString(fullAnalysis.card_title || 'Advanced Analysis')}</h2>
+          <h2 className="text-2xl font-bold text-[#1a1a2e]">{safeString(fullAnalysis.card_title || fullAnalysis.title || 'Advanced Analysis')}</h2>
           {fullAnalysis.key_concept && (
             <p className="mt-2 text-[#4a4a6a] bg-blue-50 p-3 rounded-lg border border-blue-200">
               {safeString(fullAnalysis.key_concept)}
             </p>
           )}
-          {fullAnalysis.analysis && (
-            <div className="mt-3 text-[#4a4a6a] whitespace-pre-wrap bg-gray-50 p-3 rounded-lg border border-gray-200">
-              {formatText(fullAnalysis.analysis)}
-            </div>
+          {fullAnalysis.summary && fullAnalysis.summary !== fullAnalysis.key_concept && (
+            <p className="mt-2 text-[#4a4a6a] bg-gray-50 p-3 rounded-lg border border-gray-200">
+              {safeString(fullAnalysis.summary)}
+            </p>
           )}
         </div>
 
-        {/* ===== Code Walkthrough ===== */}
-        {safeArray(fullAnalysis.codeWalkthrough).length > 0 && (
+        {/* ===== Findings (کانونیکال) ===== */}
+        {hasFindings && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
-            <h3 className="font-semibold text-[#4a86f7] mb-2">🧩 Code Walkthrough</h3>
-            {safeArray(fullAnalysis.codeWalkthrough).map((item: LegacyCodeWalkthroughItem, idx: number) => (
-              <div key={idx} className="border-b border-[#d0d0d8] pb-2 last:border-0 last:pb-0">
-                <p className="font-medium text-[#1a1a2e]">{safeString(item.section)}</p>
-                <p className="text-sm text-[#4a4a6a]">{safeString(item.explanation)}</p>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* ===== What Works Well ===== */}
-        {safeArray(fullAnalysis.whatWorksWell).length > 0 && (
-          <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
-            <h3 className="font-semibold text-[#43a047] mb-2">✅ What Works Well</h3>
-            <ul className="list-disc list-inside text-sm text-[#4a4a6a]">
-              {safeArray(fullAnalysis.whatWorksWell).map((item: string, idx: number) => (
-                <li key={idx}>{safeString(item)}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {/* ===== Bugs and Risky Cases ===== */}
-        {safeArray(fullAnalysis.bugsAndRiskyCases).length > 0 && (
-          <div>
-            <h3 className="text-lg font-semibold text-[#e53935] mb-3">🐛 Bugs and Risky Cases</h3>
+            <h3 className="font-semibold text-[#4a86f7] mb-3">🔍 Findings</h3>
             <div className="space-y-3">
-              {safeArray(fullAnalysis.bugsAndRiskyCases).map((item: LegacyBugAndRiskyCase, idx: number) => (
-                <div key={idx} className="p-4 bg-red-50 rounded-lg border border-red-200">
-                  <p className="font-semibold text-[#1a1a2e]">{safeString(item.issue)}</p>
-                  <p className="text-sm text-[#4a4a6a]"><span className="font-medium">Impact:</span> {safeString(item.impact)}</p>
-                  {item.example && <p className="text-sm text-[#4a4a6a]"><span className="font-medium">Example:</span> {safeString(item.example)}</p>}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ===== Edge Cases ===== */}
-        {safeArray(fullAnalysis.edgeCases).length > 0 && (
-          <div>
-            <h3 className="text-lg font-semibold text-[#f57c00] mb-3">🧪 Edge Cases</h3>
-            <div className="space-y-2">
-              {safeArray(fullAnalysis.edgeCases).map((item: LegacyEdgeCase, idx: number) => (
-                <div key={idx} className="p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-                  <p className="font-medium text-[#1a1a2e]">{safeString(item.case)}</p>
-                  <p className="text-sm text-[#4a4a6a]"><span className="font-medium">Current:</span> {safeString(item.currentBehavior)}</p>
-                  <p className="text-sm text-[#4a4a6a]"><span className="font-medium">Expected:</span> {safeString(item.expectedBehavior)}</p>
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${
-                    item.risk === 'High' ? 'bg-red-100 text-red-700' :
-                    item.risk === 'Medium' ? 'bg-yellow-100 text-yellow-700' :
-                    'bg-blue-100 text-blue-700'
-                  }`}>
-                    Risk: {safeString(item.risk)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ===== Performance Analysis ===== */}
-        {fullAnalysis.performanceAnalysis && (
-          <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
-            <h3 className="font-semibold text-[#4a86f7] mb-2">⚡ Performance Analysis</h3>
-            {fullAnalysis.performanceAnalysis.timeComplexity && fullAnalysis.performanceAnalysis.timeComplexity.length > 0 && (
-              <div className="mb-2">
-                <span className="font-medium text-sm">Time Complexity:</span>
-                {fullAnalysis.performanceAnalysis.timeComplexity.map((item, idx) => (
-                  <div key={idx} className="text-sm text-[#4a4a6a] ml-4">• {safeString(item.target)}: {safeString(item.complexity)} ({safeString(item.explanation)})</div>
-                ))}
-              </div>
-            )}
-            {fullAnalysis.performanceAnalysis.spaceComplexity && fullAnalysis.performanceAnalysis.spaceComplexity.length > 0 && (
-              <div className="mb-2">
-                <span className="font-medium text-sm">Space Complexity:</span>
-                {fullAnalysis.performanceAnalysis.spaceComplexity.map((item, idx) => (
-                  <div key={idx} className="text-sm text-[#4a4a6a] ml-4">• {safeString(item.target)}: {safeString(item.complexity)} ({safeString(item.explanation)})</div>
-                ))}
-              </div>
-            )}
-            {fullAnalysis.performanceAnalysis.scalabilityNotes && fullAnalysis.performanceAnalysis.scalabilityNotes.length > 0 && (
-              <div>
-                <span className="font-medium text-sm">Scalability Notes:</span>
-                {fullAnalysis.performanceAnalysis.scalabilityNotes.map((note, idx) => (
-                  <div key={idx} className="text-sm text-[#4a4a6a] ml-4">• {safeString(note)}</div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ===== Security Analysis ===== */}
-        {fullAnalysis.securityAnalysis && (
-          <div className={`p-4 rounded-lg border ${
-            fullAnalysis.securityAnalysis.severity === 'Critical' ? 'bg-red-50 border-red-300' :
-            fullAnalysis.securityAnalysis.severity === 'High' ? 'bg-orange-50 border-orange-300' :
-            fullAnalysis.securityAnalysis.severity === 'Medium' ? 'bg-yellow-50 border-yellow-300' :
-            'bg-blue-50 border-blue-300'
-          }`}>
-            <h3 className="font-semibold text-[#1a1a2e]">🔒 Security Analysis</h3>
-            <p className="text-sm"><span className="font-medium">Severity:</span> {safeString(fullAnalysis.securityAnalysis.severity)}</p>
-            {fullAnalysis.securityAnalysis.issues && fullAnalysis.securityAnalysis.issues.length > 0 && (
-              <div className="mt-2">
-                <span className="font-medium text-sm">Issues:</span>
-                {fullAnalysis.securityAnalysis.issues.map((issue, idx) => (
-                  <div key={idx} className="text-sm text-[#4a4a6a] ml-4">• {safeString(issue)}</div>
-                ))}
-              </div>
-            )}
-            {fullAnalysis.securityAnalysis.recommendations && fullAnalysis.securityAnalysis.recommendations.length > 0 && (
-              <div className="mt-2">
-                <span className="font-medium text-sm">Recommendations:</span>
-                {fullAnalysis.securityAnalysis.recommendations.map((rec, idx) => (
-                  <div key={idx} className="text-sm text-[#4a4a6a] ml-4">• {safeString(rec)}</div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ===== Production Readiness ===== */}
-        {fullAnalysis.productionReadiness && (
-          <div className={`p-4 rounded-lg border ${
-            fullAnalysis.productionReadiness.isProductionReady ? 'bg-green-50 border-green-200' : 'bg-orange-50 border-orange-200'
-          }`}>
-            <h3 className="font-semibold text-[#1a1a2e]">🛡️ Production Readiness</h3>
-            <p className="text-sm"><span className="font-medium">Ready:</span> {fullAnalysis.productionReadiness.isProductionReady ? '✅ Yes' : '❌ No'}</p>
-            {fullAnalysis.productionReadiness.reasons && fullAnalysis.productionReadiness.reasons.length > 0 && (
-              <div className="mt-2">
-                <span className="font-medium text-sm">Reasons:</span>
-                {fullAnalysis.productionReadiness.reasons.map((reason, idx) => (
-                  <div key={idx} className="text-sm text-[#4a4a6a] ml-4">• {safeString(reason)}</div>
-                ))}
-              </div>
-            )}
-            {fullAnalysis.productionReadiness.requiredChanges && fullAnalysis.productionReadiness.requiredChanges.length > 0 && (
-              <div className="mt-2">
-                <span className="font-medium text-sm">Required Changes:</span>
-                {fullAnalysis.productionReadiness.requiredChanges.map((change, idx) => (
-                  <div key={idx} className="text-sm text-[#4a4a6a] ml-4">• {safeString(change)}</div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ===== Recommended Improvements ===== */}
-        {safeArray(fullAnalysis.recommendedImprovements).length > 0 && (
-          <div>
-            <h3 className="text-lg font-semibold text-[#1a1a2e] mb-3">🔧 Recommended Improvements</h3>
-            <div className="space-y-2">
-              {safeArray(fullAnalysis.recommendedImprovements).map((item: LegacyRecommendedImprovement, idx: number) => (
-                <div key={idx} className="flex items-start gap-2 p-3 bg-[#f8f9fa] rounded-lg border border-[#d0d0d8]">
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                    item.priority === 'High' ? 'bg-red-100 text-red-700' :
-                    item.priority === 'Medium' ? 'bg-yellow-100 text-yellow-700' :
-                    'bg-blue-100 text-blue-700'
-                  }`}>
-                    {safeString(item.priority)}
-                  </span>
-                  <div>
-                    <p className="font-medium text-[#1a1a2e]">{safeString(item.improvement)}</p>
-                    <p className="text-sm text-[#4a4a6a]">{safeString(item.reason)}</p>
+              {fullAnalysis.findings.map((finding: any, idx: number) => (
+                <div key={idx} className="bg-white p-3 rounded-md border border-[#d0d0d8]">
+                  <div className="flex items-start justify-between gap-2 flex-wrap">
+                    <span className="text-sm font-semibold text-[#1a1a2e]">{safeString(finding.id)}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${severityBadge(finding.severity)}`}>
+                      {safeString(finding.severity)}
+                    </span>
+                  </div>
+                  <p className="text-sm text-[#1a1a2e] font-medium mt-1">{safeString(finding.title)}</p>
+                  {finding.technicalExplanation && (
+                    <p className="text-sm text-[#4a4a6a] mt-1">{safeString(finding.technicalExplanation)}</p>
+                  )}
+                  {finding.evidence && finding.evidence.length > 0 && (
+                    <div className="mt-2 text-xs bg-[#f1f3f5] p-2 rounded border border-[#d0d0d8]">
+                      <span className="text-[#6c7086]">Evidence: lines {finding.evidence.map((e: any) => `${e.startLine}-${e.endLine}`).join(', ')}</span>
+                      <pre className="mt-1 text-[#1a1a2e] bg-white p-2 rounded border border-[#d0d0d8] overflow-x-auto whitespace-pre-wrap max-h-[150px]">
+                        {safeString(finding.evidence[0].code)}
+                      </pre>
+                      <p className="text-xs text-[#6c7086] mt-1">{safeString(finding.evidence[0].explanation)}</p>
+                    </div>
+                  )}
+                  {finding.executionPath && finding.executionPath.length > 0 && (
+                    <div className="mt-2 text-xs">
+                      <span className="text-[#6c7086]">Path: </span>
+                      <span className="text-[#1a1a2e]">{finding.executionPath.join(' → ')}</span>
+                    </div>
+                  )}
+                  {finding.triggerConditions && finding.triggerConditions.length > 0 && (
+                    <div className="mt-1 text-xs">
+                      <span className="text-[#6c7086]">Triggers: </span>
+                      <span className="text-[#1a1a2e]">{finding.triggerConditions.join('; ')}</span>
+                    </div>
+                  )}
+                  {finding.remediation && (
+                    <div className="mt-2 text-xs text-[#43a047]">
+                      <strong>Fix:</strong> {safeString(finding.remediation)}
+                    </div>
+                  )}
+                  <div className="mt-1 text-xs text-[#6c7086]">
+                    Confidence: {safeString(finding.confidence)}
                   </div>
                 </div>
               ))}
@@ -528,75 +398,334 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* ===== Improved Code ===== */}
+        {/* ===== Execution Overview ===== */}
+        {hasExecutionOverview && (
+          <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
+            <h3 className="font-semibold text-[#4a86f7] mb-2">⚡ Execution Overview</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+              <div>
+                <span className="text-[#6c7086]">Entry Points:</span>
+                <ul className="list-disc list-inside text-[#1a1a2e]">
+                  {(fullAnalysis.executionOverview.entryPoints ?? []).map((p: string, i: number) => <li key={i}>{p}</li>)}
+                </ul>
+              </div>
+              <div>
+                <span className="text-[#6c7086]">Task Submission Points:</span>
+                <ul className="list-disc list-inside text-[#1a1a2e]">
+                  {(fullAnalysis.executionOverview.taskSubmissionPoints ?? []).map((p: string, i: number) => <li key={i}>{p}</li>)}
+                </ul>
+              </div>
+              <div>
+                <span className="text-[#6c7086]">Blocking Wait Points:</span>
+                <ul className="list-disc list-inside text-[#1a1a2e]">
+                  {(fullAnalysis.executionOverview.blockingWaitPoints ?? []).map((p: string, i: number) => <li key={i}>{p}</li>)}
+                </ul>
+              </div>
+              <div>
+                <span className="text-[#6c7086]">Shared Resources:</span>
+                <ul className="list-disc list-inside text-[#1a1a2e]">
+                  {(fullAnalysis.executionOverview.sharedResources ?? []).map((p: string, i: number) => <li key={i}>{p}</li>)}
+                </ul>
+              </div>
+              <div className="md:col-span-2">
+                <span className="text-[#6c7086]">Resource Lifecycle:</span>
+                <ul className="list-disc list-inside text-[#1a1a2e]">
+                  {(fullAnalysis.executionOverview.resourceLifecycle ?? []).map((p: string, i: number) => <li key={i}>{p}</li>)}
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ===== Architectural Observations ===== */}
+        {hasArchitecturalObservations && (
+          <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
+            <h3 className="font-semibold text-[#4a86f7] mb-2">🏗️ Architectural Observations</h3>
+            <div className="space-y-2">
+              {fullAnalysis.architecturalObservations.map((obs: any, idx: number) => (
+                <div key={idx} className="border-b border-[#d0d0d8] pb-2 last:border-0">
+                  <p className="font-medium text-[#1a1a2e]">{safeString(obs.title)}</p>
+                  <p className="text-sm text-[#4a4a6a]">{safeString(obs.explanation)}</p>
+                  {obs.relatedFindingIds && obs.relatedFindingIds.length > 0 && (
+                    <p className="text-xs text-[#6c7086]">Related: {obs.relatedFindingIds.join(', ')}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ===== Recommended Actions ===== */}
+        {hasRecommendedActions && (
+          <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
+            <h3 className="font-semibold text-[#4a86f7] mb-2">🔧 Recommended Actions</h3>
+            <div className="space-y-2">
+              {fullAnalysis.recommendedActions.map((action: any, idx: number) => (
+                <div key={idx} className="flex items-start gap-2 border-b border-[#d0d0d8] pb-2 last:border-0">
+                  <span className="text-xs text-[#6c7086] min-w-[24px]">#{action.priority}</span>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-[#1a1a2e]">{safeString(action.title)}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${severityBadge(action.severity)}`}>
+                        {safeString(action.severity)}
+                      </span>
+                    </div>
+                    <p className="text-sm text-[#4a4a6a]">{safeString(action.action)}</p>
+                    {action.relatedFindingIds && action.relatedFindingIds.length > 0 && (
+                      <p className="text-xs text-[#6c7086]">Related: {action.relatedFindingIds.join(', ')}</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ===== Complexity ===== */}
+        {hasComplexity && (
+          <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
+            <h3 className="font-semibold text-[#4a86f7] mb-2">📈 Complexity</h3>
+            {fullAnalysis.complexity.applicable ? (
+              <div className="grid grid-cols-1 gap-2 text-sm">
+                <div>
+                  <span className="text-[#6c7086]">Expression:</span>
+                  <span className="text-[#1a1a2e] ml-2">{safeString(fullAnalysis.complexity.expression)}</span>
+                </div>
+                <div>
+                  <span className="text-[#6c7086]">Explanation:</span>
+                  <span className="text-[#1a1a2e] ml-2">{safeString(fullAnalysis.complexity.explanation)}</span>
+                </div>
+                {fullAnalysis.complexity.variables && fullAnalysis.complexity.variables.length > 0 && (
+                  <div>
+                    <span className="text-[#6c7086]">Variables:</span>
+                    <ul className="list-disc list-inside text-[#1a1a2e]">
+                      {fullAnalysis.complexity.variables.map((v: any, i: number) => (
+                        <li key={i}>{safeString(v.symbol)}: {safeString(v.definition)}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {fullAnalysis.complexity.assumptions && fullAnalysis.complexity.assumptions.length > 0 && (
+                  <div>
+                    <span className="text-[#6c7086]">Assumptions:</span>
+                    <ul className="list-disc list-inside text-[#1a1a2e]">
+                      {fullAnalysis.complexity.assumptions.map((a: string, i: number) => <li key={i}>{safeString(a)}</li>)}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-[#6c7086]">Not applicable</p>
+            )}
+          </div>
+        )}
+
+        {/* ===== Legacy sections (for backward compatibility) ===== */}
+        {safeArray(fullAnalysis.codeWalkthrough).length > 0 && (
+          <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
+            <h3 className="font-semibold text-[#4a86f7] mb-2">🧩 Code Walkthrough</h3>
+            {safeArray(fullAnalysis.codeWalkthrough).map((item: LegacyCodeWalkthroughItem, idx: number) => (
+              <div key={idx} className="border-b border-[#d0d0d8] pb-2 last:border-0">
+                <p className="font-medium text-[#1a1a2e]">{safeString(item.section)}</p>
+                <p className="text-sm text-[#4a4a6a]">{safeString(item.explanation)}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {safeArray(fullAnalysis.whatWorksWell).length > 0 && (
+          <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
+            <h3 className="font-semibold text-[#43a047] mb-2">✅ What Works Well</h3>
+            <ul className="list-disc list-inside text-sm text-[#4a4a6a]">
+              {safeArray(fullAnalysis.whatWorksWell).map((item: string, idx: number) => <li key={idx}>{safeString(item)}</li>)}
+            </ul>
+          </div>
+        )}
+
+        {safeArray(fullAnalysis.bugsAndRiskyCases).length > 0 && (
+          <div className="bg-red-50 p-4 rounded-lg border border-red-200">
+            <h3 className="font-semibold text-[#e53935]">🐛 Bugs and Risky Cases</h3>
+            {safeArray(fullAnalysis.bugsAndRiskyCases).map((item: LegacyBugAndRiskyCase, idx: number) => (
+              <div key={idx} className="border-b border-red-100 pb-2 last:border-0">
+                <p className="font-semibold text-[#1a1a2e]">{safeString(item.issue)}</p>
+                <p className="text-sm text-[#4a4a6a]">Impact: {safeString(item.impact)}</p>
+                {item.example && <p className="text-sm text-[#4a4a6a]">Example: {safeString(item.example)}</p>}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {safeArray(fullAnalysis.edgeCases).length > 0 && (
+          <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+            <h3 className="font-semibold text-[#f57c00]">🧪 Edge Cases</h3>
+            {safeArray(fullAnalysis.edgeCases).map((item: LegacyEdgeCase, idx: number) => (
+              <div key={idx} className="border-b border-yellow-100 pb-2 last:border-0">
+                <p className="font-medium text-[#1a1a2e]">{safeString(item.case)}</p>
+                <p className="text-sm text-[#4a4a6a]">Current: {safeString(item.currentBehavior)}</p>
+                <p className="text-sm text-[#4a4a6a]">Expected: {safeString(item.expectedBehavior)}</p>
+                <span className={`text-xs px-2 py-0.5 rounded-full ${item.risk === 'High' ? 'bg-red-100 text-red-700' : item.risk === 'Medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-100 text-blue-700'}`}>
+                  Risk: {safeString(item.risk)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {fullAnalysis.performanceAnalysis && !hasComplexity && (
+          <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
+            <h3 className="font-semibold text-[#4a86f7] mb-2">⚡ Performance Analysis</h3>
+            {(() => {
+              const pa = fullAnalysis.performanceAnalysis;
+              let content = '';
+              if (pa.timeComplexity && pa.timeComplexity.length > 0) {
+                content += 'Time Complexity:\n';
+                pa.timeComplexity.forEach((item: any) => {
+                  content += `  • ${safeString(item.target)}: ${safeString(item.complexity)} (${safeString(item.explanation)})\n`;
+                });
+              }
+              if (pa.spaceComplexity && pa.spaceComplexity.length > 0) {
+                content += 'Space Complexity:\n';
+                pa.spaceComplexity.forEach((item: any) => {
+                  content += `  • ${safeString(item.target)}: ${safeString(item.complexity)} (${safeString(item.explanation)})\n`;
+                });
+              }
+              if (pa.scalabilityNotes && pa.scalabilityNotes.length > 0) {
+                content += 'Scalability Notes:\n';
+                pa.scalabilityNotes.forEach((item: string) => {
+                  content += `  • ${safeString(item)}\n`;
+                });
+              }
+              return <pre className="text-sm text-[#4a4a6a] whitespace-pre-wrap">{content}</pre>;
+            })()}
+          </div>
+        )}
+
+        {fullAnalysis.securityAnalysis && (
+          <div className={`p-4 rounded-lg border ${fullAnalysis.securityAnalysis.severity === 'Critical' ? 'bg-red-50 border-red-300' : fullAnalysis.securityAnalysis.severity === 'High' ? 'bg-orange-50 border-orange-300' : fullAnalysis.securityAnalysis.severity === 'Medium' ? 'bg-yellow-50 border-yellow-300' : 'bg-blue-50 border-blue-300'}`}>
+            <h3 className="font-semibold text-[#1a1a2e]">🔒 Security Analysis</h3>
+            <p className="text-sm">Severity: {safeString(fullAnalysis.securityAnalysis.severity)}</p>
+            {fullAnalysis.securityAnalysis.issues && fullAnalysis.securityAnalysis.issues.length > 0 && (
+              <div className="mt-2">
+                <span className="font-medium text-sm">Issues:</span>
+                {fullAnalysis.securityAnalysis.issues.map((issue: string, idx: number) => <div key={idx} className="text-sm text-[#4a4a6a] ml-4">• {safeString(issue)}</div>)}
+              </div>
+            )}
+            {fullAnalysis.securityAnalysis.recommendations && fullAnalysis.securityAnalysis.recommendations.length > 0 && (
+              <div className="mt-2">
+                <span className="font-medium text-sm">Recommendations:</span>
+                {fullAnalysis.securityAnalysis.recommendations.map((rec: string, idx: number) => <div key={idx} className="text-sm text-[#4a4a6a] ml-4">• {safeString(rec)}</div>)}
+              </div>
+            )}
+          </div>
+        )}
+
+        {fullAnalysis.productionReadiness && (
+          <div className={`p-4 rounded-lg border ${fullAnalysis.productionReadiness.isProductionReady ? 'bg-green-50 border-green-200' : 'bg-orange-50 border-orange-200'}`}>
+            <h3 className="font-semibold text-[#1a1a2e]">🛡️ Production Readiness</h3>
+            <p className="text-sm">Ready: {fullAnalysis.productionReadiness.isProductionReady ? '✅ Yes' : '❌ No'}</p>
+            {fullAnalysis.productionReadiness.reasons && fullAnalysis.productionReadiness.reasons.length > 0 && (
+              <div className="mt-2">
+                <span className="font-medium text-sm">Reasons:</span>
+                {fullAnalysis.productionReadiness.reasons.map((reason: string, idx: number) => <div key={idx} className="text-sm text-[#4a4a6a] ml-4">• {safeString(reason)}</div>)}
+              </div>
+            )}
+            {fullAnalysis.productionReadiness.requiredChanges && fullAnalysis.productionReadiness.requiredChanges.length > 0 && (
+              <div className="mt-2">
+                <span className="font-medium text-sm">Required Changes:</span>
+                {fullAnalysis.productionReadiness.requiredChanges.map((change: string, idx: number) => <div key={idx} className="text-sm text-[#4a4a6a] ml-4">• {safeString(change)}</div>)}
+              </div>
+            )}
+          </div>
+        )}
+
+        {safeArray(fullAnalysis.recommendedImprovements).length > 0 && !hasRecommendedActions && (
+          <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
+            <h3 className="font-semibold text-[#4a86f7] mb-2">🔧 Recommended Improvements</h3>
+            {safeArray(fullAnalysis.recommendedImprovements).map((item: LegacyRecommendedImprovement, idx: number) => (
+              <div key={idx} className="flex items-start gap-2 p-2 border-b border-[#d0d0d8] last:border-0">
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${item.priority === 'High' ? 'bg-red-100 text-red-700' : item.priority === 'Medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-100 text-blue-700'}`}>
+                  {safeString(item.priority)}
+                </span>
+                <div>
+                  <p className="font-medium text-[#1a1a2e]">{safeString(item.improvement)}</p>
+                  <p className="text-sm text-[#4a4a6a]">{safeString(item.reason)}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         {fullAnalysis.improvedCode && fullAnalysis.improvedCode.available && (
           <div className="bg-[#e8f5e9] p-4 rounded-lg border border-green-200">
             <h3 className="font-semibold text-[#43a047] mb-2">✨ Improved Code</h3>
-            <p className="text-sm text-[#4a4a6a]"><span className="font-medium">Notes:</span> {safeString(fullAnalysis.improvedCode.notes)}</p>
+            <p className="text-sm text-[#4a4a6a]">Notes: {safeString(fullAnalysis.improvedCode.notes)}</p>
             <pre className="mt-2 p-3 bg-[#1a1a2e] text-[#cdd6f4] rounded-md overflow-x-auto text-sm font-mono">
               {safeString(fullAnalysis.improvedCode.code)}
             </pre>
           </div>
         )}
 
-        {/* ===== Suggested Tests ===== */}
         {safeArray<LegacySuggestedTest>(fullAnalysis.suggestedTests).length > 0 && (
-          <div>
-            <h3 className="text-lg font-semibold text-[#1a1a2e] mb-3">🧪 Suggested Tests</h3>
-            <div className="space-y-2">
-              {safeArray<LegacySuggestedTest>(fullAnalysis.suggestedTests).map((test: LegacySuggestedTest, idx: number) => (
-                <div key={idx} className="p-3 bg-[#f8f9fa] rounded-lg border border-[#d0d0d8]">
-                  <p className="font-medium text-[#1a1a2e]">{safeString(test.name)}</p>
-                  {test.input && <p className="text-sm text-[#4a4a6a]"><span className="font-medium">Input:</span> {safeString(test.input)}</p>}
-                  {test.expectedOutput && <p className="text-sm text-[#4a4a6a]"><span className="font-medium">Expected:</span> {safeString(test.expectedOutput)}</p>}
-                  {test.type && <span className={`text-xs px-2 py-0.5 rounded-full ${
-                    test.type === 'Invalid' ? 'bg-red-100 text-red-700' :
-                    test.type === 'Edge' ? 'bg-yellow-100 text-yellow-700' :
-                    'bg-blue-100 text-blue-700'
-                  }`}>{safeString(test.type)}</span>}
-                </div>
-              ))}
-            </div>
+          <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
+            <h3 className="font-semibold text-[#4a86f7] mb-2">🧪 Suggested Tests</h3>
+            {safeArray<LegacySuggestedTest>(fullAnalysis.suggestedTests).map((test: LegacySuggestedTest, idx: number) => (
+              <div key={idx} className="p-2 border-b border-[#d0d0d8] last:border-0">
+                <p className="font-medium text-[#1a1a2e]">{safeString(test.name)}</p>
+                {test.input && <p className="text-sm text-[#4a4a6a]">Input: {safeString(test.input)}</p>}
+                {test.expectedOutput && <p className="text-sm text-[#4a4a6a]">Expected: {safeString(test.expectedOutput)}</p>}
+                {test.type && <span className={`text-xs px-2 py-0.5 rounded-full ${test.type === 'Invalid' ? 'bg-red-100 text-red-700' : test.type === 'Edge' ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-100 text-blue-700'}`}>{safeString(test.type)}</span>}
+              </div>
+            ))}
           </div>
         )}
 
-        {/* ===== Scorecard ===== */}
-        {fullAnalysis.scorecard && (
+        {/* ===== Scorecard (با پشتیبانی از scorecard_new) ===== */}
+        {hasScorecardNew && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-2">📊 Scorecard</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-              {Object.entries(fullAnalysis.scorecard).map(([key, value]) => (
-                <div key={key} className="bg-white p-2 rounded text-center border border-[#d0d0d8]">
-                  <p className="text-xs text-[#6c7086] capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</p>
-                  <p className="text-lg font-bold text-[#1a1a2e]">{typeof value === 'number' ? value : 0}/10</p>
-                </div>
-              ))}
+              {Object.entries(scorecardDisplay).map(([key, value]: [string, any]) => {
+                const score = getScoreValue(value);
+                const label = key.replace(/([A-Z])/g, ' $1').trim();
+                const isApplicable = value?.applicable !== false;
+                return (
+                  <div key={key} className="bg-white p-2 rounded text-center border border-[#d0d0d8]">
+                    <p className="text-xs text-[#6c7086] capitalize">{label}</p>
+                    <p className="text-lg font-bold text-[#1a1a2e]">
+                      {isApplicable && score !== null ? `${score}/100` : 'N/A'}
+                    </p>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
 
-        {/* ===== Final Verdict ===== */}
-        {fullAnalysis.finalVerdict && (
-          <div className={`p-4 rounded-lg border ${
-            fullAnalysis.finalVerdict.approved ? 'bg-green-50 border-green-200' : 'bg-orange-50 border-orange-200'
-          }`}>
-            <h3 className="font-semibold text-[#1a1a2e]">🏁 Final Verdict</h3>
-            <p className="mt-1 text-sm text-[#4a4a6a]">{safeString(fullAnalysis.finalVerdict.summary)}</p>
-            <p className="mt-1 text-sm">
-              <span className="font-medium">Approved:</span> {fullAnalysis.finalVerdict.approved ? '✅ Yes' : '❌ No'}
+        {/* ===== Verdict ===== */}
+        {fullAnalysis.verdict && (
+          <div className={`p-4 rounded-lg border ${fullAnalysis.verdict.status === 'approved' || fullAnalysis.verdict.status === 'approved-with-suggestions' ? 'bg-green-50 border-green-200' : 'bg-orange-50 border-orange-200'}`}>
+            <h3 className="font-semibold text-[#1a1a2e]">🏁 Verdict</h3>
+            <p className="mt-1 text-sm text-[#4a4a6a]">
+              <span className="font-medium">Status:</span> {safeString(fullAnalysis.verdict.status)}
             </p>
-            {fullAnalysis.finalVerdict.nextSteps && (
-              <p className="mt-1 text-sm text-[#4a4a6a]"><span className="font-medium">Next Steps:</span> {safeString(fullAnalysis.finalVerdict.nextSteps)}</p>
-            )}
+            <p className="mt-1 text-sm text-[#4a4a6a]">{safeString(fullAnalysis.verdict.explanation)}</p>
+          </div>
+        )}
+
+        {/* ===== Limitations ===== */}
+        {hasLimitations && (
+          <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
+            <h3 className="font-semibold text-[#e53935] mb-2">⚠️ Limitations</h3>
+            <ul className="list-disc list-inside text-sm text-[#4a4a6a]">
+              {fullAnalysis.limitations.map((lim: string, idx: number) => <li key={idx}>{safeString(lim)}</li>)}
+            </ul>
           </div>
         )}
 
         {/* ===== Debug info (if available) ===== */}
         {(fullAnalysis as any).debug_trace && process.env.NODE_ENV === 'development' && (
           <details className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
-            <summary className="cursor-pointer text-sm font-medium text-[#1a1a2e]">
-              🔍 Debug Trace
-            </summary>
+            <summary className="cursor-pointer text-sm font-medium text-[#1a1a2e]">🔍 Debug Trace</summary>
             <pre className="mt-2 text-xs text-[#4a4a6a] whitespace-pre-wrap bg-white p-3 rounded border border-[#d0d0d8] max-h-[200px] overflow-y-auto">
               {JSON.stringify((fullAnalysis as any).debug_trace, null, 2)}
             </pre>
@@ -606,7 +735,9 @@ export default function AnalysisTab({
     );
   }
 
-  // ===== Simple / Medium mode =====
+  // ============================================================
+  // 🔥 Simple / Medium mode
+  // ============================================================
   if (!quickAnalysisText) {
     return <div className="text-[#4a4a6a]">No quick analysis available.</div>;
   }
