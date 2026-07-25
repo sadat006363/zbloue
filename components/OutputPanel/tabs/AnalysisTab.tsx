@@ -240,7 +240,7 @@ export default function AnalysisTab({
 
       // Scorecard
       if (hasScorecardNew) {
-        const sc = fullAnalysis.scorecard;
+        const sc = fullAnalysis.scorecard as any;
         if (sc && typeof sc === 'object') {
           text += `📊 Scorecard:\n`;
           const categories = ['correctness', 'concurrencySafety', 'liveness', 'errorHandling', 'resourceManagement', 'maintainability', 'productionReadiness'];
