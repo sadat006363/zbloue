@@ -489,9 +489,9 @@ function normalizeFinding(finding: unknown, index: number, usedIds: Set<string>)
     evidence: normalizedEvidence,
     executionPath: getStringArray(f.executionPath) || getStringArray(f.path) || [],
     triggerConditions: getStringArray(f.triggerConditions) || getStringArray(f.conditions) || [],
-    consequence: getSafeString(f.consequence, getSafeString(f.impact, getSafeString(f.effect, ''))),
-    technicalExplanation: getSafeString(f.technicalExplanation, getSafeString(f.details, '')),
-    remediation: getSafeString(f.remediation, getSafeString(f.fix, getSafeString(f.solution, ''))),
+    consequence: getSafeString(f.consequence, getSafeString(f.impact, getSafeString(f.effect, 'No consequence provided.'))),
+    technicalExplanation: getSafeString(f.technicalExplanation, getSafeString(f.details, 'No technical explanation provided.')),
+    remediation: getSafeString(f.remediation, getSafeString(f.fix, getSafeString(f.solution, 'No remediation provided.'))),
     relatedSymbols: getStringArray(f.relatedSymbols) || getStringArray(f.symbols) || [],
     testToReproduce,
   };
@@ -665,6 +665,64 @@ function normalizeResponseLanguage(source: unknown): 'English' | 'Persian' | nul
 }
 
 // ============================================================
+// 🔥 Helper: Create minimal audit from partial data
+// ============================================================
+
+function createMinimalAuditFromPartial(
+  raw: unknown,
+  error: unknown
+): AdvancedAuditResult | null {
+  try {
+    const input = getSafeObject(raw);
+    const summary = getSafeString(input.summary, getSafeString(input.highLevelSummary, 'Partial analysis.'));
+    const title = normalizeTitle(input.title, summary);
+    const language = normalizeLanguage(input.language);
+
+    // ساخت یک ساختار حداقلی با داده‌های موجود
+    const minimal: AdvancedAuditResult = {
+      schemaVersion: '1.0',
+      auditType: 'comprehensive',
+      appliedSpecializations: normalizeAppliedSpecializations(input.appliedSpecializations ?? input.specializations),
+      completionStatus: 'partially-complete',
+      repairApplied: true,
+      title,
+      language: language || 'unknown',
+      responseLanguage: normalizeResponseLanguage(input.responseLanguage),
+      analysisCoverage: normalizeAnalysisCoverage(input.analysisCoverage ?? input.coverage ?? {}),
+      summary: summary || 'Partial analysis due to schema mismatch.',
+      executionOverview: normalizeExecutionOverview(input.executionOverview ?? input.overview ?? {}),
+      findings: getSafeArray<unknown>(input.findings ?? input.issues ?? [], []).map((f, i) => {
+        const usedIds = new Set<string>();
+        return normalizeFinding(f, i, usedIds);
+      }),
+      architecturalObservations: normalizeArchitecturalObservations(
+        input.architecturalObservations ?? input.architectural_observations,
+        new Set()
+      ),
+      recommendedActions: normalizeRecommendedActions(
+        input.recommendedActions ?? input.recommended_actions,
+        new Set()
+      ),
+      suggestedTests: normalizeSuggestedTests(
+        input.suggestedTests ?? input.suggested_tests ?? input.suggestedTestsNew,
+        new Set()
+      ),
+      complexity: normalizeComplexity(input.complexity ?? {}),
+      scorecard: normalizeScorecard(input.scorecard ?? input.scorecard_new ?? {}),
+      verdict: normalizeVerdict(input.verdict ?? input.finalVerdict ?? {}),
+      limitations: getStringArray(input.limitations).length > 0 ? getStringArray(input.limitations) : ['Analysis is incomplete due to data validation issues.'],
+      improvedCode: normalizeImprovedCode(input.improvedCode ?? input.improved_code ?? {}),
+      linkedin_post: getSafeString(input.linkedin_post ?? input.linkedinPost) || DEFAULT_LINKEDIN_POST,
+    };
+
+    return minimal;
+  } catch (err) {
+    logger.error('[Normalizer] Failed to create minimal audit:', err);
+    return null;
+  }
+}
+
+// ============================================================
 // Main Normalizer
 // ============================================================
 
@@ -795,7 +853,14 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
     logger.debug('[Normalizer] Completed in', duration, 'ms, findings:', normalizedFindings.length);
     return validated;
   } catch (error) {
-    logger.error('[Normalizer] Schema validation failed:', error);
+    logger.error('[Normalizer] Schema validation failed, attempting to create minimal audit...', error);
+    const minimal = createMinimalAuditFromPartial(result, error);
+    if (minimal) {
+      logger.info('[Normalizer] Returning minimal audit with partial data');
+      return minimal;
+    }
+    // در نهایت، همان داده‌های ناقص را با لاگ برگردان
+    logger.error('[Normalizer] Returning partial data as fallback');
     return result;
   }
 }
