@@ -34,7 +34,7 @@ function extractJSON(text: string): string {
 }
 
 // ============================================================
-// 🔥 Helper: Create minimal audit from existing data
+// 🔥 Helper: Create minimal audit from existing data (حفظ محتوای اصلی)
 // ============================================================
 
 function createMinimalAuditFromExisting(
@@ -44,9 +44,83 @@ function createMinimalAuditFromExisting(
 ): AdvancedAuditResult | null {
   try {
     const parsed = JSON.parse(previousAudit);
-    const summary = typeof parsed.summary === 'string' ? parsed.summary : 'Partial analysis from repair fallback.';
-    const title = typeof parsed.title === 'string' ? parsed.title : 'Code Analysis (Repaired)';
+    
+    // ============================================================
+    // 🔥 حفظ محتوای اصلی هوش (فقط ساختار را تعمیر کن)
+    // ============================================================
+    const summary = typeof parsed.summary === 'string' && parsed.summary.length > 0 
+      ? parsed.summary 
+      : 'Partial analysis from repair fallback.';
+    
+    const title = typeof parsed.title === 'string' && parsed.title.length > 0 
+      ? parsed.title 
+      : 'Code Analysis (Repaired)';
 
+    // ============================================================
+    // 🔥 حفظ findings اصلی (فقط فیلدهای خالی را با undefined پر کن)
+    // ============================================================
+    const findings = Array.isArray(parsed.findings) 
+      ? parsed.findings.map((f: any) => ({
+          id: f.id || `F-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`,
+          title: f.title || 'Untitled Finding',
+          category: f.category || 'other',
+          mechanisms: Array.isArray(f.mechanisms) ? f.mechanisms : [],
+          severity: f.severity || 'medium',
+          confidence: f.confidence || 'conditional',
+          evidence: Array.isArray(f.evidence) ? f.evidence : [],
+          executionPath: Array.isArray(f.executionPath) ? f.executionPath : [],
+          triggerConditions: Array.isArray(f.triggerConditions) ? f.triggerConditions : [],
+          consequence: f.consequence || undefined, // اگر خالی بود، undefined
+          technicalExplanation: f.technicalExplanation || undefined, // اگر خالی بود، undefined
+          remediation: f.remediation || undefined, // اگر خالی بود، undefined
+          relatedSymbols: Array.isArray(f.relatedSymbols) ? f.relatedSymbols : [],
+          testToReproduce: f.testToReproduce || null,
+        }))
+      : [];
+
+    // ============================================================
+    // 🔥 حفظ scorecard و verdict اصلی
+    // ============================================================
+    const scorecard = typeof parsed.scorecard === 'object' && parsed.scorecard !== null 
+      ? parsed.scorecard 
+      : {
+          correctness: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
+          concurrencySafety: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
+          liveness: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
+          errorHandling: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
+          resourceManagement: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
+          maintainability: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
+          productionReadiness: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
+        };
+
+    const verdict = typeof parsed.verdict === 'object' && parsed.verdict !== null 
+      ? parsed.verdict 
+      : {
+          status: 'requires-changes',
+          explanation: 'Partial analysis due to repair failure.',
+        };
+
+    const improvedCode = typeof parsed.improvedCode === 'object' && parsed.improvedCode !== null 
+      ? parsed.improvedCode 
+      : {
+          available: false,
+          code: null,
+          notes: 'No improved code available.',
+        };
+
+    const complexity = typeof parsed.complexity === 'object' && parsed.complexity !== null 
+      ? parsed.complexity 
+      : {
+          applicable: false,
+          expression: null,
+          explanation: null,
+          variables: [],
+          assumptions: [],
+        };
+
+    // ============================================================
+    // 🔥 ساخت ساختار نهایی با حفظ محتوای اصلی
+    // ============================================================
     const minimal: AdvancedAuditResult = {
       schemaVersion: '1.0',
       auditType: 'comprehensive',
@@ -65,59 +139,24 @@ function createMinimalAuditFromExisting(
         sharedResources: [],
         resourceLifecycle: [],
       },
-      findings: Array.isArray(parsed.findings) ? parsed.findings.map((f: any) => ({
-        id: f.id || 'F-001',
-        title: f.title || 'Untitled Finding',
-        category: f.category || 'other',
-        mechanisms: Array.isArray(f.mechanisms) ? f.mechanisms : [],
-        severity: f.severity || 'medium',
-        confidence: f.confidence || 'conditional',
-        evidence: Array.isArray(f.evidence) ? f.evidence : [],
-        executionPath: Array.isArray(f.executionPath) ? f.executionPath : [],
-        triggerConditions: Array.isArray(f.triggerConditions) ? f.triggerConditions : [],
-        consequence: f.consequence || 'No consequence provided.',
-        technicalExplanation: f.technicalExplanation || 'No technical explanation provided.',
-        remediation: f.remediation || 'No remediation provided.',
-        relatedSymbols: Array.isArray(f.relatedSymbols) ? f.relatedSymbols : [],
-        testToReproduce: f.testToReproduce || null,
-      })) : [],
+      findings: findings,
       architecturalObservations: Array.isArray(parsed.architecturalObservations) ? parsed.architecturalObservations : [],
       recommendedActions: Array.isArray(parsed.recommendedActions) ? parsed.recommendedActions : [],
       suggestedTests: Array.isArray(parsed.suggestedTests) ? parsed.suggestedTests : [],
-      complexity: typeof parsed.complexity === 'object' && parsed.complexity !== null ? parsed.complexity : {
-        applicable: false,
-        expression: null,
-        explanation: null,
-        variables: [],
-        assumptions: [],
-      },
-      scorecard: typeof parsed.scorecard === 'object' && parsed.scorecard !== null ? parsed.scorecard : {
-        correctness: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
-        concurrencySafety: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
-        liveness: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
-        errorHandling: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
-        resourceManagement: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
-        maintainability: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
-        productionReadiness: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
-      },
-      verdict: typeof parsed.verdict === 'object' && parsed.verdict !== null ? parsed.verdict : {
-        status: 'requires-changes',
-        explanation: 'Partial analysis due to repair failure.',
-      },
+      complexity: complexity,
+      scorecard: scorecard,
+      verdict: verdict,
       limitations: ['Analysis is incomplete due to repair failure.'],
-      improvedCode: typeof parsed.improvedCode === 'object' && parsed.improvedCode !== null ? parsed.improvedCode : {
-        available: false,
-        code: null,
-        notes: 'No improved code available.',
-      },
+      improvedCode: improvedCode,
       linkedin_post: typeof parsed.linkedin_post === 'string' ? parsed.linkedin_post : 'Check out this code analysis! #Zbloue',
     };
 
-    // اعتبارسنجی نهایی (با انعطاف‌پذیری)
+    // ============================================================
+    // 🔥 اعتبارسنجی نهایی (با انعطاف‌پذیری)
+    // ============================================================
     try {
       return AdvancedAuditResultSchema.parse(minimal);
     } catch {
-      // اگر باز هم خطا داشت، همان minimal را برگردان (با لاگ)
       logger.warn('[Repair] Minimal audit also failed validation, returning as-is');
       return minimal as AdvancedAuditResult;
     }
@@ -157,6 +196,9 @@ export async function repairAudit(
       rawCode: numberedCode,
     };
 
+    // ============================================================
+    // 🔥 پرامپت تعمیر با تأکید بر حفظ محتوای اصلی
+    // ============================================================
     const prompt = buildRepairPrompt(
       promptContext,
       previousAudit,
@@ -164,7 +206,13 @@ export async function repairAudit(
       missingCoverage
     );
 
-    const systemPrompt = 'You are an expert code auditor. Return only valid JSON. Do not use Markdown fences or any text outside the JSON.';
+    const systemPrompt = `You are an expert code auditor. 
+IMPORTANT: Your task is to REPAIR the structure of the JSON, NOT to rewrite the content.
+- PRESERVE all valid content (titles, descriptions, explanations, remediations).
+- ONLY fix structural issues (missing fields, invalid types, empty arrays).
+- Do NOT replace valid content with placeholder text like "No ... provided".
+- If a field is missing, keep it as null or empty array.
+- Return only valid JSON. Do not use Markdown fences.`;
 
     const rawContent = await callOpenAI(systemPrompt, prompt, {
       mode: 'advanced',
@@ -178,7 +226,7 @@ export async function repairAudit(
 
     if (!parseResult.success || !parseResult.data) {
       logger.warn('[Repair] Parse failed:', parseResult.error);
-      // 🔥 Fallback: ساخت یک audit حداقلی از داده‌های موجود
+      // 🔥 Fallback: ساخت یک audit حداقلی از داده‌های موجود (با حفظ محتوای اصلی)
       return createMinimalAuditFromExisting(previousAudit, language, auditType);
     }
 
@@ -274,7 +322,13 @@ export async function repairStructureOnly(
       missingCoverage
     );
 
-    const systemPrompt = 'You are an expert code auditor. Return only valid JSON that matches the canonical schema. Do not use Markdown fences or any text outside the JSON.';
+    const systemPrompt = `You are an expert code auditor. 
+IMPORTANT: Your task is to REPAIR the structure of the JSON, NOT to rewrite the content.
+- PRESERVE all valid content (titles, descriptions, explanations, remediations).
+- ONLY fix structural issues (missing fields, invalid types, empty arrays).
+- Do NOT replace valid content with placeholder text like "No ... provided".
+- If a field is missing, keep it as null or empty array.
+- Return only valid JSON that matches the canonical schema. Do not use Markdown fences.`;
 
     const rawContent = await callOpenAI(systemPrompt, prompt, {
       mode: 'advanced',

@@ -409,12 +409,15 @@ function normalizeImprovedCode(source: unknown): ImprovedCode {
 }
 
 // ============================================================
-// Finding Normalization (with fallbacks to avoid placeholder text)
+// Finding Normalization (با حفظ محتوای اصلی و عدم استفاده از placeholderهای بی‌معنی)
 // ============================================================
 
 function normalizeFinding(finding: unknown, index: number, usedIds: Set<string>): AuditFinding {
   const f = getSafeObject(finding);
 
+  // ============================================================
+  // 🔥 1. نرمالایز کردن evidence (با حفظ داده‌های موجود)
+  // ============================================================
   const evidenceList = getSafeArray<unknown>(f.evidence, []);
   const normalizedEvidence = evidenceList.map((e: unknown) => {
     const ev = getSafeObject(e);
@@ -431,6 +434,9 @@ function normalizeFinding(finding: unknown, index: number, usedIds: Set<string>)
     };
   });
 
+  // ============================================================
+  // 🔥 2. نرمالایز کردن testToReproduce
+  // ============================================================
   let testToReproduce = null;
   const testRaw = f.testToReproduce ?? f.test;
   if (isObject(testRaw)) {
@@ -446,6 +452,9 @@ function normalizeFinding(finding: unknown, index: number, usedIds: Set<string>)
     }
   }
 
+  // ============================================================
+  // 🔥 3. ساخت ID یکتا
+  // ============================================================
   let id = getSafeString(f.id, `F-${String(index + 1).padStart(3, '0')}`);
   if (!/^F-\d{3,}$/.test(id)) {
     id = `F-${String(index + 1).padStart(3, '0')}`;
@@ -460,10 +469,12 @@ function normalizeFinding(finding: unknown, index: number, usedIds: Set<string>)
   }
   usedIds.add(finalId);
 
+  // ============================================================
+  // 🔥 4. category و mechanisms
+  // ============================================================
   const legacyCategory = getSafeString(f.category ?? f.type, 'other');
   const broadCategory = mapToBroadCategory(legacyCategory);
   
-  // Extract and validate mechanisms
   const rawMechanisms = extractMechanisms(f);
   const validMechanisms: Mechanism[] = rawMechanisms
     .filter((m): m is Mechanism => {
@@ -471,11 +482,14 @@ function normalizeFinding(finding: unknown, index: number, usedIds: Set<string>)
       return result.success;
     });
 
-  // 🔥 Ensure we have meaningful values, avoid placeholders
+  // ============================================================
+  // 🔥 5. فیلدهای اصلی (با حفظ محتوای اصلی هوش)
+  //    اگر فیلد خالی بود، به‌جای placeholder بی‌معنی، null یا undefined بگذاریم
+  // ============================================================
   const title = getSafeString(f.title, getSafeString(f.name, 'Untitled Finding'));
-  const consequence = getSafeString(f.consequence, getSafeString(f.impact, getSafeString(f.effect, 'No consequence provided.')));
-  const technicalExplanation = getSafeString(f.technicalExplanation, getSafeString(f.details, 'No technical explanation provided.'));
-  const remediation = getSafeString(f.remediation, getSafeString(f.fix, getSafeString(f.solution, 'No remediation provided.')));
+  const consequence = getSafeString(f.consequence, getSafeString(f.impact, getSafeString(f.effect, '')));
+  const technicalExplanation = getSafeString(f.technicalExplanation, getSafeString(f.details, ''));
+  const remediation = getSafeString(f.remediation, getSafeString(f.fix, getSafeString(f.solution, '')));
   const executionPath = getStringArray(f.executionPath) || getStringArray(f.path) || [];
   const triggerConditions = getStringArray(f.triggerConditions) || getStringArray(f.conditions) || [];
   const relatedSymbols = getStringArray(f.relatedSymbols) || getStringArray(f.symbols) || [];
@@ -498,9 +512,9 @@ function normalizeFinding(finding: unknown, index: number, usedIds: Set<string>)
     evidence: normalizedEvidence,
     executionPath,
     triggerConditions,
-    consequence,
-    technicalExplanation,
-    remediation,
+    consequence: consequence || undefined as any, // اگر خالی بود، undefined
+    technicalExplanation: technicalExplanation || undefined as any, // اگر خالی بود، undefined
+    remediation: remediation || undefined as any, // اگر خالی بود، undefined
     relatedSymbols,
     testToReproduce,
   };
@@ -761,9 +775,17 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
   const findingsArray = getSafeArray<unknown>(findingsSource, []);
   const usedIds = new Set<string>();
 
+  // ============================================================
+  // 🔥 نرمالایز کردن Findings با حفظ محتوای اصلی
+  // ============================================================
   const normalizedFindings: AuditFinding[] = findingsArray
     .map((f: unknown, index: number) => normalizeFinding(f, index, usedIds))
-    .filter((finding) => finding.title.trim().length > 0 || finding.evidence.length > 0);
+    .filter((finding) => {
+      // حداقل یک فیلد معتبر داشته باشد (عنوان، شواهد، یا توضیح فنی)
+      return finding.title.trim().length > 0 || 
+             finding.evidence.length > 0 || 
+             (finding.technicalExplanation && finding.technicalExplanation.length > 0);
+    });
 
   const findingIds = new Set(normalizedFindings.map((f) => f.id));
 
