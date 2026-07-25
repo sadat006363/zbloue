@@ -79,6 +79,11 @@ You must return a JSON object with the following structure:
       "title": "Bulkhead Pattern Implementation",
       "explanation": "The code implements a bulkhead pattern using Semaphore and ThreadPoolExecutor to limit concurrent access.",
       "relatedFindingIds": ["F-001"]
+    },
+    {
+      "title": "Retry Pattern Implementation",
+      "explanation": "The code implements a retry pattern with while loop and retryCount.",
+      "relatedFindingIds": ["F-002"]
     }
   ],
   "recommendedActions": [
@@ -158,6 +163,55 @@ You must return a JSON object with the following structure:
    - Dependency management
    - Error recovery and retry logic
    - Testability
+
+==================== ARCHITECTURAL OBSERVATIONS (MANDATORY) ====================
+
+You MUST identify and report architectural patterns in the code:
+- Bulkhead pattern: using Semaphore + ThreadPoolExecutor
+- Retry pattern: while loop with retryCount
+- Circuit Breaker pattern (if present)
+- Timeout pattern: Future.get with timeout
+- Producer-Consumer pattern (if present)
+- Any other design patterns or architectural decisions
+
+For each pattern found, provide:
+- title: Name of the pattern
+- explanation: How it is implemented in the code
+- relatedFindingIds: IDs of findings related to this pattern
+
+🔥 **You MUST output architecturalObservations even if no findings exist.**
+If no architectural patterns are found, output an empty array.
+
+==================== RECOMMENDED ACTIONS (MANDATORY) ====================
+
+For each finding with severity "critical" or "high", you MUST provide a recommended action.
+For each finding with severity "medium", you SHOULD provide a recommended action.
+
+Each action must include:
+- priority: number from 1 (highest) to 10 (lowest)
+- severity: same as the finding
+- title: short title of the action
+- action: specific, actionable step to fix the issue
+- relatedFindingIds: array of finding IDs
+
+🔥 **You MUST output recommendedActions even if no findings exist.**
+If no findings exist, output an empty array.
+
+==================== SUGGESTED TESTS (MANDATORY) ====================
+
+For each finding, you SHOULD provide a suggested test to reproduce the issue.
+For findings with severity "critical" or "high", you MUST provide a suggested test.
+
+Each test must include:
+- title: short title of the test
+- purpose: why this test is needed
+- setup: array of setup steps
+- steps: array of test steps (at least 1)
+- expectedResult: what should happen
+- relatedFindingIds: array of finding IDs
+
+🔥 **You MUST output suggestedTests even if no findings exist.**
+If no findings exist, output an empty array.
 
 ==================== EVIDENCE REQUIREMENTS ====================
 
