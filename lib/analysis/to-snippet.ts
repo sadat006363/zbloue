@@ -199,7 +199,7 @@ export function legacyRowToAudit(row: SnippetRow | any): AdvancedAuditResult | n
     }
 
     // ============================================================
-    // 6️⃣ analysisCoverage (با اصلاح TypeScript)
+    // 6️⃣ analysisCoverage (اصلاح‌شده)
     // ============================================================
     const coverageDimensions = [
       'correctness',
@@ -221,10 +221,10 @@ export function legacyRowToAudit(row: SnippetRow | any): AdvancedAuditResult | n
 
     type CoverageDimension = typeof coverageDimensions[number];
 
-    // 🔥 اصلاح: استفاده از as const برای literal type status
+    // 🔥 اصلاح: استفاده از as برای تعیین نوع literal
     const analysisCoverage = coverageDimensions.map((dim) => ({
       dimension: dim as CoverageDimension,
-      status: (dim === 'concurrency' && !hasConcurrency ? 'not-applicable' : 'analyzed') as const,
+      status: (dim === 'concurrency' && !hasConcurrency ? 'not-applicable' : 'analyzed') as 'analyzed' | 'not-applicable',
       summary: `Analysis of ${dim} dimension.`,
       limitation: null,
     }));
@@ -258,7 +258,7 @@ export function legacyRowToAudit(row: SnippetRow | any): AdvancedAuditResult | n
       scorecard: scorecard,
       verdict: verdict,
       improvedCode: improvedCode,
-      analysisCoverage: analysisCoverage, // ✅ خطا برطرف شد
+      analysisCoverage: analysisCoverage,
       title: row.card_title || 'Code Analysis Report',
     };
 
