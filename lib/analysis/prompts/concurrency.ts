@@ -46,28 +46,28 @@ Keep identifiers, code, enum values, IDs, and schema keys unchanged.
 ==================== MANDATORY ANALYSIS PROCEDURE ====================
 
 1. BUILD AN EXECUTION MAP:
-   - Identify entry points.
-   - Trace method calls.
-   - Identify task creation, submission, and execution.
-   - Identify executors, pools, threads.
+   - Identify entry points visible in the supplied code.
+   - Trace method-to-method calls that are visible.
+   - Identify where tasks are created, submitted, and executed.
+   - Identify which executor, pool, thread, or event loop executes each task.
    - Identify blocking waits (Future.get, join, await, etc.).
-   - 🔥 Output in executionOverview.
+   - 🔥 Output in executionOverview. ALL fields must be filled.
 
 2. ANALYZE RESOURCE OWNERSHIP:
-   - Track resource creation and release.
-   - Identify ownership transfers.
-   - Identify potential leaks.
-   - 🔥 Include in executionOverview.resourceLifecycle.
+   - Analyze construction sites, reference holders, lifecycle owners, ownership transfers.
+   - Claim lifecycle ownership only when positive visible evidence establishes it.
+   - If ownership is ambiguous, record a limitation rather than a definite defect.
+   - 🔥 Include resource lifecycle observations in executionOverview.resourceLifecycle.
 
 3. ANALYZE SAFETY AND GENERATE FINDINGS:
    - For each safety issue, create a finding with:
      - title: Concise description (e.g., "Semaphore Leak on Exception")
      - severity: critical (deadlock), high (thread-starvation), medium (race-condition)
      - confidence: definite, likely, conditional
-     - evidence: At least one code snippet with exact line numbers
+     - evidence: At least ONE code snippet with exact line numbers (startLine, endLine, code, explanation)
      - technicalExplanation: Detailed technical explanation (min 50 characters)
      - remediation: Specific actionable fix (min 50 characters)
-   - 🔥 **DO NOT use placeholders like "Untitled Finding" or "No ... provided".**
+   - 🔥 DO NOT use placeholders like "Untitled Finding" or "No ... provided".
 
 4. ANALYZE LIVENESS:
    - Detect deadlock, thread-starvation, livelock.
@@ -89,35 +89,55 @@ Keep identifiers, code, enum values, IDs, and schema keys unchanged.
    - If a clear fix exists, provide improved code.
    - 🔥 Output in improvedCode.
 
-==================== FINDINGS GENERATION (CRITICAL - DO NOT IGNORE) ====================
+==================== FINDINGS GENERATION (CRITICAL - HIGHEST PRIORITY) ====================
 
-You MUST generate findings with the following structure:
-- **id:** F-001, F-002, ... (sequential)
-- **title:** Descriptive title (e.g., "Potential Thread Starvation", "Semaphore Not Released on Exception")
-- **technicalExplanation:** Detailed root cause (min 50 characters)
-- **remediation:** Specific fix (min 50 characters)
-- **evidence:** At least one code snippet with line numbers
+🔥 THIS IS THE MOST IMPORTANT SECTION. FOLLOW IT EXACTLY.
 
-**Examples of GOOD findings:**
-✅ "Semaphore Not Released on Exception" - with detailed explanation and fix
-✅ "Potential Thread Starvation Due to Nested Submission" - with execution path and fix
+You MUST generate findings that are:
+- At least 2 findings for non-trivial code.
+- At least 1 finding for trivial code.
 
-**Examples of BAD findings (DO NOT PRODUCE):**
-❌ "Untitled Finding" - lacks description
-❌ "No technical explanation provided." - lacks detail
-❌ "No remediation provided." - lacks action
+Each finding MUST include:
 
-🔥 **Rules:**
-- For non-trivial code, produce at least 2 findings.
-- For trivial code, produce at least 1 finding.
-- If you cannot find a defect, report a potential improvement or edge case.
-- Never use placeholder text.
+- id: Sequential: F-001, F-002, ...
+- title: A concise, descriptive title (max 10 words). Example: "Semaphore Leak on Exception", "Potential Thread Starvation". NEVER use "Untitled Finding".
+- category: One of: correctness, concurrency, security, reliability, error-handling, resource-management, performance, data-integrity, input-validation, api-design, configuration, architecture, maintainability, testability, observability, compatibility, other.
+- mechanisms: Array of applicable mechanisms (e.g., ["resource-leak", "deadlock"]). Use [] if none.
+- severity: critical, high, medium, low, or info.
+- confidence: definite, likely, or conditional.
+- evidence: 🔥 MUST contain at least ONE object with startLine, endLine, code (exact excerpt), and explanation. Use the numbered source code to find exact line numbers.
+- executionPath: Array of method/function names leading to the issue.
+- triggerConditions: Array of conditions that trigger the issue.
+- consequence: What happens if the issue is not fixed (min 20 characters).
+- technicalExplanation: Detailed technical explanation (min 50 characters). NEVER use "No technical explanation provided."
+- remediation: Specific, actionable fix (min 50 characters). NEVER use "No remediation provided."
+- relatedSymbols: Array of relevant variable/method names.
+- testToReproduce: Either null or an object with title, setup, steps, expectedResult.
+
+🔥 RULES:
+- DO NOT use placeholder text like "Untitled Finding", "No technical explanation provided.", or "No remediation provided."
+- DO NOT leave evidence empty. Provide at least one evidence item per finding.
+- DO NOT copy the example finding verbatim. Generate findings based on the actual source code.
+- If you cannot find a defect, produce a finding about a potential improvement or edge case.
+- The startLine and endLine must be valid line numbers from the numbered source code.
+
+==================== EXECUTION OVERVIEW (MANDATORY - COMPLETE ALL FIELDS) ====================
+
+You MUST fill ALL fields of executionOverview:
+
+- entryPoints: Array of method names where execution begins (e.g., ["build", "run", "main"]).
+- taskSubmissionPoints: Array of methods/locations where tasks are submitted (e.g., ["executor.submit", "executor.execute", "thread.start"]).
+- blockingWaitPoints: Array of methods/locations where the code blocks waiting for results (e.g., ["future.get", "semaphore.tryAcquire", "Thread.join", "CountDownLatch.await"]).
+- sharedResources: Array of resources that are shared across threads (e.g., ["poolMap", "semaphoreMap", "sharedQueue"]).
+- resourceLifecycle: Array of lifecycle events (e.g., ["created in bulkhead", "released in finally", "acquired in tryAcquire"]).
+
+🔥 **DO NOT leave these fields empty.** If a category is not applicable, provide a brief explanation (e.g., "No task submission points identified").
 
 ==================== ARCHITECTURAL OBSERVATIONS (MANDATORY) ====================
 
 You MUST identify architectural patterns in the code. For each pattern found, provide:
 - title: Name of the pattern (e.g., "Bulkhead Pattern Implementation")
-- explanation: How it is implemented
+- explanation: How it is implemented in the code
 - relatedFindingIds: IDs of findings related to this pattern
 
 If no architectural patterns are found, output an empty array.
@@ -239,6 +259,14 @@ All fields are mandatory.
 Arrays must be present (use [] when empty).
 Strings must be non-empty.
 Do not use placeholder text like "Untitled Finding" or "No ... provided".
+
+==================== FINAL REMINDER (DO NOT IGNORE) ====================
+
+🔥 You MUST produce at least 2 findings for non-trivial code.
+🔥 Each finding MUST have a descriptive title, detailed technical explanation, and actionable remediation.
+🔥 Each finding MUST have at least ONE evidence item with startLine, endLine, code, and explanation.
+🔥 executionOverview MUST have ALL fields filled (entryPoints, taskSubmissionPoints, blockingWaitPoints, sharedResources, resourceLifecycle).
+🔥 NEVER use placeholder text. Generate all content from the actual source code.
 
 ==================== OUTPUT ====================
 

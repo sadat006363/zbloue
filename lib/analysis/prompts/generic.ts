@@ -86,9 +86,6 @@ You must return a JSON object with the following structure. **All fields are man
     "resourceLifecycle": ["created in bulkhead", "released in finally"]
   },
   "findings": [
-    // 🔥 CRITICAL: You MUST generate at least 2 findings for non-trivial code.
-    // Each finding MUST have a descriptive title, technical explanation, remediation, and evidence.
-    // Example of a GOOD finding (do not copy, generate from the actual code):
     {
       "id": "F-001",
       "title": "Semaphore leak on exception path",
@@ -197,7 +194,7 @@ Each finding MUST include:
 - mechanisms: Array of applicable mechanisms (e.g., ["resource-leak", "deadlock"]). Use [] if none.
 - severity: critical, high, medium, low, or info.
 - confidence: definite, likely, or conditional.
-- evidence: MUST contain at least one object with startLine, endLine, code (exact excerpt), and explanation.
+- evidence: 🔥 MUST contain at least ONE object with startLine, endLine (exact line numbers from the numbered source), code (exact excerpt), and explanation. If you cannot find exact line numbers, use reasonable estimates based on the code structure.
 - executionPath: Array of method/function names leading to the issue.
 - triggerConditions: Array of conditions that trigger the issue.
 - consequence: What happens if the issue is not fixed (min 20 characters).
@@ -208,9 +205,22 @@ Each finding MUST include:
 
 🔥 RULES:
 - DO NOT use placeholder text like "Untitled Finding", "No technical explanation provided.", or "No remediation provided."
-- DO NOT leave evidence empty.
+- DO NOT leave evidence empty. Provide at least one evidence item per finding.
 - DO NOT copy the example finding verbatim. Generate findings based on the actual source code.
 - If you cannot find a defect, produce a finding about a potential improvement or edge case.
+- The startLine and endLine must be valid line numbers from the numbered source code.
+
+==================== EXECUTION OVERVIEW (MANDATORY - COMPLETE ALL FIELDS) ====================
+
+You MUST fill ALL fields of executionOverview:
+
+- entryPoints: Array of method names where execution begins (e.g., ["main", "build", "run"]).
+- taskSubmissionPoints: Array of methods/locations where tasks are submitted (e.g., ["executor.submit", "executor.execute", "thread.start"]).
+- blockingWaitPoints: Array of methods/locations where the code blocks waiting for results (e.g., ["future.get", "semaphore.tryAcquire", "Thread.join", "CountDownLatch.await"]).
+- sharedResources: Array of resources that are shared across threads (e.g., ["poolMap", "semaphoreMap", "sharedQueue"]).
+- resourceLifecycle: Array of lifecycle events (e.g., ["created in bulkhead", "released in finally", "acquired in tryAcquire"]).
+
+🔥 **DO NOT leave these fields empty.** If a category is not applicable, provide a brief explanation (e.g., "No task submission points identified").
 
 ==================== ARCHITECTURAL OBSERVATIONS (MANDATORY) ====================
 
@@ -254,7 +264,7 @@ If no findings exist, output an empty array.
 
 - Every finding must have at least one evidence object.
 - Evidence code must be an exact excerpt from the provided source (no ellipses).
-- Line numbers must be valid (1-indexed).
+- Line numbers must be valid (1-indexed) based on the numbered source code.
 - Do not invent code or line numbers.
 
 ==================== CONFIDENCE CALIBRATION ====================
@@ -346,6 +356,8 @@ Do not use placeholder text like "Untitled Finding" or "No ... provided".
 
 🔥 You MUST produce at least 2 findings for non-trivial code.
 🔥 Each finding MUST have a descriptive title, detailed technical explanation, and actionable remediation.
+🔥 Each finding MUST have at least ONE evidence item with startLine, endLine, code, and explanation.
+🔥 executionOverview MUST have ALL fields filled (entryPoints, taskSubmissionPoints, blockingWaitPoints, sharedResources, resourceLifecycle).
 🔥 NEVER use placeholder text. Generate all content from the actual source code.
 
 ==================== OUTPUT ====================
