@@ -21,7 +21,7 @@ export interface SnippetCreationContext {
 }
 
 // ============================================================
-// 🔥 تبدیل AdvancedAuditResult به SnippetInsert (بدون تغییر)
+// 🔥 تبدیل AdvancedAuditResult به SnippetInsert
 // ============================================================
 
 export function toSnippetInsert(
@@ -85,7 +85,7 @@ export function toSnippetInsert(
 }
 
 // ============================================================
-// 🔥 تبدیل Snippet از دیتابیس به AdvancedAuditResult (بدون تغییر)
+// 🔥 تبدیل Snippet از دیتابیس به AdvancedAuditResult
 // ============================================================
 
 export function snippetRowToAudit(row: SnippetRow): AdvancedAuditResult | null {
@@ -127,14 +127,13 @@ export function legacyRowToAudit(row: SnippetRow | any): AdvancedAuditResult | n
     if (row.responseLanguage === 'English' || row.responseLanguage === 'Persian') {
       responseLanguage = row.responseLanguage;
     } else {
-      responseLanguage = 'English'; // مقدار پیش‌فرض ایمن
+      responseLanguage = 'English';
     }
 
     // ============================================================
     // 2️⃣ نرمالایز کردن complexity
     // ============================================================
     let complexity = row.complexity || {};
-    // اگر complexity وجود ندارد یا ساختار آن درست نیست، مقدار پیش‌فرض قرار دهید
     if (typeof complexity.applicable !== 'boolean') {
       complexity = {
         applicable: false,
@@ -150,7 +149,6 @@ export function legacyRowToAudit(row: SnippetRow | any): AdvancedAuditResult | n
     // ============================================================
     let scorecard: any = row.scorecard_new || row.scorecard || null;
     if (!scorecard || typeof scorecard !== 'object') {
-      // اگر scorecard وجود ندارد، یک مقدار پیش‌فرض با applicable: false برای همه‌ی دسته‌ها بسازید
       scorecard = {
         correctness: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
         concurrencySafety: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
@@ -201,7 +199,7 @@ export function legacyRowToAudit(row: SnippetRow | any): AdvancedAuditResult | n
     }
 
     // ============================================================
-    // 6️⃣ analysisCoverage
+    // 6️⃣ analysisCoverage (با اصلاح TypeScript)
     // ============================================================
     const coverageDimensions = [
       'correctness',
@@ -223,9 +221,10 @@ export function legacyRowToAudit(row: SnippetRow | any): AdvancedAuditResult | n
 
     type CoverageDimension = typeof coverageDimensions[number];
 
+    // 🔥 اصلاح: استفاده از as const برای literal type status
     const analysisCoverage = coverageDimensions.map((dim) => ({
       dimension: dim as CoverageDimension,
-      status: dim === 'concurrency' && !hasConcurrency ? 'not-applicable' : 'analyzed',
+      status: (dim === 'concurrency' && !hasConcurrency ? 'not-applicable' : 'analyzed') as const,
       summary: `Analysis of ${dim} dimension.`,
       limitation: null,
     }));
@@ -240,7 +239,7 @@ export function legacyRowToAudit(row: SnippetRow | any): AdvancedAuditResult | n
       completionStatus: 'complete',
       repairApplied: false,
       language: row.language || 'unknown',
-      responseLanguage: responseLanguage, // 🔥 مقدار نرمالایز شده
+      responseLanguage: responseLanguage,
       summary: row.key_concept || '',
       executionOverview: row.execution_overview || { 
         entryPoints: [], 
@@ -253,13 +252,13 @@ export function legacyRowToAudit(row: SnippetRow | any): AdvancedAuditResult | n
       architecturalObservations: row.architectural_observations || [],
       recommendedActions: row.recommended_actions || [],
       suggestedTests: row.suggested_tests_new || [],
-      complexity: complexity, // 🔥 مقدار نرمالایز شده
+      complexity: complexity,
       limitations: row.limitations || [],
       linkedin_post: row.linkedin_post || '',
-      scorecard: scorecard, // 🔥 مقدار نرمالایز شده
+      scorecard: scorecard,
       verdict: verdict,
       improvedCode: improvedCode,
-      analysisCoverage: analysisCoverage,
+      analysisCoverage: analysisCoverage, // ✅ خطا برطرف شد
       title: row.card_title || 'Code Analysis Report',
     };
 
