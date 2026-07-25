@@ -210,6 +210,67 @@ Each finding MUST include:
 - If you cannot find a defect, produce a finding about a potential improvement or edge case.
 - The startLine and endLine must be valid line numbers from the numbered source code.
 
+==================== DEADLOCK DETECTION (CRITICAL - NEW) ====================
+
+🔥 **DEADLOCK DETECTION RULES:**
+
+If you detect a potential deadlock in the code (cyclic dependency, lock-ordering issue, nested blocking waits, or circular wait-for graph), you MUST create a separate finding with the following specifications:
+
+- **severity**: "critical" (deadlock is a critical issue)
+- **confidence**: "definite" (if the cycle is proven by visible code) or "likely" (if strongly implied)
+- **title**: "Potential Deadlock Detected" (or a more specific title if possible)
+- **category**: "concurrency"
+- **mechanisms**: ["deadlock"] (must include this mechanism)
+- **technicalExplanation**: Explain the circular wait condition, participants, resources, and the wait-for cycle.
+- **remediation**: Suggest specific steps to break the cycle, such as:
+  - Reordering locks to a consistent order
+  - Using tryLock with timeout
+  - Avoiding nested locks
+  - Using higher-level concurrency utilities
+- **evidence**: Must include at least one code snippet showing the conflicting lock acquisition order or blocking wait.
+- **executionPath**: Show the path that leads to the deadlock.
+- **triggerConditions**: Conditions required for the deadlock to occur.
+
+**When to report a deadlock:**
+- Two or more threads/tasks acquiring locks in different orders.
+- A thread holding a lock while waiting for another resource that is held by a thread waiting for the first lock.
+- Nested blocking waits (e.g., Future.get inside a synchronized block while holding a lock).
+
+**If deadlock is not proven but strongly possible:**
+- Set confidence to "likely" and explain the conditions needed.
+- If deadlock depends on external factors, use "conditional".
+
+🔥 **Example of a deadlock finding:**
+{
+  "id": "F-003",
+  "title": "Potential Deadlock Due to Lock Ordering",
+  "category": "concurrency",
+  "mechanisms": ["deadlock"],
+  "severity": "critical",
+  "confidence": "likely",
+  "evidence": [
+    {
+      "startLine": 45,
+      "endLine": 52,
+      "code": "synchronized(lockA) { synchronized(lockB) { ... } }",
+      "explanation": "Lock A acquired before lock B in this path."
+    },
+    {
+      "startLine": 78,
+      "endLine": 85,
+      "code": "synchronized(lockB) { synchronized(lockA) { ... } }",
+      "explanation": "Lock B acquired before lock A in another path, creating a cycle."
+    }
+  ],
+  "executionPath": ["method1", "method2"],
+  "triggerConditions": ["Both methods are called concurrently"],
+  "consequence": "Threads may deadlock indefinitely, causing application hang.",
+  "technicalExplanation": "The code acquires locks in different orders in different methods, creating a circular wait condition that can lead to deadlock under concurrent execution.",
+  "remediation": "Refactor the code to acquire locks in a consistent order (e.g., always acquire lockA before lockB). Consider using tryLock with timeout to avoid indefinite blocking.",
+  "relatedSymbols": ["lockA", "lockB"],
+  "testToReproduce": null
+}
+
 ==================== EXECUTION OVERVIEW (MANDATORY - COMPLETE ALL FIELDS) ====================
 
 You MUST fill ALL fields of executionOverview:
@@ -358,6 +419,7 @@ Do not use placeholder text like "Untitled Finding" or "No ... provided".
 🔥 Each finding MUST have a descriptive title, detailed technical explanation, and actionable remediation.
 🔥 Each finding MUST have at least ONE evidence item with startLine, endLine, code, and explanation.
 🔥 executionOverview MUST have ALL fields filled (entryPoints, taskSubmissionPoints, blockingWaitPoints, sharedResources, resourceLifecycle).
+🔥 If a deadlock is detected, create a separate finding with severity "critical" and mechanism ["deadlock"].
 🔥 NEVER use placeholder text. Generate all content from the actual source code.
 
 ==================== OUTPUT ====================
