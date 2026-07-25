@@ -28,6 +28,17 @@ export const snippetService = {
    * ذخیره‌سازی یک Snippet جدید در دیتابیس
    */
   async save(data: SaveSnippetData): Promise<CreateSnippetResponse> {
+    // ============================================================
+    // 🔥 لاگ در سرویس (قبل از ارسال)
+    // ============================================================
+    console.log('🔍 [snippetService.save] ===== START =====');
+    console.log('🔍 [snippetService.save] data.audit_result:', (data as any).audit_result);
+    console.log('🔍 [snippetService.save] data.findings:', data.findings);
+    console.log('🔍 [snippetService.save] data.scorecard_new:', data.scorecard_new);
+    console.log('🔍 [snippetService.save] data.verdict:', data.verdict);
+    console.log('🔍 [snippetService.save] Full data keys:', Object.keys(data));
+    console.log('🔍 [snippetService.save] ===== END =====');
+
     const response = await fetch('/api/create-snippet', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

@@ -258,6 +258,20 @@ export default function HomePage() {
         audit_result: genData.audit_result,
       };
 
+      // ============================================================
+      // 🔥 لاگ‌های سمت کلاینت (مرحله ۱)
+      // ============================================================
+      console.log('🔍 [Client] ===== START DEBUG =====');
+      console.log('🔍 [Client] genData.audit_result:', genData.audit_result);
+      console.log('🔍 [Client] genData.findings:', genData.findings);
+      console.log('🔍 [Client] genData.scorecard:', genData.scorecard);
+      console.log('🔍 [Client] genData.verdict:', genData.verdict);
+      console.log('🔍 [Client] saveData.audit_result:', saveData.audit_result);
+      console.log('🔍 [Client] saveData.findings:', saveData.findings);
+      console.log('🔍 [Client] saveData.scorecard_new:', saveData.scorecard_new);
+      console.log('🔍 [Client] saveData.verdict:', saveData.verdict);
+      console.log('🔍 [Client] ===== END DEBUG =====');
+
       const saveResult = await snippetService.save(saveData);
 
       if (!saveResult.success) {

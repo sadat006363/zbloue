@@ -137,6 +137,18 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
 
   const body = validation.data;
 
+  // ============================================================
+  // 🔥 لاگ‌های سمت سرور (مرحله ۲)
+  // ============================================================
+  console.log('🔍 [Server] ===== START DEBUG =====');
+  console.log('🔍 [Server] body.audit_result:', body.audit_result);
+  console.log('🔍 [Server] body.findings:', body.findings);
+  console.log('🔍 [Server] body.scorecard_new:', body.scorecard_new);
+  console.log('🔍 [Server] body.verdict:', body.verdict);
+  console.log('🔍 [Server] body.execution_overview:', body.execution_overview);
+  console.log('🔍 [Server] body.complexity:', body.complexity);
+  console.log('🔍 [Server] ===== END DEBUG =====');
+
   // ===== Generate Slug =====
   let slug: string;
   try {
@@ -376,6 +388,16 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
       { status: 500 }
     );
   }
+
+  // ============================================================
+  // 🔥 لاگ‌های سمت سرور قبل از insert (مرحله ۳)
+  // ============================================================
+  console.log('🔍 [Server] ===== BEFORE INSERT =====');
+  console.log('🔍 [Server] row.audit_result:', row.audit_result);
+  console.log('🔍 [Server] row.findings:', row.findings);
+  console.log('🔍 [Server] row.scorecard_new:', row.scorecard_new);
+  console.log('🔍 [Server] row.verdict:', row.verdict);
+  console.log('🔍 [Server] ===== END BEFORE INSERT =====');
 
   // ============================================================
   // 5. Insert into Supabase
