@@ -20,23 +20,21 @@ export interface SnippetCreationContext {
   isPublic?: boolean;
 }
 
-/**
- * تبدیل AdvancedAuditResult به SnippetInsert
- * با پشتیبانی کامل از audit_result
- */
+// ============================================================
+// 🔥 تبدیل AdvancedAuditResult به SnippetInsert (بدون تغییر)
+// ============================================================
+
 export function toSnippetInsert(
   audit: AdvancedAuditResult,
   context: SnippetCreationContext
 ): SnippetInsert {
   const now = new Date().toISOString();
 
-  // ===== فیلدهای اصلی =====
   const row: SnippetInsert = {
     slug: context.slug,
     raw_code: context.rawCode,
     language: context.sourceLanguage,
 
-    // ===== فیلدهای اجباری Legacy =====
     card_title: audit.summary?.slice(0, 100) || 'Code Analysis',
     key_concept: audit.summary?.slice(0, 2000) || '',
     what_this_code_does: audit.executionOverview?.entryPoints?.join(', ') || '',
@@ -46,7 +44,6 @@ export function toSnippetInsert(
       : '-',
     linkedin_post: audit.linkedin_post || 'Check out this code analysis! #Zbloue',
 
-    // ===== فیلدهای کاربر =====
     username: context.username ?? null,
     github_username: context.githubUsername ?? null,
     avatar_url: context.avatarUrl ?? null,
@@ -56,7 +53,6 @@ export function toSnippetInsert(
     created_at: now,
     schema_version: '1.0',
 
-    // ===== فیلدهای Legacy (برای سازگاری) =====
     code_walkthrough: null,
     what_works_well: null,
     bugs_and_risky_cases: null,
@@ -72,7 +68,6 @@ export function toSnippetInsert(
     final_verdict_approved: audit.verdict?.status === 'approved',
     final_verdict_next_steps: null,
 
-    // ===== فیلدهای Advanced (JSONB) =====
     findings: (audit.findings || null) as any,
     execution_overview: (audit.executionOverview || null) as any,
     architectural_observations: (audit.architecturalObservations || null) as any,
@@ -83,19 +78,17 @@ export function toSnippetInsert(
     verdict: (audit.verdict || null) as any,
     limitations: (audit.limitations || null) as any,
 
-    // ===== ذخیره خروجی کامل Audit به عنوان منبع حقیقت =====
     audit_result: audit as any,
   };
 
   return row;
 }
 
-/**
- * تبدیل ردیف Snippet از دیتابیس به AdvancedAuditResult
- * با پشتیبانی از audit_result و Legacy
- */
+// ============================================================
+// 🔥 تبدیل Snippet از دیتابیس به AdvancedAuditResult (بدون تغییر)
+// ============================================================
+
 export function snippetRowToAudit(row: SnippetRow): AdvancedAuditResult | null {
-  // ===== 1. اگر audit_result موجود است =====
   if (row.audit_result) {
     try {
       let data = row.audit_result;
@@ -113,13 +106,13 @@ export function snippetRowToAudit(row: SnippetRow): AdvancedAuditResult | null {
     }
   }
 
-  // ===== 2. Fallback به Legacy =====
   return legacyRowToAudit(row);
 }
 
-/**
- * تبدیل Legacy Snippet به AdvancedAuditResult (با رعایت اسکیماهای جدید)
- */
+// ============================================================
+// 🔥 تبدیل Legacy به Canonical (اصلاح‌شده)
+// ============================================================
+
 export function legacyRowToAudit(row: SnippetRow | any): AdvancedAuditResult | null {
   try {
     const hasConcurrency = row.execution_overview && 
@@ -127,131 +120,89 @@ export function legacyRowToAudit(row: SnippetRow | any): AdvancedAuditResult | n
        row.execution_overview.taskSubmissionPoints?.length > 0 ||
        row.execution_overview.blockingWaitPoints?.length > 0);
 
-    // 🔥 اصلاح: auditType باید 'comprehensive' باشد
-    const audit: Partial<AdvancedAuditResult> = {
-      schemaVersion: '1.0',
-      auditType: 'comprehensive',
-      appliedSpecializations: hasConcurrency ? ['concurrency'] : [],
-      completionStatus: 'complete',
-      repairApplied: false,
-      language: row.language || 'unknown',
-      summary: row.key_concept || '',
-      executionOverview: row.execution_overview || { 
-        entryPoints: [], 
-        taskSubmissionPoints: [], 
-        blockingWaitPoints: [], 
-        sharedResources: [], 
-        resourceLifecycle: [] 
-      },
-      findings: row.findings || [],
-      architecturalObservations: row.architectural_observations || [],
-      recommendedActions: row.recommended_actions || [],
-      suggestedTests: row.suggested_tests_new || [],
-      complexity: row.complexity || { 
-        time: 'unknown', 
-        space: 'unknown', 
-        resourceGrowth: 'unknown', 
-        assumptions: [] 
-      },
-      limitations: row.limitations || [],
-      linkedin_post: row.linkedin_post || '',
-    };
+    // ============================================================
+    // 1️⃣ نرمالایز کردن responseLanguage
+    // ============================================================
+    let responseLanguage: 'English' | 'Persian' | null = 'English';
+    if (row.responseLanguage === 'English' || row.responseLanguage === 'Persian') {
+      responseLanguage = row.responseLanguage;
+    } else {
+      responseLanguage = 'English'; // مقدار پیش‌فرض ایمن
+    }
 
-    // ===== improvedCode =====
+    // ============================================================
+    // 2️⃣ نرمالایز کردن complexity
+    // ============================================================
+    let complexity = row.complexity || {};
+    // اگر complexity وجود ندارد یا ساختار آن درست نیست، مقدار پیش‌فرض قرار دهید
+    if (typeof complexity.applicable !== 'boolean') {
+      complexity = {
+        applicable: false,
+        expression: null,
+        explanation: null,
+        variables: [],
+        assumptions: [],
+      };
+    }
+
+    // ============================================================
+    // 3️⃣ نرمالایز کردن scorecard
+    // ============================================================
+    let scorecard: any = row.scorecard_new || row.scorecard || null;
+    if (!scorecard || typeof scorecard !== 'object') {
+      // اگر scorecard وجود ندارد، یک مقدار پیش‌فرض با applicable: false برای همه‌ی دسته‌ها بسازید
+      scorecard = {
+        correctness: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
+        concurrencySafety: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
+        liveness: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
+        errorHandling: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
+        resourceManagement: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
+        maintainability: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
+        productionReadiness: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
+      };
+    }
+
+    // ============================================================
+    // 4️⃣ improvedCode
+    // ============================================================
+    let improvedCode: any;
     if (row.improved_code_jsonb) {
-      audit.improvedCode = row.improved_code_jsonb;
+      improvedCode = row.improved_code_jsonb;
     } else if (row.improved_code) {
-      audit.improvedCode = {
+      improvedCode = {
         available: true,
         code: row.improved_code,
         notes: 'Migrated from legacy improved_code column',
       };
     } else {
-      audit.improvedCode = {
+      improvedCode = {
         available: false,
         code: null,
         notes: 'No improved code available in legacy data',
       };
     }
 
-    // ===== scorecard =====
-    if (row.scorecard_new) {
-      audit.scorecard = row.scorecard_new;
-    } else if (row.scorecard) {
-      const legacy = row.scorecard as {
-        correctness?: number;
-        readability?: number;
-        performance?: number;
-        maintainability?: number;
-        productionReadiness?: number;
-        security?: number;
-        overall?: number;
-      };
-      
-      audit.scorecard = {
-        correctness: { 
-          applicable: true,
-          score: (legacy.correctness ?? 0) * 10, 
-          reason: 'Migrated from legacy correctness', 
-          relatedFindings: [] 
-        },
-        concurrencySafety: { 
-          applicable: true,
-          score: (legacy.security ?? 0) * 10, 
-          reason: 'Migrated from legacy security', 
-          relatedFindings: [] 
-        },
-        liveness: { 
-          applicable: true,
-          score: (legacy.overall ?? 0) * 10, 
-          reason: 'Migrated from legacy overall', 
-          relatedFindings: [] 
-        },
-        errorHandling: { 
-          applicable: true,
-          score: (legacy.overall ?? 0) * 10, 
-          reason: 'Migrated from legacy overall', 
-          relatedFindings: [] 
-        },
-        resourceManagement: { 
-          applicable: true,
-          score: (legacy.overall ?? 0) * 10, 
-          reason: 'Migrated from legacy overall', 
-          relatedFindings: [] 
-        },
-        maintainability: { 
-          applicable: true,
-          score: (legacy.maintainability ?? 0) * 10, 
-          reason: 'Migrated from legacy maintainability', 
-          relatedFindings: [] 
-        },
-        productionReadiness: { 
-          applicable: true,
-          score: (legacy.productionReadiness ?? 0) * 10, 
-          reason: 'Migrated from legacy productionReadiness', 
-          relatedFindings: [] 
-        },
-      };
-    }
-
-    // ===== verdict =====
+    // ============================================================
+    // 5️⃣ verdict
+    // ============================================================
+    let verdict: any;
     if (row.verdict) {
-      audit.verdict = row.verdict;
+      verdict = row.verdict;
     } else if (row.final_verdict_approved !== undefined && row.final_verdict_approved !== null) {
-      audit.verdict = {
+      verdict = {
         status: row.final_verdict_approved ? 'approved' : 'requires-changes',
         explanation: row.final_verdict_summary || 'Legacy verdict',
       };
     } else {
-      // مقدار پیش‌فرض
-      audit.verdict = {
+      verdict = {
         status: 'requires-changes',
         explanation: 'Legacy record without verdict data',
       };
     }
 
-    // ===== analysisCoverage =====
-    // 🔥 اصلاح: استفاده از `as const` برای تطابق با نوع دقیق
+    // ============================================================
+    // 6️⃣ analysisCoverage
+    // ============================================================
     const coverageDimensions = [
       'correctness',
       'security',
@@ -272,17 +223,49 @@ export function legacyRowToAudit(row: SnippetRow | any): AdvancedAuditResult | n
 
     type CoverageDimension = typeof coverageDimensions[number];
 
-    audit.analysisCoverage = coverageDimensions.map((dim) => ({
+    const analysisCoverage = coverageDimensions.map((dim) => ({
       dimension: dim as CoverageDimension,
       status: dim === 'concurrency' && !hasConcurrency ? 'not-applicable' : 'analyzed',
       summary: `Analysis of ${dim} dimension.`,
       limitation: null,
     }));
 
-    // ===== title =====
-    audit.title = row.card_title || 'Code Analysis Report';
+    // ============================================================
+    // 7️⃣ ساخت Audit نهایی با مقادیر نرمالایز‌شده
+    // ============================================================
+    const audit: Partial<AdvancedAuditResult> = {
+      schemaVersion: '1.0',
+      auditType: 'comprehensive',
+      appliedSpecializations: hasConcurrency ? ['concurrency'] : [],
+      completionStatus: 'complete',
+      repairApplied: false,
+      language: row.language || 'unknown',
+      responseLanguage: responseLanguage, // 🔥 مقدار نرمالایز شده
+      summary: row.key_concept || '',
+      executionOverview: row.execution_overview || { 
+        entryPoints: [], 
+        taskSubmissionPoints: [], 
+        blockingWaitPoints: [], 
+        sharedResources: [], 
+        resourceLifecycle: [] 
+      },
+      findings: row.findings || [],
+      architecturalObservations: row.architectural_observations || [],
+      recommendedActions: row.recommended_actions || [],
+      suggestedTests: row.suggested_tests_new || [],
+      complexity: complexity, // 🔥 مقدار نرمالایز شده
+      limitations: row.limitations || [],
+      linkedin_post: row.linkedin_post || '',
+      scorecard: scorecard, // 🔥 مقدار نرمالایز شده
+      verdict: verdict,
+      improvedCode: improvedCode,
+      analysisCoverage: analysisCoverage,
+      title: row.card_title || 'Code Analysis Report',
+    };
 
-    // ===== اعتبارسنجی نهایی با Zod Schema کانونیکال =====
+    // ============================================================
+    // 8️⃣ اعتبارسنجی نهایی با Zod Schema کانونیکال
+    // ============================================================
     const result = AdvancedAuditResultSchema.safeParse(audit);
     if (result.success) {
       return result.data;
@@ -296,9 +279,10 @@ export function legacyRowToAudit(row: SnippetRow | any): AdvancedAuditResult | n
   }
 }
 
-/**
- * اعتبارسنجی Context ورودی
- */
+// ============================================================
+// 🔥 اعتبارسنجی Context ورودی
+// ============================================================
+
 export function isValidSnippetContext(context: SnippetCreationContext): boolean {
   if (!context.rawCode || context.rawCode.trim().length === 0) {
     throw new Error('rawCode is required and must not be empty');
