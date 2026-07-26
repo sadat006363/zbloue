@@ -42,7 +42,7 @@ export function toSnippetInsert(
     optimization: audit.recommendedActions?.length
       ? audit.recommendedActions.map((a) => a.title).join('; ')
       : '-',
-    linkedin_post: audit.linkedin_post || 'Check out this code analysis! #Zbloue',
+    linkedin_post: audit.linkedinPost || 'Check out this code analysis! #Zbloue', // 🔥 اصلاح شده
 
     username: context.username ?? null,
     github_username: context.githubUsername ?? null,
@@ -121,14 +121,8 @@ export function legacyRowToAudit(row: SnippetRow | any): AdvancedAuditResult | n
        row.execution_overview.blockingWaitPoints?.length > 0);
 
     // ============================================================
-    // 1️⃣ نرمالایز کردن responseLanguage
+    // 1️⃣ نرمالایز کردن responseLanguage (حذف شده - دیگر در اسکیما نیست)
     // ============================================================
-    let responseLanguage: 'English' | 'Persian' | null = 'English';
-    if (row.responseLanguage === 'English' || row.responseLanguage === 'Persian') {
-      responseLanguage = row.responseLanguage;
-    } else {
-      responseLanguage = 'English';
-    }
 
     // ============================================================
     // 2️⃣ نرمالایز کردن complexity
@@ -150,13 +144,13 @@ export function legacyRowToAudit(row: SnippetRow | any): AdvancedAuditResult | n
     let scorecard: any = row.scorecard_new || row.scorecard || null;
     if (!scorecard || typeof scorecard !== 'object') {
       scorecard = {
-        correctness: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
-        concurrencySafety: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
-        liveness: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
-        errorHandling: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
-        resourceManagement: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
-        maintainability: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
-        productionReadiness: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
+        correctness: { applicable: false, score: null, reason: 'No data', relatedFindingIds: [] },
+        concurrencySafety: { applicable: false, score: null, reason: 'No data', relatedFindingIds: [] },
+        liveness: { applicable: false, score: null, reason: 'No data', relatedFindingIds: [] },
+        errorHandling: { applicable: false, score: null, reason: 'No data', relatedFindingIds: [] },
+        resourceManagement: { applicable: false, score: null, reason: 'No data', relatedFindingIds: [] },
+        maintainability: { applicable: false, score: null, reason: 'No data', relatedFindingIds: [] },
+        productionReadiness: { applicable: false, score: null, reason: 'No data', relatedFindingIds: [] },
       };
     }
 
@@ -199,7 +193,7 @@ export function legacyRowToAudit(row: SnippetRow | any): AdvancedAuditResult | n
     }
 
     // ============================================================
-    // 6️⃣ analysisCoverage (اصلاح‌شده)
+    // 6️⃣ analysisCoverage (با اصلاح TypeScript)
     // ============================================================
     const coverageDimensions = [
       'correctness',
@@ -221,7 +215,6 @@ export function legacyRowToAudit(row: SnippetRow | any): AdvancedAuditResult | n
 
     type CoverageDimension = typeof coverageDimensions[number];
 
-    // 🔥 اصلاح: استفاده از as برای تعیین نوع literal
     const analysisCoverage = coverageDimensions.map((dim) => ({
       dimension: dim as CoverageDimension,
       status: (dim === 'concurrency' && !hasConcurrency ? 'not-applicable' : 'analyzed') as 'analyzed' | 'not-applicable',
@@ -239,7 +232,6 @@ export function legacyRowToAudit(row: SnippetRow | any): AdvancedAuditResult | n
       completionStatus: 'complete',
       repairApplied: false,
       language: row.language || 'unknown',
-      responseLanguage: responseLanguage,
       summary: row.key_concept || '',
       executionOverview: row.execution_overview || { 
         entryPoints: [], 
@@ -254,7 +246,7 @@ export function legacyRowToAudit(row: SnippetRow | any): AdvancedAuditResult | n
       suggestedTests: row.suggested_tests_new || [],
       complexity: complexity,
       limitations: row.limitations || [],
-      linkedin_post: row.linkedin_post || '',
+      linkedinPost: row.linkedin_post || 'Check out this code analysis! #Zbloue', // 🔥 اصلاح شده
       scorecard: scorecard,
       verdict: verdict,
       improvedCode: improvedCode,

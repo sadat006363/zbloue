@@ -368,7 +368,7 @@ Each category is an object with:
 - applicable: boolean (true if evaluated)
 - score: number (0-100) or null if not applicable
 - reason: string
-- relatedFindingIds: array of finding IDs
+- relatedFindingIds: array of finding IDs (use this field name)
 
 Categories: correctness, concurrencySafety, liveness, errorHandling, resourceManagement, maintainability, productionReadiness
 
@@ -391,23 +391,32 @@ Categories: correctness, concurrencySafety, liveness, errorHandling, resourceMan
 
 ==================== IMPROVED CODE (DISCRIMINATED UNION) ====================
 
+**CRITICAL RULES for improvedCode:**
+
+- You MUST provide an improvedCode field in every response.
+- Set "available": true ONLY if you are 100% confident that the provided code snippet is correct, compiles, and fixes a specific issue without introducing new problems.
+- If you are not confident, or the fix requires architectural changes, set "available": false and explain why in "notes".
+- NEVER provide a code snippet that you are unsure about. Invalid code is worse than no code.
+
+Valid examples:
+
+- available: true (only if you are certain):
 {
   "available": true,
-  "code": "...",
-  "notes": "..."
+  "code": "// Correct and compilable code",
+  "notes": "Explanation of the fix."
 }
-or
+
+- available: false (when unsure or need architecture changes):
 {
   "available": false,
   "code": null,
-  "notes": "..."
+  "notes": "Fixing the duplicate submission pattern requires architectural changes that may break existing APIs."
 }
 
-**Rules:**
-- Do NOT invent missing APIs, types, imports, configuration, or dependencies.
-- Prefer minimal, targeted fixes over broad rewrites.
-- Preserve public APIs and intended behavior where possible.
-- If safe fix depends on missing context, set available to false.
+**Do NOT invent missing APIs, types, imports, or dependencies.**
+**Prefer minimal, targeted fixes over broad rewrites.**
+**If safe fix depends on missing context, set available to false.**
 
 ==================== COMPLEXITY (DISCRIMINATED UNION) ====================
 
@@ -480,6 +489,7 @@ Do NOT include "responseLanguage" field.
 🔥 Use "relatedFindingIds" (camelCase) for all finding references.
 🔥 Use "linkedinPost" (camelCase) for the LinkedIn post field.
 🔥 Do NOT include "responseLanguage" in the output.
+🔥 For improvedCode, only set available:true if you are 100% confident the code is correct and compiles; otherwise set available:false.
 🔥 NEVER use placeholder text. Generate all content from the actual source code.
 
 ==================== OUTPUT ====================

@@ -86,7 +86,8 @@ Keep identifiers, code, enum values, IDs, and schema keys unchanged.
    - 🔥 Output in suggestedTests.
 
 8. PROVIDE IMPROVED CODE:
-   - If a clear fix exists, provide improved code.
+   - Only provide improved code if you are 100% confident it is correct and compiles.
+   - Otherwise, set available: false.
    - 🔥 Output in improvedCode.
 
 ==================== FINDINGS GENERATION (CRITICAL - HIGHEST PRIORITY) ====================
@@ -360,15 +361,32 @@ Categories: correctness, concurrencySafety, liveness, errorHandling, resourceMan
 
 ==================== IMPROVED CODE ====================
 
+**CRITICAL RULES for improvedCode:**
+
+- You MUST provide an improvedCode field in every response.
+- Set "available": true ONLY if you are 100% confident that the provided code snippet is correct, compiles, and fixes a specific issue without introducing new problems.
+- If you are not confident, or the fix requires architectural changes, set "available": false and explain why in "notes".
+- NEVER provide a code snippet that you are unsure about. Invalid code is worse than no code.
+
+Valid examples:
+
+- available: true (only if you are certain):
 {
-  "available": true, "code": "...", "notes": "..."
-}
-or
-{
-  "available": false, "code": null, "notes": "..."
+  "available": true,
+  "code": "// Correct and compilable code",
+  "notes": "Explanation of the fix."
 }
 
-Only provide code if you can confidently fix the issues.
+- available: false (when unsure or need architecture changes):
+{
+  "available": false,
+  "code": null,
+  "notes": "Fixing the duplicate submission pattern requires architectural changes that may break existing APIs."
+}
+
+**Do NOT invent missing APIs, types, imports, or dependencies.**
+**Prefer minimal, targeted fixes over broad rewrites.**
+**If safe fix depends on missing context, set available to false.**
 
 ==================== COMPLEXITY ====================
 
@@ -406,6 +424,7 @@ Do NOT include "responseLanguage" field.
 🔥 Use "relatedFindingIds" (camelCase) for all finding references.
 🔥 Use "linkedinPost" (camelCase) for the LinkedIn post field.
 🔥 Do NOT include "responseLanguage" in the output.
+🔥 For improvedCode, only set available:true if you are 100% confident the code is correct and compiles; otherwise set available:false.
 🔥 NEVER use placeholder text. Generate all content from the actual source code.
 
 ==================== OUTPUT ====================

@@ -121,9 +121,9 @@ function validateReferences(
     ];
 
     for (const [category, item] of categories) {
-      if (item && item.relatedFindings) {
-        const path = `scorecard.${category}.relatedFindings`;
-        checkReferences(item.relatedFindings, path, `scorecard.${category}`);
+      if (item && (item as any).relatedFindingIds) { // 🔥 اصلاح: استفاده از relatedFindingIds
+        const path = `scorecard.${category}.relatedFindingIds`;
+        checkReferences((item as any).relatedFindingIds, path, `scorecard.${category}`);
       }
     }
   }
@@ -241,7 +241,7 @@ function validateScorecardConsistency(result: AdvancedAuditResult): SemanticVali
   const hasCritical = findings.some((f) => f.severity === 'critical');
   const hasHigh = findings.some((f) => f.severity === 'high');
 
-  // 🔥 اصلاح: ابتدا مطمئن شویم که score یک عدد است
+  // 🔥 اصلاح: دسترسی به score از productionReadiness
   const prodScore = scorecard.productionReadiness?.score;
   if (hasCritical && prodScore !== null && typeof prodScore === 'number' && prodScore > 50) {
     issues.push({
