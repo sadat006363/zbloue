@@ -97,7 +97,7 @@ export function normalizeSnippetAudit(row: any): NormalizedSnippetAudit {
           findingsCount: validation.data.findings?.length || 0,
           verdictStatus: validation.data.verdict?.status,
           overallScore: validation.data.scorecard?.productionReadiness?.score ?? undefined,
-          linkedinPost: validation.data.linkedinPost, // 🔥 اصلاح شده
+          linkedinPost: validation.data.linkedinPost,
           summary: validation.data.summary,
         };
       }
@@ -124,7 +124,7 @@ export function normalizeSnippetAudit(row: any): NormalizedSnippetAudit {
   if (hasNewAdvancedFields) {
     try {
       const partialAudit: Partial<AdvancedAuditResult> = {
-        schemaVersion: '1.0',
+        schemaVersion: '1.0.0', // 🔥 اصلاح شده
         auditType: 'comprehensive',
         appliedSpecializations: row.execution_overview ? ['concurrency'] : [],
         completionStatus: 'complete',
@@ -141,7 +141,7 @@ export function normalizeSnippetAudit(row: any): NormalizedSnippetAudit {
         verdict: row.verdict || { status: 'requires-changes', explanation: 'No verdict data' },
         limitations: row.limitations || [],
         improvedCode: row.improved_code_jsonb || row.improved_code ? { available: true, code: row.improved_code || '', notes: 'Migrated from improved_code' } : { available: false, code: null, notes: 'No improved code' },
-        linkedinPost: row.linkedin_post || 'Check out this code analysis! #Zbloue', // 🔥 اصلاح شده
+        linkedinPost: row.linkedin_post || 'Check out this code analysis! #Zbloue',
         title: row.card_title || 'Code Analysis',
         analysisCoverage: [
           'correctness', 'security', 'concurrency', 'liveness', 'performance',
