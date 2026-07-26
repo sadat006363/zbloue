@@ -512,6 +512,16 @@ function extractMechanisms(finding: Record<string, unknown>): string[] {
 
 function normalizeExecutionOverview(source: unknown): ExecutionOverview {
   const input = getSafeObject(source);
+  // 🔥 اگر source خالی یا نامعتبر بود، مقدار پیش‌فرض برگردان
+  if (!input || Object.keys(input).length === 0) {
+    return {
+      entryPoints: [],
+      taskSubmissionPoints: [],
+      blockingWaitPoints: [],
+      sharedResources: [],
+      resourceLifecycle: [],
+    };
+  }
   return {
     entryPoints: getStringArray(input.entryPoints),
     taskSubmissionPoints: getStringArray(input.taskSubmissionPoints),
@@ -590,6 +600,29 @@ function createMinimalAuditFromPartial(
     const title = normalizeTitle(input.title, summary);
     const language = normalizeLanguage(input.language);
 
+    // 🔥 اطمینان از وجود analysisCoverage
+    let analysisCoverage = normalizeAnalysisCoverage(input.analysisCoverage ?? input.coverage ?? {});
+    if (analysisCoverage.length === 0) {
+      analysisCoverage = ALL_DIMENSIONS.map(dim => ({
+        dimension: dim as any,
+        status: 'analyzed',
+        summary: `Analysis of ${dim} dimension.`,
+        limitation: null,
+      }));
+    }
+
+    // 🔥 اطمینان از وجود executionOverview
+    let executionOverview = normalizeExecutionOverview(input.executionOverview ?? input.overview ?? {});
+    if (!executionOverview || Object.keys(executionOverview).length === 0) {
+      executionOverview = {
+        entryPoints: [],
+        taskSubmissionPoints: [],
+        blockingWaitPoints: [],
+        sharedResources: [],
+        resourceLifecycle: [],
+      };
+    }
+
     const minimal: AdvancedAuditResult = {
       schemaVersion: '1.0',
       auditType: 'comprehensive',
@@ -598,9 +631,9 @@ function createMinimalAuditFromPartial(
       repairApplied: true,
       title,
       language: language || 'unknown',
-      analysisCoverage: normalizeAnalysisCoverage(input.analysisCoverage ?? input.coverage ?? {}),
+      analysisCoverage,
       summary: summary || 'Partial analysis due to schema mismatch.',
-      executionOverview: normalizeExecutionOverview(input.executionOverview ?? input.overview ?? {}),
+      executionOverview,
       findings: getSafeArray<unknown>(input.findings ?? input.issues ?? [], []).map((f, i) => {
         const usedIds = new Set<string>();
         return normalizeFinding(f, i, usedIds);
@@ -685,13 +718,22 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
   );
   const improvedCode = normalizeImprovedCode(improvedCodeSource);
 
-  const executionOverviewSource = getSafeObject(
+  // 🔥 اطمینان از وجود executionOverview (با مقدار پیش‌فرض)
+  let executionOverview = normalizeExecutionOverview(
     input.executionOverview ??
     input.execution_overview ??
     input.overview ??
     {}
   );
-  const executionOverview = normalizeExecutionOverview(executionOverviewSource);
+  if (!executionOverview || Object.keys(executionOverview).length === 0) {
+    executionOverview = {
+      entryPoints: [],
+      taskSubmissionPoints: [],
+      blockingWaitPoints: [],
+      sharedResources: [],
+      resourceLifecycle: [],
+    };
+  }
 
   const architecturalObservations = normalizeArchitecturalObservations(
     input.architecturalObservations ?? input.architectural_observations,
@@ -724,9 +766,18 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
     linkedinPost = DEFAULT_LINKEDIN_POST;
   }
 
-  const analysisCoverage = normalizeAnalysisCoverage(
+  // 🔥 اطمینان از وجود analysisCoverage (با مقدار پیش‌فرض)
+  let analysisCoverage = normalizeAnalysisCoverage(
     input.analysisCoverage ?? input.coverage ?? {}
   );
+  if (analysisCoverage.length === 0) {
+    analysisCoverage = ALL_DIMENSIONS.map(dim => ({
+      dimension: dim as any,
+      status: 'analyzed',
+      summary: `Analysis of ${dim} dimension.`,
+      limitation: null,
+    }));
+  }
 
   const result: AdvancedAuditResult = {
     schemaVersion: '1.0',

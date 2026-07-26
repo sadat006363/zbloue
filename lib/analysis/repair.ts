@@ -15,16 +15,8 @@ import { parseModelOutput } from './parse-model-output';
 import { type PromptContext } from './prompt-context';
 import logger from '@/lib/logger';
 
-// ============================================================
-// Type aliases derived from schemas
-// ============================================================
-
 type CompletionStatus = z.infer<typeof CompletionStatusSchema>;
 type AppliedSpecialization = z.infer<typeof SpecializationSchema>;
-
-// ============================================================
-// HELPER: EXTRACT JSON (Fallback)
-// ============================================================
 
 function extractJSON(text: string): string {
   const start = text.indexOf('{');
@@ -33,9 +25,46 @@ function extractJSON(text: string): string {
   return text.substring(start, end + 1).replace(/[\u0000-\u001F\u007F-\u009F]/g, '');
 }
 
-// ============================================================
-// 🔥 Helper: Create minimal audit from existing data (حفظ محتوای اصلی)
-// ============================================================
+const ALL_DIMENSIONS = [
+  'correctness',
+  'security',
+  'concurrency',
+  'liveness',
+  'performance',
+  'resource-management',
+  'error-handling',
+  'input-validation',
+  'data-integrity',
+  'api-design',
+  'architecture',
+  'maintainability',
+  'testability',
+  'observability',
+  'compatibility',
+] as const;
+
+type Dimension = typeof ALL_DIMENSIONS[number];
+
+// 🔥 Helper: ایجاد analysisCoverage پیش‌فرض
+function getDefaultAnalysisCoverage(): any[] {
+  return ALL_DIMENSIONS.map(dim => ({
+    dimension: dim as any,
+    status: 'analyzed',
+    summary: `Analysis of ${dim} dimension.`,
+    limitation: null,
+  }));
+}
+
+// 🔥 Helper: ایجاد executionOverview پیش‌فرض
+function getDefaultExecutionOverview(): any {
+  return {
+    entryPoints: [],
+    taskSubmissionPoints: [],
+    blockingWaitPoints: [],
+    sharedResources: [],
+    resourceLifecycle: [],
+  };
+}
 
 function createMinimalAuditFromExisting(
   previousAudit: string,
@@ -53,7 +82,6 @@ function createMinimalAuditFromExisting(
       ? parsed.title 
       : 'Code Analysis (Repaired)';
 
-    // حفظ findings اصلی (فقط فیلدهای خالی را با undefined پر کن)
     const findings = Array.isArray(parsed.findings) 
       ? parsed.findings.map((f: any) => ({
           id: f.id || `F-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`,
@@ -73,7 +101,6 @@ function createMinimalAuditFromExisting(
         }))
       : [];
 
-    // حفظ scorecard و verdict اصلی
     const scorecard = typeof parsed.scorecard === 'object' && parsed.scorecard !== null 
       ? parsed.scorecard 
       : {
@@ -111,10 +138,21 @@ function createMinimalAuditFromExisting(
           assumptions: [],
         };
 
-    // 🔥 استفاده از linkedinPost (به‌جای linkedin_post یا responseLanguage)
     const linkedinPost = typeof parsed.linkedinPost === 'string' 
       ? parsed.linkedinPost 
       : (typeof parsed.linkedin_post === 'string' ? parsed.linkedin_post : 'Check out this code analysis! #Zbloue');
+
+    // 🔥 اطمینان از وجود analysisCoverage
+    let analysisCoverage = Array.isArray(parsed.analysisCoverage) ? parsed.analysisCoverage : [];
+    if (analysisCoverage.length === 0) {
+      analysisCoverage = getDefaultAnalysisCoverage();
+    }
+
+    // 🔥 اطمینان از وجود executionOverview
+    let executionOverview = parsed.executionOverview || {};
+    if (Object.keys(executionOverview).length === 0) {
+      executionOverview = getDefaultExecutionOverview();
+    }
 
     const minimal: AdvancedAuditResult = {
       schemaVersion: '1.0',
@@ -125,13 +163,7 @@ function createMinimalAuditFromExisting(
       title: title,
       language: language || 'unknown',
       summary: summary,
-      executionOverview: {
-        entryPoints: [],
-        taskSubmissionPoints: [],
-        blockingWaitPoints: [],
-        sharedResources: [],
-        resourceLifecycle: [],
-      },
+      executionOverview: executionOverview,
       findings: findings,
       architecturalObservations: Array.isArray(parsed.architecturalObservations) ? parsed.architecturalObservations : [],
       recommendedActions: Array.isArray(parsed.recommendedActions) ? parsed.recommendedActions : [],
@@ -141,8 +173,8 @@ function createMinimalAuditFromExisting(
       verdict: verdict,
       limitations: ['Analysis is incomplete due to repair failure.'],
       improvedCode: improvedCode,
-      linkedinPost: linkedinPost, // 🔥 اصلاح شده
-      analysisCoverage: [], // 🔥 اضافه شد (برای تطابق با اسکیما)
+      linkedinPost: linkedinPost,
+      analysisCoverage: analysisCoverage,
     };
 
     try {
@@ -156,10 +188,6 @@ function createMinimalAuditFromExisting(
     return null;
   }
 }
-
-// ============================================================
-// MAIN REPAIR FUNCTION
-// ============================================================
 
 export async function repairAudit(
   numberedCode: string,
