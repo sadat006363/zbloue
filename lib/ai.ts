@@ -3,10 +3,9 @@
 import { callOpenAI, callOpenAIJson } from './openaiClient';
 import logger from './logger';
 import type { LegacyGenerateResponse } from '@/types';
-import { getBaseSystemInstructions } from './analysis/prompts/base';
 
 // ============================================================
-// 1. Prompt builders for each mode
+// 1. Prompt builders (بدون getBaseSystemInstructions)
 // ============================================================
 
 function buildSimplePrompt(code: string, language: string): string {
@@ -42,8 +41,6 @@ Return your analysis as plain text (not JSON). Do not wrap it in Markdown code b
 
 function buildAdvancedPrompt(code: string, language: string): string {
   return `
-${getBaseSystemInstructions()}
-
 You are a Staff Engineer and code auditor. Provide a comprehensive analysis of the following code.
 Use the canonical AdvancedAuditResult schema (JSON).
 
@@ -55,7 +52,7 @@ Return valid JSON that matches the AdvancedAuditResult schema.
 }
 
 // ============================================================
-// 2. Helper: safe slice
+// 2. Helper functions
 // ============================================================
 
 function safeSlice(value: unknown, start: number, end?: number): string {
@@ -64,10 +61,6 @@ function safeSlice(value: unknown, start: number, end?: number): string {
   }
   return '';
 }
-
-// ============================================================
-// 3. Helper: extract text from possible JSON response (enhanced)
-// ============================================================
 
 function extractTextFromResponse(content: unknown): string {
   if (typeof content !== 'string') {
@@ -105,7 +98,7 @@ function extractTextFromResponse(content: unknown): string {
 }
 
 // ============================================================
-// 4. Main generation function
+// 3. Main generation function
 // ============================================================
 
 export async function generateEducationalContent(
@@ -115,26 +108,32 @@ export async function generateEducationalContent(
 ): Promise<LegacyGenerateResponse> {
   logger.info(`[ai] Generating ${mode} analysis for ${language}`);
 
-  let systemPrompt: string;
-  let userPrompt: string;
-
-  if (mode === 'simple') {
-    systemPrompt = 'You are a friendly programming mentor. Return your response as plain text.';
-    userPrompt = buildSimplePrompt(code, language);
-  } else if (mode === 'medium') {
-    systemPrompt = 'You are a senior developer. Return your response as plain text.';
-    userPrompt = buildMediumPrompt(code, language);
-  } else {
-    systemPrompt = 'You are an expert code auditor. Return only valid JSON.';
-    userPrompt = buildAdvancedPrompt(code, language);
-  }
-
   try {
+    let systemPrompt: string;
+    let userPrompt: string;
+
+    if (mode === 'simple') {
+      systemPrompt = 'You are a friendly programming mentor. Return your response as plain text.';
+      userPrompt = buildSimplePrompt(code, language);
+    } else if (mode === 'medium') {
+      systemPrompt = 'You are a senior developer. Return your response as plain text.';
+      userPrompt = buildMediumPrompt(code, language);
+    } else {
+      systemPrompt = 'You are an expert code auditor. Return only valid JSON.';
+      userPrompt = buildAdvancedPrompt(code, language);
+    }
+
     if (mode === 'simple' || mode === 'medium') {
+      // ===== Simple / Medium: text response =====
       const content = await callOpenAI(systemPrompt, userPrompt, {
         responseFormat: 'text',
         mode: mode,
       });
+
+      if (!content || typeof content !== 'string' || content.trim().length === 0) {
+        throw new Error('Empty response from OpenAI');
+      }
+
       const text = extractTextFromResponse(content);
 
       return {
@@ -147,10 +146,16 @@ export async function generateEducationalContent(
         linkedin_post: 'Check out this code analysis! #Zbloue',
       };
     } else {
+      // ===== Advanced: JSON response =====
       const content = await callOpenAIJson<any>(systemPrompt, userPrompt, {
         responseFormat: 'json_object',
         mode: 'advanced',
       });
+
+      if (!content) {
+        throw new Error('Empty JSON response from OpenAI');
+      }
+
       const parsed = typeof content === 'string' ? JSON.parse(content) : content;
 
       return {
@@ -192,7 +197,7 @@ export async function generateEducationalContent(
     return {
       error: error instanceof Error ? error.message : 'AI generation failed',
       card_title: 'Error',
-      analysis: 'Failed to generate analysis.',
+      analysis: 'Failed to generate analysis. Please try again.',
       key_concept: '',
       what_this_code_does: '',
       debug_analysis: '',
