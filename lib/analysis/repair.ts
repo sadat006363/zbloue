@@ -45,9 +45,6 @@ function createMinimalAuditFromExisting(
   try {
     const parsed = JSON.parse(previousAudit);
     
-    // ============================================================
-    // 🔥 حفظ محتوای اصلی هوش (فقط ساختار را تعمیر کن)
-    // ============================================================
     const summary = typeof parsed.summary === 'string' && parsed.summary.length > 0 
       ? parsed.summary 
       : 'Partial analysis from repair fallback.';
@@ -56,9 +53,7 @@ function createMinimalAuditFromExisting(
       ? parsed.title 
       : 'Code Analysis (Repaired)';
 
-    // ============================================================
-    // 🔥 حفظ findings اصلی (فقط فیلدهای خالی را با undefined پر کن)
-    // ============================================================
+    // حفظ findings اصلی (فقط فیلدهای خالی را با undefined پر کن)
     const findings = Array.isArray(parsed.findings) 
       ? parsed.findings.map((f: any) => ({
           id: f.id || `F-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`,
@@ -70,27 +65,25 @@ function createMinimalAuditFromExisting(
           evidence: Array.isArray(f.evidence) ? f.evidence : [],
           executionPath: Array.isArray(f.executionPath) ? f.executionPath : [],
           triggerConditions: Array.isArray(f.triggerConditions) ? f.triggerConditions : [],
-          consequence: f.consequence || undefined, // اگر خالی بود، undefined
-          technicalExplanation: f.technicalExplanation || undefined, // اگر خالی بود، undefined
-          remediation: f.remediation || undefined, // اگر خالی بود، undefined
+          consequence: f.consequence || undefined,
+          technicalExplanation: f.technicalExplanation || undefined,
+          remediation: f.remediation || undefined,
           relatedSymbols: Array.isArray(f.relatedSymbols) ? f.relatedSymbols : [],
           testToReproduce: f.testToReproduce || null,
         }))
       : [];
 
-    // ============================================================
-    // 🔥 حفظ scorecard و verdict اصلی
-    // ============================================================
+    // حفظ scorecard و verdict اصلی
     const scorecard = typeof parsed.scorecard === 'object' && parsed.scorecard !== null 
       ? parsed.scorecard 
       : {
-          correctness: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
-          concurrencySafety: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
-          liveness: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
-          errorHandling: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
-          resourceManagement: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
-          maintainability: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
-          productionReadiness: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
+          correctness: { applicable: false, score: null, reason: 'No data', relatedFindingIds: [] },
+          concurrencySafety: { applicable: false, score: null, reason: 'No data', relatedFindingIds: [] },
+          liveness: { applicable: false, score: null, reason: 'No data', relatedFindingIds: [] },
+          errorHandling: { applicable: false, score: null, reason: 'No data', relatedFindingIds: [] },
+          resourceManagement: { applicable: false, score: null, reason: 'No data', relatedFindingIds: [] },
+          maintainability: { applicable: false, score: null, reason: 'No data', relatedFindingIds: [] },
+          productionReadiness: { applicable: false, score: null, reason: 'No data', relatedFindingIds: [] },
         };
 
     const verdict = typeof parsed.verdict === 'object' && parsed.verdict !== null 
@@ -118,9 +111,11 @@ function createMinimalAuditFromExisting(
           assumptions: [],
         };
 
-    // ============================================================
-    // 🔥 ساخت ساختار نهایی با حفظ محتوای اصلی
-    // ============================================================
+    // 🔥 استفاده از linkedinPost (به‌جای linkedin_post یا responseLanguage)
+    const linkedinPost = typeof parsed.linkedinPost === 'string' 
+      ? parsed.linkedinPost 
+      : (typeof parsed.linkedin_post === 'string' ? parsed.linkedin_post : 'Check out this code analysis! #Zbloue');
+
     const minimal: AdvancedAuditResult = {
       schemaVersion: '1.0',
       auditType: 'comprehensive',
@@ -129,8 +124,6 @@ function createMinimalAuditFromExisting(
       repairApplied: true,
       title: title,
       language: language || 'unknown',
-      responseLanguage: typeof parsed.responseLanguage === 'string' ? (parsed.responseLanguage as any) : 'English',
-      analysisCoverage: [],
       summary: summary,
       executionOverview: {
         entryPoints: [],
@@ -148,12 +141,10 @@ function createMinimalAuditFromExisting(
       verdict: verdict,
       limitations: ['Analysis is incomplete due to repair failure.'],
       improvedCode: improvedCode,
-      linkedin_post: typeof parsed.linkedin_post === 'string' ? parsed.linkedin_post : 'Check out this code analysis! #Zbloue',
+      linkedinPost: linkedinPost, // 🔥 اصلاح شده
+      analysisCoverage: [], // 🔥 اضافه شد (برای تطابق با اسکیما)
     };
 
-    // ============================================================
-    // 🔥 اعتبارسنجی نهایی (با انعطاف‌پذیری)
-    // ============================================================
     try {
       return AdvancedAuditResultSchema.parse(minimal);
     } catch {
@@ -196,9 +187,6 @@ export async function repairAudit(
       rawCode: numberedCode,
     };
 
-    // ============================================================
-    // 🔥 پرامپت تعمیر با تأکید بر حفظ محتوای اصلی
-    // ============================================================
     const prompt = buildRepairPrompt(
       promptContext,
       previousAudit,
@@ -226,7 +214,6 @@ IMPORTANT: Your task is to REPAIR the structure of the JSON, NOT to rewrite the 
 
     if (!parseResult.success || !parseResult.data) {
       logger.warn('[Repair] Parse failed:', parseResult.error);
-      // 🔥 Fallback: ساخت یک audit حداقلی از داده‌های موجود (با حفظ محتوای اصلی)
       return createMinimalAuditFromExisting(previousAudit, language, auditType);
     }
 
@@ -235,7 +222,6 @@ IMPORTANT: Your task is to REPAIR the structure of the JSON, NOT to rewrite the 
     const semanticResult = validateSemanticIntegrity(repaired);
     if (!semanticResult.isValid) {
       logger.warn('[Repair] Semantic validation failed:', semanticResult.errors);
-      // 🔥 Fallback: ساخت یک audit حداقلی
       return createMinimalAuditFromExisting(previousAudit, language, auditType);
     }
 
@@ -258,7 +244,6 @@ IMPORTANT: Your task is to REPAIR the structure of the JSON, NOT to rewrite the 
     const finalValidation = AdvancedAuditResultSchema.safeParse(canonicalRepaired);
     if (!finalValidation.success) {
       logger.error('[Repair] Final validation failed:', finalValidation.error.issues);
-      // 🔥 Fallback: ساخت یک audit حداقلی
       return createMinimalAuditFromExisting(previousAudit, language, auditType);
     }
 
@@ -268,7 +253,6 @@ IMPORTANT: Your task is to REPAIR the structure of the JSON, NOT to rewrite the 
     return finalValidation.data;
   } catch (error) {
     logger.error('[Repair] Failed:', error);
-    // 🔥 Fallback نهایی
     return createMinimalAuditFromExisting(previousAudit, language, auditType);
   }
 }
