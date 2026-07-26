@@ -28,6 +28,10 @@ import {
 
 export const dynamic = 'force-dynamic';
 
+// ============================================================
+// Helper functions
+// ============================================================
+
 function safeSlice(value: unknown, start: number, end?: number): string {
   if (typeof value === 'string') {
     return value.slice(start, end);
@@ -138,6 +142,98 @@ function buildPromptInfo(
   };
 }
 
+// ============================================================
+// 🔥 تابع ساخت audit_result برای Simple/Medium
+// ============================================================
+
+function buildMinimalAuditResult(
+  genData: LegacyGenerateResponse,
+  language: string,
+  mode: AnalysisMode
+): any {
+  const analysisText = genData.analysis || '';
+  const summary = genData.key_concept || analysisText.slice(0, 200) || 'Basic code analysis.';
+  const linkedinPost = genData.linkedin_post || 'Check out this code analysis! #Zbloue';
+  const cardTitle = genData.card_title || 'Code Analysis';
+
+  const allDimensions = [
+    'correctness', 'security', 'concurrency', 'liveness', 'performance',
+    'resource-management', 'error-handling', 'input-validation', 'data-integrity',
+    'api-design', 'architecture', 'maintainability', 'testability', 'observability',
+    'compatibility'
+  ] as const;
+
+  const analysisCoverage = allDimensions.map((dim) => ({
+    dimension: dim,
+    status: 'analyzed',
+    summary: `Analysis of ${dim} dimension.`,
+    limitation: null,
+  }));
+
+  // تشخیص هم‌روندی از متن
+  const hasConcurrency = analysisText.toLowerCase().includes('concurrency') ||
+                         analysisText.toLowerCase().includes('thread') ||
+                         analysisText.toLowerCase().includes('deadlock') ||
+                         analysisText.toLowerCase().includes('async') ||
+                         analysisText.toLowerCase().includes('executor');
+
+  return {
+    schemaVersion: '1.0.0',
+    auditType: 'comprehensive',
+    appliedSpecializations: hasConcurrency ? ['concurrency'] : [],
+    completionStatus: 'complete',
+    repairApplied: false,
+    title: cardTitle,
+    language: language,
+    summary: summary,
+    analysisCoverage,
+    executionOverview: {
+      entryPoints: [],
+      taskSubmissionPoints: [],
+      blockingWaitPoints: [],
+      sharedResources: [],
+      resourceLifecycle: [],
+    },
+    findings: [],
+    architecturalObservations: [],
+    recommendedActions: [],
+    suggestedTests: [],
+    complexity: {
+      applicable: false,
+      expression: null,
+      explanation: null,
+      variables: [],
+      assumptions: [],
+    },
+    scorecard: {
+      correctness: { applicable: true, score: 0, reason: 'No detailed score available in this mode.', relatedFindingIds: [] },
+      concurrencySafety: { applicable: false, score: null, reason: 'No concurrency analysis performed.', relatedFindingIds: [] },
+      liveness: { applicable: false, score: null, reason: 'No liveness analysis performed.', relatedFindingIds: [] },
+      errorHandling: { applicable: false, score: null, reason: 'No detailed error handling analysis performed.', relatedFindingIds: [] },
+      resourceManagement: { applicable: false, score: null, reason: 'No resource management analysis performed.', relatedFindingIds: [] },
+      maintainability: { applicable: false, score: null, reason: 'No maintainability analysis performed.', relatedFindingIds: [] },
+      productionReadiness: { applicable: false, score: null, reason: 'No production readiness analysis performed.', relatedFindingIds: [] },
+    },
+    verdict: {
+      status: 'approved-with-suggestions',
+      explanation: `This is a ${mode} analysis. For deeper insights, use Advanced mode.`,
+    },
+    limitations: [
+      `This analysis was performed using "${mode}" mode. For detailed findings, scorecard, and recommendations, please use Advanced mode.`
+    ],
+    improvedCode: {
+      available: false,
+      code: null,
+      notes: 'Improved code is only available in Advanced mode.',
+    },
+    linkedinPost: linkedinPost,
+  };
+}
+
+// ============================================================
+// Main Component
+// ============================================================
+
 export default function HomePage() {
   const { state, dispatch } = useAppContext();
   const {
@@ -165,6 +261,10 @@ export default function HomePage() {
     setErrorMessage(null);
     dispatch({ type: 'SET_ERROR', payload: null });
   }, [dispatch]);
+
+  // ============================================================
+  // 🔥 handleGenerate (اصلاح‌شده برای ذخیره هر سه حالت)
+  // ============================================================
 
   const handleGenerate = useCallback(async () => {
     if (!code.trim()) {
@@ -199,14 +299,25 @@ export default function HomePage() {
       const normalizedGithubUsername = githubUsername && githubUsername.trim() !== '' ? githubUsername : undefined;
       const normalizedAvatarUrl = avatarUrl && avatarUrl.trim() !== '' ? avatarUrl : undefined;
 
-      // 🔥 ساخت saveData با فقط audit_result و فیلدهای ضروری
+      // ============================================================
+      // 🔥 ساخت audit_result (اگر موجود نبود)
+      // ============================================================
+      let auditResult = genData.audit_result;
+
+      if (!auditResult) {
+        auditResult = buildMinimalAuditResult(genData, language, mode);
+      }
+
+      // ============================================================
+      // 🔥 ذخیره در دیتابیس (برای هر سه حالت)
+      // ============================================================
       const saveData = {
         code: cleanedCode,
         language,
         username: normalizedUsername,
         github_username: normalizedGithubUsername,
         avatar_url: normalizedAvatarUrl,
-        audit_result: genData.audit_result,
+        audit_result: auditResult,
       };
 
       const saveResult = await snippetService.save(saveData);
@@ -215,19 +326,25 @@ export default function HomePage() {
         throw new Error(saveResult.error || 'Failed to save snippet');
       }
 
+      // ============================================================
+      // 🔥 ساخت SnippetData برای نمایش
+      // ============================================================
       const snippetData: Snippet = {
         id: saveResult.id,
         slug: saveResult.slug,
         raw_code: cleanedCode,
         language,
-        card_title: genData.audit_result?.title || 'Code Analysis',
-        key_concept: genData.audit_result?.summary || '',
-        what_this_code_does: genData.audit_result?.executionOverview?.entryPoints?.join(', ') || '',
-        debug_analysis: genData.audit_result?.findings?.length ? `${genData.audit_result.findings.length} findings` : '-',
-        optimization: genData.audit_result?.recommendedActions?.length
-          ? genData.audit_result.recommendedActions.map((a: any) => a.title).join('; ')
-          : '-',
-        linkedin_post: genData.audit_result?.linkedinPost || '',
+        card_title: auditResult.title || 'Code Analysis',
+        key_concept: auditResult.summary || '',
+        what_this_code_does: auditResult.executionOverview?.entryPoints?.join(', ') || 
+                           genData.what_this_code_does || 
+                           genData.analysis || '',
+        debug_analysis: auditResult.findings?.length ? `${auditResult.findings.length} findings` : 
+                       (genData.debug_analysis || '-'),
+        optimization: auditResult.recommendedActions?.length
+          ? auditResult.recommendedActions.map((a: any) => a.title).join('; ')
+          : (genData.optimization || '-'),
+        linkedin_post: auditResult.linkedinPost || genData.linkedin_post || '',
         is_public: true,
         created_at: new Date().toISOString(),
         username: saveResult.username || normalizedUsername,
@@ -242,22 +359,23 @@ export default function HomePage() {
         security_analysis: undefined,
         production_readiness: undefined,
         recommended_improvements: undefined,
-        improved_code: genData.audit_result?.improvedCode?.code,
+        improved_code: undefined,
         suggested_tests: undefined,
         scorecard: undefined,
-        final_verdict_summary: genData.audit_result?.verdict?.explanation || null,
-        final_verdict_approved: genData.audit_result?.verdict?.status === 'approved',
+        final_verdict_summary: auditResult.verdict?.explanation || null,
+        final_verdict_approved: auditResult.verdict?.status === 'approved' || 
+                               auditResult.verdict?.status === 'approved-with-suggestions',
         final_verdict_next_steps: undefined,
-        findings: genData.audit_result?.findings || [],
-        execution_overview: genData.audit_result?.executionOverview || null,
-        architectural_observations: genData.audit_result?.architecturalObservations || [],
-        recommended_actions: genData.audit_result?.recommendedActions || [],
-        suggested_tests_new: genData.audit_result?.suggestedTests || [],
-        complexity: genData.audit_result?.complexity || null,
-        scorecard_new: genData.audit_result?.scorecard || null,
-        verdict: genData.audit_result?.verdict || null,
-        limitations: genData.audit_result?.limitations || [],
-        audit_result: genData.audit_result,
+        findings: auditResult.findings || [],
+        execution_overview: auditResult.executionOverview || null,
+        architectural_observations: auditResult.architecturalObservations || [],
+        recommended_actions: auditResult.recommendedActions || [],
+        suggested_tests_new: auditResult.suggestedTests || [],
+        complexity: auditResult.complexity || null,
+        scorecard_new: auditResult.scorecard || null,
+        verdict: auditResult.verdict || null,
+        limitations: auditResult.limitations || [],
+        audit_result: auditResult,
         debug_trace: genData.debug_trace,
         line_explanations: undefined,
         generated_prompt: undefined,
@@ -293,6 +411,10 @@ export default function HomePage() {
       dispatch({ type: 'SET_LOADING', payload: false });
     }
   }, [code, language, mode, username, githubUsername, avatarUrl, dispatch, clearError]);
+
+  // ============================================================
+  // Other handlers (Explain, Prompt, Convert, Clear)
+  // ============================================================
 
   const handleExplain = useCallback(async () => {
     if (!code.trim()) {
@@ -418,6 +540,10 @@ export default function HomePage() {
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [handleGenerate]);
+
+  // ============================================================
+  // Render
+  // ============================================================
 
   return (
     <main className="min-h-screen bg-[#f8f9fa] p-2 md:p-3">
