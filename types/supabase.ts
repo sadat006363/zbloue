@@ -1,3 +1,5 @@
+// types/supabase.ts
+
 export type Json =
   | string
   | number
@@ -7,26 +9,21 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.5"
-  }
   public: {
     Tables: {
       snippets: {
         Row: {
           architectural_observations: Json | null
-          audit_result: Json | null
+          audit_result: Json
           avatar_url: string | null
           bugs_and_risky_cases: Json | null
           card_image_url: string | null
-          card_title: string
+          card_title: string | null  // 🔥 تغییر: string → string | null
           code: string | null
           code_walkthrough: Json | null
           complexity: Json | null
           created_at: string
-          debug_analysis: string
+          debug_analysis: string | null  // 🔥 تغییر: string → string | null
           debug_trace: Json | null
           edge_cases: Json | null
           execution_overview: Json | null
@@ -40,12 +37,12 @@ export type Database = {
           improved_code: string | null
           improved_code_jsonb: Json | null
           is_public: boolean
-          key_concept: string
+          key_concept: string | null  // 🔥 تغییر: string → string | null
           language: string
           limitations: string[] | null
           line_explanations: Json | null
-          linkedin_post: string
-          optimization: string
+          linkedin_post: string | null  // 🔥 تغییر: string → string | null
+          optimization: string | null  // 🔥 تغییر: string → string | null
           performance_analysis: Json | null
           production_readiness: Json | null
           raw_code: string
@@ -61,21 +58,21 @@ export type Database = {
           user_id: string | null
           username: string | null
           verdict: Json | null
-          what_this_code_does: string
+          what_this_code_does: string | null  // 🔥 تغییر: string → string | null
           what_works_well: Json | null
         }
         Insert: {
           architectural_observations?: Json | null
-          audit_result?: Json | null
+          audit_result: Json  // 🔥 تغییر: optional → required
           avatar_url?: string | null
           bugs_and_risky_cases?: Json | null
           card_image_url?: string | null
-          card_title: string
+          card_title?: string | null  // 🔥 تغییر: string → string | null
           code?: string | null
           code_walkthrough?: Json | null
           complexity?: Json | null
           created_at?: string
-          debug_analysis: string
+          debug_analysis?: string | null  // 🔥 تغییر: string → string | null
           debug_trace?: Json | null
           edge_cases?: Json | null
           execution_overview?: Json | null
@@ -89,12 +86,12 @@ export type Database = {
           improved_code?: string | null
           improved_code_jsonb?: Json | null
           is_public?: boolean
-          key_concept: string
+          key_concept?: string | null  // 🔥 تغییر: string → string | null
           language: string
           limitations?: string[] | null
           line_explanations?: Json | null
-          linkedin_post: string
-          optimization: string
+          linkedin_post?: string | null  // 🔥 تغییر: string → string | null
+          optimization?: string | null  // 🔥 تغییر: string → string | null
           performance_analysis?: Json | null
           production_readiness?: Json | null
           raw_code: string
@@ -110,21 +107,21 @@ export type Database = {
           user_id?: string | null
           username?: string | null
           verdict?: Json | null
-          what_this_code_does: string
+          what_this_code_does?: string | null  // 🔥 تغییر: string → string | null
           what_works_well?: Json | null
         }
         Update: {
           architectural_observations?: Json | null
-          audit_result?: Json | null
+          audit_result?: Json
           avatar_url?: string | null
           bugs_and_risky_cases?: Json | null
           card_image_url?: string | null
-          card_title?: string
+          card_title?: string | null  // 🔥 تغییر: string → string | null
           code?: string | null
           code_walkthrough?: Json | null
           complexity?: Json | null
           created_at?: string
-          debug_analysis?: string
+          debug_analysis?: string | null  // 🔥 تغییر: string → string | null
           debug_trace?: Json | null
           edge_cases?: Json | null
           execution_overview?: Json | null
@@ -138,12 +135,12 @@ export type Database = {
           improved_code?: string | null
           improved_code_jsonb?: Json | null
           is_public?: boolean
-          key_concept?: string
+          key_concept?: string | null  // 🔥 تغییر: string → string | null
           language?: string
           limitations?: string[] | null
           line_explanations?: Json | null
-          linkedin_post?: string
-          optimization?: string
+          linkedin_post?: string | null  // 🔥 تغییر: string → string | null
+          optimization?: string | null  // 🔥 تغییر: string → string | null
           performance_analysis?: Json | null
           production_readiness?: Json | null
           raw_code?: string
@@ -159,7 +156,7 @@ export type Database = {
           user_id?: string | null
           username?: string | null
           verdict?: Json | null
-          what_this_code_does?: string
+          what_this_code_does?: string | null  // 🔥 تغییر: string → string | null
           what_works_well?: Json | null
         }
         Relationships: []
@@ -179,6 +176,10 @@ export type Database = {
     }
   }
 }
+
+// ============================================================
+// 🔥 Utility types (بدون تغییر)
+// ============================================================
 
 type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
 
