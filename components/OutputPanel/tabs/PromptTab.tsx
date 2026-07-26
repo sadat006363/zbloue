@@ -1,10 +1,10 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
 import { CopyButton, DownloadButton } from '@/components/common';
-import type { Snippet } from '@/types';
+import type { SnippetData } from '@/types'; // تغییر تایپ
 
 interface PromptTabProps {
-  snippet: Snippet | null;
+  snippet: SnippetData | null; // تغییر تایپ
   generatedPrompt?: string;
   isGeneratingPrompt?: boolean;
   showToast: (message: string) => void;
@@ -39,7 +39,7 @@ export default function PromptTab({
   const handleShare = (platform: string) => {
     setShowShareDropdown(false);
     const slug = snippet?.slug ?? '';
-    const cardTitle = snippet?.card_title ?? 'Check out this code analysis on Zbloue!';
+    const cardTitle = snippet?.cardTitle ?? 'Check out this code analysis on Zbloue!'; // تغییر: card_title → cardTitle
     const url = `${appUrl}/snippet/${slug}`;
     const title = cardTitle;
     const fullText = `${title} - Analyze your code with AI and share it with the world! #Zbloue #CodeReview #AI #Developer`;

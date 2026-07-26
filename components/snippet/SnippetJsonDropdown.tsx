@@ -3,10 +3,10 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Snippet } from '@/types';
+import { SnippetData } from '@/types'; // تغییر تایپ
 
 interface SnippetJsonDropdownProps {
-  snippet: Snippet | null;
+  snippet: SnippetData | null; // تغییر تایپ
 }
 
 type JsonViewMode =
@@ -64,29 +64,29 @@ export default function SnippetJsonDropdown({ snippet }: SnippetJsonDropdownProp
       findings: { label: 'Findings', data: snippet.findings || [] },
       scorecard: {
         label: 'Scorecard',
-        data: snippet.scorecard_new || snippet.scorecard || {},
+        data: snippet.scorecard || {}, // تغییر: scorecard_new → scorecard
       },
       verdict: { label: 'Verdict', data: snippet.verdict || {} },
       complexity: { label: 'Complexity', data: snippet.complexity || {} },
       recommendedActions: {
         label: 'Recommended Actions',
-        data: snippet.recommended_actions || [],
+        data: snippet.recommendedActions || [], // تغییر: recommended_actions → recommendedActions
       },
       improvedCode: {
         label: 'Improved Code',
-        data: snippet.improved_code || null,
+        data: snippet.improvedCode || null, // تغییر: improved_code → improvedCode
       },
       linkedinPost: {
         label: 'LinkedIn Post',
-        data: snippet.linkedin_post || null,
+        data: snippet.linkedinPost || null, // تغییر: linkedin_post → linkedinPost
       },
       executionOverview: {
         label: 'Execution Overview',
-        data: snippet.execution_overview || {},
+        data: snippet.executionOverview || {}, // تغییر: execution_overview → executionOverview
       },
       architecturalObservations: {
         label: 'Architectural Observations',
-        data: snippet.architectural_observations || [],
+        data: snippet.architecturalObservations || [], // تغییر: architectural_observations → architecturalObservations
       },
       limitations: {
         label: 'Limitations',
@@ -94,7 +94,7 @@ export default function SnippetJsonDropdown({ snippet }: SnippetJsonDropdownProp
       },
       debugTrace: {
         label: 'Pipeline Trace - Full Analysis Chain',
-        data: snippet.debug_trace || null,
+        data: snippet.debugTrace || null, // تغییر: debug_trace → debugTrace
       },
     };
     return dataMap[mode];
