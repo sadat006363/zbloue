@@ -100,6 +100,11 @@ Zbloue is currently in the MVP stage and actively collecting feedback.
 
 ## 🚀 Local Setup
 ```bash
+
+git clone https://github.com/sadat006363/zbloue.git
+cd zbloue
+npm install
+npm run dev
 ## Feedback Wanted
 
 Zbloue is currently being refined toward MVP.
@@ -114,7 +119,4 @@ I'm especially looking for feedback on:
 
 If you'd like to help, feel free to open an issue or start a discussion.
 
-git clone https://github.com/sadat006363/zbloue.git
-cd zbloue
-npm install
-npm run dev
+
