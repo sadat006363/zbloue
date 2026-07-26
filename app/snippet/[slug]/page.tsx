@@ -186,7 +186,8 @@ export default async function SnippetPage({ params }: PageProps) {
             complexity: auditData.complexity ?? snippet.complexity,
             limitations: auditData.limitations ?? snippet.limitations,
             improved_code: auditData.improvedCode?.code ?? snippet.improved_code,
-            linkedin_post: auditData.linkedin_post ?? snippet.linkedin_post,
+            // 🔥 اصلاح: linkedin_post از linkedinPost کانونیکال گرفته می‌شود
+            linkedin_post: auditData.linkedinPost ?? snippet.linkedin_post,
             summary: auditData.summary ?? snippet.key_concept,
             // فیلدهای متفرقه برای نمایش بهتر
             card_title: auditData.title ?? snippet.card_title,
