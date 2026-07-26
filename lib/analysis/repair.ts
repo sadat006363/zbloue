@@ -136,6 +136,7 @@ function createMinimalAuditFromExisting(
           assumptions: [],
         };
 
+    // 🔥 اصلاح: استفاده از camelCase
     const linkedinPost = typeof parsed.linkedinPost === 'string' 
       ? parsed.linkedinPost 
       : (typeof parsed.linkedin_post === 'string' ? parsed.linkedin_post : 'Check out this code analysis! #Zbloue');
@@ -151,7 +152,8 @@ function createMinimalAuditFromExisting(
     }
 
     const minimal: AdvancedAuditResult = {
-      schemaVersion: '1.0.0', // 🔥 اصلاح شده
+      // 🔥 اصلاح: schemaVersion به صورت string معمولی
+      schemaVersion: '1.0.0',
       auditType: 'comprehensive',
       appliedSpecializations: auditType === 'concurrency' ? ['concurrency'] : [],
       completionStatus: 'partially-complete',
@@ -224,6 +226,10 @@ IMPORTANT: Your task is to REPAIR the structure of the JSON, NOT to rewrite the 
 - ONLY fix structural issues (missing fields, invalid types, empty arrays).
 - Do NOT replace valid content with placeholder text like "No ... provided".
 - If a field is missing, keep it as null or empty array.
+- Use "schemaVersion": "1.0.0" in your output.
+- Use "linkedinPost" (camelCase) NOT "linkedin_post".
+- Use "relatedFindingIds" NOT "relatedFindings".
+- Do NOT include "responseLanguage" in the output.
 - Return only valid JSON. Do not use Markdown fences.`;
 
     const rawContent = await callOpenAI(systemPrompt, prompt, {
@@ -249,9 +255,10 @@ IMPORTANT: Your task is to REPAIR the structure of the JSON, NOT to rewrite the 
       return createMinimalAuditFromExisting(previousAudit, language, auditType);
     }
 
+    // 🔥 اصلاح: اطمینان از schemaVersion صحیح و حذف فیلدهای اضافی
     const canonicalRepaired: AdvancedAuditResult = {
       ...repaired,
-      schemaVersion: '1.0.0', // 🔥 اصلاح شده
+      schemaVersion: '1.0.0', // ← مقدار صحیح
       auditType: 'comprehensive',
       completionStatus: 'complete',
       repairApplied: true,
@@ -336,7 +343,11 @@ IMPORTANT: Your task is to REPAIR the structure of the JSON, NOT to rewrite the 
 - ONLY fix structural issues (missing fields, invalid types, empty arrays).
 - Do NOT replace valid content with placeholder text like "No ... provided".
 - If a field is missing, keep it as null or empty array.
-- Return only valid JSON that matches the canonical schema. Do not use Markdown fences.`;
+- Use "schemaVersion": "1.0.0" in your output.
+- Use "linkedinPost" (camelCase) NOT "linkedin_post".
+- Use "relatedFindingIds" NOT "relatedFindings".
+- Do NOT include "responseLanguage" in the output.
+- Return only valid JSON. Do not use Markdown fences.`;
 
     const rawContent = await callOpenAI(systemPrompt, prompt, {
       mode: 'advanced',
@@ -357,7 +368,7 @@ IMPORTANT: Your task is to REPAIR the structure of the JSON, NOT to rewrite the 
 
     const canonicalRepaired: AdvancedAuditResult = {
       ...repaired,
-      schemaVersion: '1.0.0', // 🔥 اصلاح شده
+      schemaVersion: '1.0.0',
       auditType: 'comprehensive',
       completionStatus: 'complete',
       repairApplied: true,

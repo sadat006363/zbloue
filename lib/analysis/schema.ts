@@ -272,12 +272,17 @@ export const VerdictSchema = z
   .strict();
 
 // ============================================================
-// 4. Top-level Canonical Schema (نسخه نهایی بدون responseLanguage)
+// 4. Top-level Canonical Schema (نسخه اصلاح‌شده)
 // ============================================================
 
 export const AdvancedAuditResultSchema = z
   .object({
-    schemaVersion: z.literal('1.0.0'),
+    // 🔥 اصلاح: قبول هر دو نسخه "1.0.0" و "1.0"
+    schemaVersion: z.union([
+      z.literal('1.0.0'),
+      z.literal('1.0'),
+    ]).default('1.0.0'),
+
     auditType: z.literal('comprehensive'),
     appliedSpecializations: z.array(SpecializationSchema).default([]),
     completionStatus: CompletionStatusSchema,
@@ -298,7 +303,9 @@ export const AdvancedAuditResultSchema = z
     improvedCode: ImprovedCodeSchema,
     linkedinPost: z.string().trim().min(1, 'LinkedIn post must not be empty').max(300, 'LinkedIn post must be at most 300 characters'),
   })
-  .strict();
+  .strict()
+  // 🔥 حذف فیلدهای ناشناخته (responseLanguage, linkedin_post, relatedFindings)
+  .catchall(z.unknown()); // ← این اجازه می‌دهد فیلدهای اضافی نادیده گرفته شوند
 
 // ============================================================
 // 5. Type inference

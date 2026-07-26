@@ -195,9 +195,13 @@ function normalizeScoreItem(
   if (isObject(value)) {
     const score = normalizeScore(value.score, fallback);
     const reason = typeof value.reason === 'string' ? value.reason.trim() : defaultReason;
-    const relatedFindingIds = Array.isArray(value.relatedFindingIds)
-      ? value.relatedFindingIds.filter((id): id is string => typeof id === 'string')
-      : [];
+    // 🔥 اصلاح: پشتیبانی از هر دو نام فیلد (relatedFindingIds و relatedFindings)
+    let relatedFindingIds: string[] = [];
+    if (Array.isArray(value.relatedFindingIds)) {
+      relatedFindingIds = value.relatedFindingIds.filter((id): id is string => typeof id === 'string');
+    } else if (Array.isArray(value.relatedFindings)) {
+      relatedFindingIds = value.relatedFindings.filter((id): id is string => typeof id === 'string');
+    }
 
     if (typeof score === 'number' && !isNaN(score) && score >= 0) {
       return {
@@ -540,7 +544,13 @@ function normalizeArchitecturalObservations(
       const o = getSafeObject(obs);
       const title = getSafeString(o.title, '');
       const explanation = getSafeString(o.explanation, '');
-      const relatedFindingIds = getStringArray(o.relatedFindingIds).filter((id) => findingIds.has(id));
+      // 🔥 اصلاح: پشتیبانی از هر دو نام فیلد
+      let relatedFindingIds: string[] = [];
+      if (Array.isArray(o.relatedFindingIds)) {
+        relatedFindingIds = o.relatedFindingIds.filter((id) => findingIds.has(id));
+      } else if (Array.isArray(o.relatedFindings)) {
+        relatedFindingIds = o.relatedFindings.filter((id) => findingIds.has(id));
+      }
       return { title, explanation, relatedFindingIds };
     })
     .filter((obs) => obs.title.length > 0 || obs.explanation.length > 0);
@@ -558,7 +568,13 @@ function normalizeRecommendedActions(
       const severity = sanitizeEnum(a.severity, SeveritySchema.options, 'medium');
       const title = getSafeString(a.title, '');
       const action = getSafeString(a.action, '');
-      const relatedFindingIds = getStringArray(a.relatedFindingIds).filter((id) => findingIds.has(id));
+      // 🔥 اصلاح: پشتیبانی از هر دو نام فیلد
+      let relatedFindingIds: string[] = [];
+      if (Array.isArray(a.relatedFindingIds)) {
+        relatedFindingIds = a.relatedFindingIds.filter((id) => findingIds.has(id));
+      } else if (Array.isArray(a.relatedFindings)) {
+        relatedFindingIds = a.relatedFindings.filter((id) => findingIds.has(id));
+      }
       return { priority, severity, title, action, relatedFindingIds };
     })
     .filter((act) => act.title.length > 0 || act.action.length > 0)
@@ -579,7 +595,13 @@ function normalizeSuggestedTests(
       const setup = getStringArray(t.setup) || [];
       const steps = getStringArray(t.steps) || [];
       const expectedResult = getSafeString(t.expectedResult, getSafeString(t.expectedOutput, ''));
-      const relatedFindingIds = getStringArray(t.relatedFindingIds).filter((id) => findingIds.has(id));
+      // 🔥 اصلاح: پشتیبانی از هر دو نام فیلد
+      let relatedFindingIds: string[] = [];
+      if (Array.isArray(t.relatedFindingIds)) {
+        relatedFindingIds = t.relatedFindingIds.filter((id) => findingIds.has(id));
+      } else if (Array.isArray(t.relatedFindings)) {
+        relatedFindingIds = t.relatedFindings.filter((id) => findingIds.has(id));
+      }
       return { title, purpose, setup, steps, expectedResult, relatedFindingIds };
     })
     .filter((test) => test.title.length > 0 || test.purpose.length > 0);
@@ -589,6 +611,7 @@ function normalizeLanguage(source: unknown): string {
   return getSafeString(source, 'unknown');
 }
 
+// 🔥 اصلاح: تابع createMinimalAuditFromPartial
 function createMinimalAuditFromPartial(
   raw: unknown,
   error: unknown
@@ -621,6 +644,7 @@ function createMinimalAuditFromPartial(
     }
 
     const minimal: AdvancedAuditResult = {
+      // 🔥 اصلاح: schemaVersion به صورت string معمولی
       schemaVersion: '1.0.0',
       auditType: 'comprehensive',
       appliedSpecializations: normalizeAppliedSpecializations(input.appliedSpecializations ?? input.specializations),
@@ -662,6 +686,7 @@ function createMinimalAuditFromPartial(
   }
 }
 
+// 🔥 اصلاح: تابع اصلی normalizeAnalysisOutput
 export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
   const startTime = Date.now();
   logger.debug('[Normalizer] Starting normalization');
@@ -751,6 +776,7 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
 
   const limitations = getStringArray(input.limitations);
 
+  // 🔥 اصلاح: پشتیبانی از هر دو نام فیلد (camelCase و snake_case)
   let linkedinPost =
     typeof input.linkedinPost === 'string'
       ? input.linkedinPost.trim()
@@ -774,7 +800,9 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
     }));
   }
 
+  // 🔥 اصلاح: ساخت نتیجه نهایی با schemaVersion صحیح
   const result: AdvancedAuditResult = {
+    // 🔥 اصلاح: schemaVersion به صورت string معمولی (پشتیبانی از هر دو نسخه)
     schemaVersion: '1.0.0',
     auditType: 'comprehensive',
     appliedSpecializations,
