@@ -1,4 +1,7 @@
+// components/common/Tooltip.tsx
+
 'use client';
+
 import { useState, useRef, useEffect, ReactNode } from 'react';
 
 interface TooltipProps {
@@ -8,15 +11,16 @@ interface TooltipProps {
   className?: string;
 }
 
-export default function Tooltip({ 
-  children, 
-  text, 
+export default function Tooltip({
+  children,
+  text,
   position = 'top',
-  className = '' 
+  className = '',
 }: TooltipProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
   const triggerRef = useRef<HTMLDivElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
 
   const showTooltip = () => setIsVisible(true);
   const hideTooltip = () => setIsVisible(false);
@@ -24,29 +28,52 @@ export default function Tooltip({
   useEffect(() => {
     if (isVisible && triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect();
-      const tooltipWidth = 200;
+      const tooltipWidth = Math.min(200, window.innerWidth - 20); // 🔥 حداکثر عرض با احترام به margin
       const tooltipHeight = 40;
 
       let top = 0;
       let left = 0;
 
+      // 🔥 محاسبه موقعیت با در نظر گرفتن لبه‌های صفحه
+      const margin = 8;
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+
       switch (position) {
         case 'top':
-          top = rect.top - tooltipHeight - 8;
+          top = rect.top - tooltipHeight - margin;
           left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
           break;
         case 'bottom':
-          top = rect.bottom + 8;
+          top = rect.bottom + margin;
           left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
           break;
         case 'left':
           top = rect.top + (rect.height / 2) - (tooltipHeight / 2);
-          left = rect.left - tooltipWidth - 8;
+          left = rect.left - tooltipWidth - margin;
           break;
         case 'right':
           top = rect.top + (rect.height / 2) - (tooltipHeight / 2);
-          left = rect.right + 8;
+          left = rect.right + margin;
           break;
+      }
+
+      // 🔥 اصلاح: اطمینان از اینکه Tooltip از صفحه خارج نشود
+      // جلوگیری از خروج از سمت راست
+      if (left + tooltipWidth > viewportWidth - margin) {
+        left = viewportWidth - tooltipWidth - margin;
+      }
+      // جلوگیری از خروج از سمت چپ
+      if (left < margin) {
+        left = margin;
+      }
+      // جلوگیری از خروج از بالا
+      if (top < margin) {
+        top = margin;
+      }
+      // جلوگیری از خروج از پایین
+      if (top + tooltipHeight > viewportHeight - margin) {
+        top = viewportHeight - tooltipHeight - margin;
       }
 
       setTooltipPosition({ top, left });
@@ -54,7 +81,7 @@ export default function Tooltip({
   }, [isVisible, position]);
 
   return (
-    <div 
+    <div
       ref={triggerRef}
       className={`relative inline-block ${className}`}
       onMouseEnter={showTooltip}
@@ -65,10 +92,14 @@ export default function Tooltip({
       {children}
       {isVisible && text && (
         <div
-          className="fixed z-50 px-3 py-1.5 text-xs font-medium text-white bg-[#1a1a2e] rounded-md shadow-lg whitespace-nowrap max-w-[200px] text-center pointer-events-none"
+          ref={tooltipRef}
+          className="fixed z-50 px-3 py-1.5 text-xs font-medium text-white bg-[#1a1a2e] rounded-md shadow-lg text-center pointer-events-none"
           style={{
             top: tooltipPosition.top,
             left: tooltipPosition.left,
+            maxWidth: Math.min(280, window.innerWidth - 20), // 🔥 حداکثر عرض
+            whiteSpace: 'normal', // 🔥 اجازه شکستن خط
+            wordBreak: 'break-word', // 🔥 شکستن کلمات طولانی
             transform: 'translateY(0)',
           }}
         >
