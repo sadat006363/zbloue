@@ -118,8 +118,9 @@ function validateResponse(result: unknown): LegacyGenerateResponse {
  * while also preserving all canonical fields for storage and UI.
  */
 function mapCanonicalToLegacy(canonical: any): LegacyGenerateResponse {
-  // فیلدهای Legacy اصلی
-  const legacy: LegacyGenerateResponse = {
+  // ساخت یک شیء واحد با تمام فیلدها (بدون تکرار نام)
+  return {
+    // ===== فیلدهای Legacy اصلی =====
     analysis: canonical.summary || '',
     card_title: canonical.title || 'Code Analysis',
     key_concept: canonical.summary?.slice(0, 2000) || '',
@@ -144,8 +145,9 @@ function mapCanonicalToLegacy(canonical: any): LegacyGenerateResponse {
           notes: canonical.improvedCode.notes || '',
         }
       : undefined,
-    suggestedTests: canonical.suggestedTests || [], // 🔥 داده‌های جدید در اینجا قرار می‌گیرند
-    scorecard: undefined,
+    // 🔥 استفاده از suggestedTests برای داده‌های جدید
+    suggestedTests: canonical.suggestedTests || [], // داده‌های جدید در اینجا قرار می‌گیرند
+    // 🔥 scorecard: undefined حذف شد تا با مقدار کانونیکال تداخل نداشته باشد
     finalVerdict: canonical.verdict
       ? {
           summary: canonical.verdict.explanation,
@@ -154,13 +156,14 @@ function mapCanonicalToLegacy(canonical: any): LegacyGenerateResponse {
         }
       : undefined,
     error: undefined,
-    // 🔥 فیلدهای کانونیکال
+
+    // ===== فیلدهای کانونیکال (برای ذخیره‌سازی و نمایش Full Analysis) =====
     findings: canonical.findings || [],
     executionOverview: canonical.executionOverview || null,
     architecturalObservations: canonical.architecturalObservations || [],
     recommendedActions: canonical.recommendedActions || [],
     complexity: canonical.complexity || null,
-    scorecard: canonical.scorecard || null,
+    scorecard: canonical.scorecard || null, // تنها یک بار تعریف شده
     verdict: canonical.verdict || null,
     limitations: canonical.limitations || [],
     analysisCoverage: canonical.analysisCoverage || [],
@@ -172,8 +175,6 @@ function mapCanonicalToLegacy(canonical: any): LegacyGenerateResponse {
     debug_trace: canonical.debug_trace || undefined,
     audit_result: canonical,
   };
-
-  return legacy;
 }
 
 // ============================================================
