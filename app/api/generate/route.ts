@@ -144,7 +144,7 @@ function mapCanonicalToLegacy(canonical: any): LegacyGenerateResponse {
           notes: canonical.improvedCode.notes || '',
         }
       : undefined,
-    suggestedTests: [],
+    suggestedTests: [], // Legacy (خالی)
     scorecard: undefined,
     finalVerdict: canonical.verdict
       ? {
@@ -154,17 +154,12 @@ function mapCanonicalToLegacy(canonical: any): LegacyGenerateResponse {
         }
       : undefined,
     error: undefined,
-  };
-
-  // 🔥 اضافه کردن فیلدهای کانونیکال (برای ذخیره‌سازی در دیتابیس و نمایش Full Analysis)
-  return {
-    ...legacy,
-    // فیلدهای Advanced (کانونیکال)
+    // 🔥 فیلدهای کانونیکال
     findings: canonical.findings || [],
     executionOverview: canonical.executionOverview || null,
     architecturalObservations: canonical.architecturalObservations || [],
     recommendedActions: canonical.recommendedActions || [],
-    suggestedTests: canonical.suggestedTests || [],
+    suggestedTestsNew: canonical.suggestedTests || [], // 🔥 تست‌های جدید
     complexity: canonical.complexity || null,
     scorecard: canonical.scorecard || null,
     verdict: canonical.verdict || null,
@@ -176,9 +171,10 @@ function mapCanonicalToLegacy(canonical: any): LegacyGenerateResponse {
     title: canonical.title || 'Code Analysis',
     summary: canonical.summary || '',
     debug_trace: canonical.debug_trace || undefined,
-    // 🔥 اضافه کردن audit_result برای ذخیره‌سازی کامل
     audit_result: canonical,
   };
+
+  return legacy;
 }
 
 // ============================================================

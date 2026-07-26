@@ -122,6 +122,8 @@ export default function AnalysisTab({
   const hasComplexity = fullAnalysis?.complexity && typeof fullAnalysis.complexity === 'object';
   const hasLimitations = fullAnalysis?.limitations && Array.isArray(fullAnalysis.limitations) && fullAnalysis.limitations.length > 0;
   const hasScorecardNew = fullAnalysis?.scorecard && typeof fullAnalysis.scorecard === 'object';
+  const hasSuggestedTestsNew = fullAnalysis?.suggestedTestsNew && Array.isArray(fullAnalysis.suggestedTestsNew) && fullAnalysis.suggestedTestsNew.length > 0;
+  const hasSuggestedTestsLegacy = fullAnalysis?.suggestedTests && Array.isArray(fullAnalysis.suggestedTests) && fullAnalysis.suggestedTests.length > 0;
 
   // ============================================================
   // 🔥 استخراج امتیازات از scorecard_new
@@ -522,6 +524,47 @@ export default function AnalysisTab({
           </div>
         )}
 
+        {/* ===== Suggested Tests (New Canonical) ===== */}
+        {hasSuggestedTestsNew && (
+          <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
+            <h3 className="font-semibold text-[#4a86f7] mb-2">🧪 Suggested Tests</h3>
+            <div className="space-y-2">
+              {fullAnalysis.suggestedTestsNew.map((test: any, idx: number) => (
+                <div key={idx} className="p-2 border-b border-[#d0d0d8] last:border-0">
+                  <p className="font-medium text-[#1a1a2e]">{safeString(test.title)}</p>
+                  {test.purpose && <p className="text-sm text-[#4a4a6a]">Purpose: {safeString(test.purpose)}</p>}
+                  {test.setup && test.setup.length > 0 && (
+                    <div className="text-sm text-[#4a4a6a] mt-1">
+                      <span className="font-medium">Setup:</span>
+                      <ul className="list-disc list-inside ml-2">
+                        {test.setup.map((step: string, i: number) => <li key={i}>{safeString(step)}</li>)}
+                      </ul>
+                    </div>
+                  )}
+                  {test.steps && test.steps.length > 0 && (
+                    <div className="text-sm text-[#4a4a6a] mt-1">
+                      <span className="font-medium">Steps:</span>
+                      <ul className="list-disc list-inside ml-2">
+                        {test.steps.map((step: string, i: number) => <li key={i}>{safeString(step)}</li>)}
+                      </ul>
+                    </div>
+                  )}
+                  {test.expectedResult && (
+                    <div className="text-sm text-[#4a4a6a] mt-1">
+                      <span className="font-medium">Expected:</span> {safeString(test.expectedResult)}
+                    </div>
+                  )}
+                  {test.relatedFindingIds && test.relatedFindingIds.length > 0 && (
+                    <div className="text-xs text-[#6c7086] mt-1">
+                      Related: {test.relatedFindingIds.join(', ')}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* ===== Legacy sections (for backward compatibility) ===== */}
         {safeArray(fullAnalysis.codeWalkthrough).length > 0 && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
@@ -667,7 +710,8 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {safeArray<LegacySuggestedTest>(fullAnalysis.suggestedTests).length > 0 && (
+        {/* ===== Suggested Tests (Legacy - Fallback) ===== */}
+        {!hasSuggestedTestsNew && hasSuggestedTestsLegacy && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-2">🧪 Suggested Tests</h3>
             {safeArray<LegacySuggestedTest>(fullAnalysis.suggestedTests).map((test: LegacySuggestedTest, idx: number) => (
