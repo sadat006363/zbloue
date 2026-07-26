@@ -21,7 +21,7 @@ export interface SnippetCreationContext {
 }
 
 // ============================================================
-// 🔥 تبدیل AdvancedAuditResult به SnippetInsert
+// 🔥 تبدیل AdvancedAuditResult به SnippetInsert (فقط audit_result)
 // ============================================================
 
 export function toSnippetInsert(
@@ -35,14 +35,16 @@ export function toSnippetInsert(
     raw_code: context.rawCode,
     language: context.sourceLanguage,
 
-    card_title: audit.summary?.slice(0, 100) || 'Code Analysis',
+    // 🔥 فیلدهای Legacy را با مقادیر پیش‌فرض یا از audit_result پر می‌کنیم
+    // تا ستون‌های اجباری دیتابیس خالی نمانند
+    card_title: audit.title || 'Code Analysis',
     key_concept: audit.summary?.slice(0, 2000) || '',
     what_this_code_does: audit.executionOverview?.entryPoints?.join(', ') || '',
     debug_analysis: audit.findings?.length ? `${audit.findings.length} findings` : '-',
     optimization: audit.recommendedActions?.length
       ? audit.recommendedActions.map((a) => a.title).join('; ')
       : '-',
-    linkedin_post: audit.linkedinPost || 'Check out this code analysis! #Zbloue', // 🔥 اصلاح شده
+    linkedin_post: audit.linkedinPost || 'Check out this code analysis! #Zbloue',
 
     username: context.username ?? null,
     github_username: context.githubUsername ?? null,
@@ -53,6 +55,7 @@ export function toSnippetInsert(
     created_at: now,
     schema_version: '1.0',
 
+    // ===== فیلدهای Legacy را `null` می‌گذاریم چون از `audit_result` استخراج می‌شوند =====
     code_walkthrough: null,
     what_works_well: null,
     bugs_and_risky_cases: null,
@@ -61,23 +64,25 @@ export function toSnippetInsert(
     security_analysis: null,
     production_readiness: null,
     recommended_improvements: null,
-    improved_code: audit.improvedCode?.available ? audit.improvedCode.code : null,
+    improved_code: null,
     suggested_tests: null,
     scorecard: null,
-    final_verdict_summary: audit.verdict?.explanation || null,
-    final_verdict_approved: audit.verdict?.status === 'approved',
+    final_verdict_summary: null,
+    final_verdict_approved: null,
     final_verdict_next_steps: null,
 
-    findings: (audit.findings || null) as any,
-    execution_overview: (audit.executionOverview || null) as any,
-    architectural_observations: (audit.architecturalObservations || null) as any,
-    recommended_actions: (audit.recommendedActions || null) as any,
-    suggested_tests_new: (audit.suggestedTests || null) as any,
-    complexity: (audit.complexity || null) as any,
-    scorecard_new: (audit.scorecard || null) as any,
-    verdict: (audit.verdict || null) as any,
-    limitations: (audit.limitations || null) as any,
+    // ===== فیلدهای Advanced (JSONB) را `null` می‌گذاریم =====
+    findings: null,
+    execution_overview: null,
+    architectural_observations: null,
+    recommended_actions: null,
+    suggested_tests_new: null,
+    complexity: null,
+    scorecard_new: null,
+    verdict: null,
+    limitations: null,
 
+    // 🔥 فقط `audit_result` را به‌عنوان JSONB ذخیره می‌کنیم
     audit_result: audit as any,
   };
 
@@ -110,7 +115,7 @@ export function snippetRowToAudit(row: SnippetRow): AdvancedAuditResult | null {
 }
 
 // ============================================================
-// 🔥 تبدیل Legacy به Canonical (اصلاح‌شده)
+// 🔥 تبدیل Legacy به Canonical (برای داده‌های قدیمی)
 // ============================================================
 
 export function legacyRowToAudit(row: SnippetRow | any): AdvancedAuditResult | null {
@@ -121,11 +126,7 @@ export function legacyRowToAudit(row: SnippetRow | any): AdvancedAuditResult | n
        row.execution_overview.blockingWaitPoints?.length > 0);
 
     // ============================================================
-    // 1️⃣ نرمالایز کردن responseLanguage (حذف شده - دیگر در اسکیما نیست)
-    // ============================================================
-
-    // ============================================================
-    // 2️⃣ نرمالایز کردن complexity
+    // 1️⃣ نرمالایز کردن complexity
     // ============================================================
     let complexity = row.complexity || {};
     if (typeof complexity.applicable !== 'boolean') {
@@ -139,7 +140,7 @@ export function legacyRowToAudit(row: SnippetRow | any): AdvancedAuditResult | n
     }
 
     // ============================================================
-    // 3️⃣ نرمالایز کردن scorecard
+    // 2️⃣ نرمالایز کردن scorecard
     // ============================================================
     let scorecard: any = row.scorecard_new || row.scorecard || null;
     if (!scorecard || typeof scorecard !== 'object') {
@@ -155,7 +156,7 @@ export function legacyRowToAudit(row: SnippetRow | any): AdvancedAuditResult | n
     }
 
     // ============================================================
-    // 4️⃣ improvedCode
+    // 3️⃣ improvedCode
     // ============================================================
     let improvedCode: any;
     if (row.improved_code_jsonb) {
@@ -175,7 +176,7 @@ export function legacyRowToAudit(row: SnippetRow | any): AdvancedAuditResult | n
     }
 
     // ============================================================
-    // 5️⃣ verdict
+    // 4️⃣ verdict
     // ============================================================
     let verdict: any;
     if (row.verdict) {
@@ -193,7 +194,7 @@ export function legacyRowToAudit(row: SnippetRow | any): AdvancedAuditResult | n
     }
 
     // ============================================================
-    // 6️⃣ analysisCoverage (با اصلاح TypeScript)
+    // 5️⃣ analysisCoverage
     // ============================================================
     const coverageDimensions = [
       'correctness',
@@ -223,7 +224,7 @@ export function legacyRowToAudit(row: SnippetRow | any): AdvancedAuditResult | n
     }));
 
     // ============================================================
-    // 7️⃣ ساخت Audit نهایی با مقادیر نرمالایز‌شده
+    // 6️⃣ ساخت Audit نهایی
     // ============================================================
     const audit: Partial<AdvancedAuditResult> = {
       schemaVersion: '1.0',
@@ -246,7 +247,7 @@ export function legacyRowToAudit(row: SnippetRow | any): AdvancedAuditResult | n
       suggestedTests: row.suggested_tests_new || [],
       complexity: complexity,
       limitations: row.limitations || [],
-      linkedinPost: row.linkedin_post || 'Check out this code analysis! #Zbloue', // 🔥 اصلاح شده
+      linkedinPost: row.linkedin_post || 'Check out this code analysis! #Zbloue',
       scorecard: scorecard,
       verdict: verdict,
       improvedCode: improvedCode,
@@ -254,9 +255,6 @@ export function legacyRowToAudit(row: SnippetRow | any): AdvancedAuditResult | n
       title: row.card_title || 'Code Analysis Report',
     };
 
-    // ============================================================
-    // 8️⃣ اعتبارسنجی نهایی با Zod Schema کانونیکال
-    // ============================================================
     const result = AdvancedAuditResultSchema.safeParse(audit);
     if (result.success) {
       return result.data;

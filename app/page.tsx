@@ -205,7 +205,7 @@ export default function HomePage() {
         throw new Error(response.error);
       }
 
-      const genData = response as LegacyGenerateResponse;
+      const genData = response as LegacyGenerateResponse & { audit_result?: any };
       const normalized = normalizeLegacyResponse(genData);
 
       const normalizedUsername = username && username.trim() !== '' ? username : 'Developer';
@@ -213,64 +213,17 @@ export default function HomePage() {
       const normalizedAvatarUrl = avatarUrl && avatarUrl.trim() !== '' ? avatarUrl : undefined;
 
       // ============================================================
-      // 🔥 ساخت saveData با اضافه کردن audit_result
+      // 🔥 ساخت saveData با فقط audit_result و فیلدهای ضروری
       // ============================================================
       const saveData = {
         code: cleanedCode,
         language,
-        card_title: normalized.card_title,
-        key_concept: normalized.key_concept,
-        what_this_code_does: normalized.what_this_code_does,
-        debug_analysis: normalized.debug_analysis,
-        optimization: normalized.optimization,
-        linkedin_post: normalized.linkedin_post,
         username: normalizedUsername,
         github_username: normalizedGithubUsername,
         avatar_url: normalizedAvatarUrl,
-        code_walkthrough: normalized.codeWalkthrough,
-        what_works_well: normalized.whatWorksWell,
-        bugs_and_risky_cases: normalized.bugsAndRiskyCases,
-        edge_cases: normalized.edgeCases,
-        performance_analysis: normalized.performanceAnalysis,
-        security_analysis: normalized.securityAnalysis,
-        production_readiness: normalized.productionReadiness,
-        recommended_improvements: normalized.recommendedImprovements,
-        improved_code: normalized.improvedCode?.code,
-        suggested_tests: normalized.suggestedTests,
-        scorecard: normalized.scorecard,
-        final_verdict_summary: normalized.finalVerdict?.summary,
-        final_verdict_approved: normalized.finalVerdict?.approved,
-        final_verdict_next_steps: normalized.finalVerdict?.nextSteps,
-
-        // ===== فیلدهای Advanced (کانونیکال) =====
-        findings: genData.findings,
-        execution_overview: genData.executionOverview,
-        architectural_observations: genData.architecturalObservations,
-        recommended_actions: genData.recommendedActions,
-        suggested_tests_new: genData.suggestedTests,
-        complexity: genData.complexity,
-        scorecard_new: genData.scorecard,
-        verdict: genData.verdict,
-        limitations: genData.limitations,
-        debug_trace: genData.debug_trace,
-
-        // ===== 🔥 مهم: audit_result را اضافه کنید =====
+        // 🔥 فقط audit_result را ارسال می‌کنیم
         audit_result: genData.audit_result,
       };
-
-      // ============================================================
-      // 🔥 لاگ‌های سمت کلاینت (مرحله ۱)
-      // ============================================================
-      console.log('🔍 [Client] ===== START DEBUG =====');
-      console.log('🔍 [Client] genData.audit_result:', genData.audit_result);
-      console.log('🔍 [Client] genData.findings:', genData.findings);
-      console.log('🔍 [Client] genData.scorecard:', genData.scorecard);
-      console.log('🔍 [Client] genData.verdict:', genData.verdict);
-      console.log('🔍 [Client] saveData.audit_result:', saveData.audit_result);
-      console.log('🔍 [Client] saveData.findings:', saveData.findings);
-      console.log('🔍 [Client] saveData.scorecard_new:', saveData.scorecard_new);
-      console.log('🔍 [Client] saveData.verdict:', saveData.verdict);
-      console.log('🔍 [Client] ===== END DEBUG =====');
 
       const saveResult = await snippetService.save(saveData);
 
@@ -278,46 +231,49 @@ export default function HomePage() {
         throw new Error(saveResult.error || 'Failed to save snippet');
       }
 
+      // ساخت snippetData برای UI (از audit_result و پاسخ save)
       const snippetData: Snippet = {
         id: saveResult.id,
         slug: saveResult.slug,
         raw_code: cleanedCode,
         language,
-        card_title: normalized.card_title,
-        key_concept: normalized.key_concept,
-        what_this_code_does: normalized.what_this_code_does,
-        debug_analysis: normalized.debug_analysis,
-        optimization: normalized.optimization,
-        linkedin_post: normalized.linkedin_post,
+        card_title: genData.audit_result?.title || 'Code Analysis',
+        key_concept: genData.audit_result?.summary || '',
+        what_this_code_does: genData.audit_result?.executionOverview?.entryPoints?.join(', ') || '',
+        debug_analysis: genData.audit_result?.findings?.length ? `${genData.audit_result.findings.length} findings` : '-',
+        optimization: genData.audit_result?.recommendedActions?.length
+          ? genData.audit_result.recommendedActions.map((a: any) => a.title).join('; ')
+          : '-',
+        linkedin_post: genData.audit_result?.linkedinPost || '',
         is_public: true,
         created_at: new Date().toISOString(),
         username: saveResult.username || normalizedUsername,
         github_username: saveResult.github_username ?? normalizedGithubUsername,
         avatar_url: normalizedAvatarUrl,
         card_image_url: undefined,
-        code_walkthrough: normalized.codeWalkthrough,
-        what_works_well: normalized.whatWorksWell,
-        bugs_and_risky_cases: normalized.bugsAndRiskyCases,
-        edge_cases: normalized.edgeCases,
-        performance_analysis: normalized.performanceAnalysis,
-        security_analysis: normalized.securityAnalysis,
-        production_readiness: normalized.productionReadiness,
-        recommended_improvements: normalized.recommendedImprovements,
-        improved_code: normalized.improvedCode?.code,
-        suggested_tests: normalized.suggestedTests,
-        scorecard: normalized.scorecard,
-        final_verdict_summary: normalized.finalVerdict?.summary,
-        final_verdict_approved: normalized.finalVerdict?.approved,
-        final_verdict_next_steps: normalized.finalVerdict?.nextSteps,
-        findings: genData.findings,
-        execution_overview: genData.executionOverview,
-        architectural_observations: genData.architecturalObservations,
-        recommended_actions: genData.recommendedActions,
-        suggested_tests_new: genData.suggestedTests,
-        complexity: genData.complexity,
-        scorecard_new: genData.scorecard,
-        verdict: genData.verdict,
-        limitations: genData.limitations,
+        code_walkthrough: undefined,
+        what_works_well: undefined,
+        bugs_and_risky_cases: undefined,
+        edge_cases: undefined,
+        performance_analysis: undefined,
+        security_analysis: undefined,
+        production_readiness: undefined,
+        recommended_improvements: undefined,
+        improved_code: genData.audit_result?.improvedCode?.code,
+        suggested_tests: undefined,
+        scorecard: undefined,
+        final_verdict_summary: genData.audit_result?.verdict?.explanation || null,
+        final_verdict_approved: genData.audit_result?.verdict?.status === 'approved',
+        final_verdict_next_steps: undefined,
+        findings: genData.audit_result?.findings || [],
+        execution_overview: genData.audit_result?.executionOverview || null,
+        architectural_observations: genData.audit_result?.architecturalObservations || [],
+        recommended_actions: genData.audit_result?.recommendedActions || [],
+        suggested_tests_new: genData.audit_result?.suggestedTests || [],
+        complexity: genData.audit_result?.complexity || null,
+        scorecard_new: genData.audit_result?.scorecard || null,
+        verdict: genData.audit_result?.verdict || null,
+        limitations: genData.audit_result?.limitations || [],
         audit_result: genData.audit_result,
         debug_trace: genData.debug_trace,
         line_explanations: undefined,
@@ -488,17 +444,14 @@ export default function HomePage() {
   }, [handleGenerate]);
 
   return (
-    // 🔥 padding کاهش یافته برای افزایش عرض ادیتور و پنل
     <main className="min-h-screen bg-[#f8f9fa] p-2 md:p-3">
       <div className="max-w-7xl mx-auto">
-        {/* ===== Header ===== */}
         <div className="mb-4">
           <h1 className="text-2xl font-bold text-[#1a1a2e] flex items-center gap-2">
             <span className="text-[#4a86f7]">⚡</span> Zbloue
           </h1>
         </div>
 
-        {/* ===== Error Display ===== */}
         {errorMessage && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm flex items-center justify-between">
             <span>❌ {errorMessage}</span>
@@ -508,7 +461,6 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* ===== Editor + Output ===== */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 h-[calc(100vh-180px)] min-h-[600px]">
           <div className="min-h-[400px] lg:min-h-0">
             <Editor
@@ -531,7 +483,6 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* ===== Footer ===== */}
         <div className="mt-4 text-center text-xs text-[#a0a0b0] border-t border-[#d0d0d8] pt-3">
           Press <kbd className="px-1.5 py-0.5 bg-[#e8e8f0] rounded text-[#4a4a6a] text-xs font-mono">Ctrl+Enter</kbd> to generate
         </div>

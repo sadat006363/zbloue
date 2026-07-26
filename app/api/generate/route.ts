@@ -145,9 +145,8 @@ function mapCanonicalToLegacy(canonical: any): LegacyGenerateResponse {
           notes: canonical.improvedCode.notes || '',
         }
       : undefined,
-    // ===== فیلدهایی که هم Legacy و هم Canonical دارند =====
-    suggestedTests: canonical.suggestedTests || [], // فقط یک بار
-    scorecard: canonical.scorecard || null, // فقط یک بار
+    suggestedTests: canonical.suggestedTests || [],
+    scorecard: canonical.scorecard || null,
     finalVerdict: canonical.verdict
       ? {
           summary: canonical.verdict.explanation,
@@ -243,7 +242,12 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
   const cached = getCachedResult(cacheKey);
   if (cached) {
     logger.info(`[generate] Cache hit for IP ${ip}, mode ${mode}, key ${cacheKey.slice(0, 8)}...`);
-    return NextResponse.json(cached.result);
+    // بازگرداندن فقط audit_result و metadata ساده
+    return NextResponse.json({
+      audit_result: cached.result.audit_result,
+      language,
+      raw_code: code,
+    });
   }
 
   // Mock support
@@ -251,7 +255,11 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
     logger.info(`[generate] Using mock response for advanced mode (IP ${ip})`);
     const mock = validateResponse(MOCK_RESPONSE);
     setCacheResult(cacheKey, mock);
-    return NextResponse.json(mock);
+    return NextResponse.json({
+      audit_result: mock.audit_result,
+      language,
+      raw_code: code,
+    });
   }
 
   // Actual generation
@@ -265,37 +273,27 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
       pipelineTrace = pipelineResult.trace || null;
 
       if (pipelineResult.result) {
-        // Validate the canonical result
         const validated = AdvancedAuditResultSchema.safeParse(pipelineResult.result);
         if (validated.success) {
-          // Map to legacy shape for now
           legacyResult = mapCanonicalToLegacy(validated.data);
-          // Add debug trace if available
           if (pipelineResult.trace) {
             (legacyResult as any).debug_trace = pipelineResult.trace;
           }
           logger.info(`[generate] Advanced pipeline succeeded with status: ${pipelineResult.status}`);
         } else {
-          // Fallback to legacy generation
           logger.warn('[generate] Pipeline output failed schema validation, falling back to legacy');
           const legacyData = await generateEducationalContent(code, language, mode);
           legacyResult = validateResponse(legacyData);
         }
       } else {
-        // Pipeline failed
         logger.warn(`[generate] Advanced pipeline failed: ${pipelineResult.error}`);
         const legacyData = await generateEducationalContent(code, language, mode);
         legacyResult = validateResponse(legacyData);
       }
 
-      // ============================================================
-      // 🔥 اضافه کردن trace به legacyResult در همه حالت‌ها
-      // ============================================================
       if (pipelineResult.trace) {
         (legacyResult as any).debug_trace = pipelineResult.trace;
-        logger.info('[generate] Pipeline trace attached to response (even on fallback)');
       } else if (pipelineResult.error) {
-        // اگر trace وجود نداشت، حداقل error را ذخیره کن
         (legacyResult as any).debug_trace = {
           error: pipelineResult.error,
           status: pipelineResult.status,
@@ -305,24 +303,27 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
       logger.error('[generate] Pipeline error, falling back to legacy:', error);
       const legacyData = await generateEducationalContent(code, language, mode);
       legacyResult = validateResponse(legacyData);
-      // در صورت خطای غیرمنتظره، یک trace حداقلی اضافه کن
       (legacyResult as any).debug_trace = {
         error: error instanceof Error ? error.message : 'Unknown pipeline error',
         timestamp: new Date().toISOString(),
       };
     }
   } else {
-    // Simple / Medium modes
     logger.info(`[generate] Running legacy generation for mode ${mode} (IP ${ip})`);
     const legacyData = await generateEducationalContent(code, language, mode);
     legacyResult = validateResponse(legacyData);
   }
 
-  // Cache the result (همراه با trace در صورت وجود)
+  // Cache the result
   setCacheResult(cacheKey, legacyResult, pipelineTrace);
 
   const duration = Date.now() - startTime;
   logger.info(`[generate] Request completed in ${duration}ms for mode ${mode} (IP ${ip})`);
 
-  return NextResponse.json(legacyResult);
+  // 🔥 بازگرداندن فقط audit_result و metadata ساده
+  return NextResponse.json({
+    audit_result: legacyResult.audit_result,
+    language,
+    raw_code: code,
+  });
 });
