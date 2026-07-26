@@ -144,7 +144,7 @@ function mapCanonicalToLegacy(canonical: any): LegacyGenerateResponse {
           notes: canonical.improvedCode.notes || '',
         }
       : undefined,
-    suggestedTests: [], // Legacy (خالی)
+    suggestedTests: canonical.suggestedTests || [], // 🔥 داده‌های جدید در اینجا قرار می‌گیرند
     scorecard: undefined,
     finalVerdict: canonical.verdict
       ? {
@@ -159,7 +159,6 @@ function mapCanonicalToLegacy(canonical: any): LegacyGenerateResponse {
     executionOverview: canonical.executionOverview || null,
     architecturalObservations: canonical.architecturalObservations || [],
     recommendedActions: canonical.recommendedActions || [],
-    suggestedTestsNew: canonical.suggestedTests || [], // 🔥 تست‌های جدید
     complexity: canonical.complexity || null,
     scorecard: canonical.scorecard || null,
     verdict: canonical.verdict || null,

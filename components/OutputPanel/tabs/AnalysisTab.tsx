@@ -122,8 +122,7 @@ export default function AnalysisTab({
   const hasComplexity = fullAnalysis?.complexity && typeof fullAnalysis.complexity === 'object';
   const hasLimitations = fullAnalysis?.limitations && Array.isArray(fullAnalysis.limitations) && fullAnalysis.limitations.length > 0;
   const hasScorecardNew = fullAnalysis?.scorecard && typeof fullAnalysis.scorecard === 'object';
-  const hasSuggestedTestsNew = fullAnalysis?.suggestedTestsNew && Array.isArray(fullAnalysis.suggestedTestsNew) && fullAnalysis.suggestedTestsNew.length > 0;
-  const hasSuggestedTestsLegacy = fullAnalysis?.suggestedTests && Array.isArray(fullAnalysis.suggestedTests) && fullAnalysis.suggestedTests.length > 0;
+  const hasSuggestedTests = fullAnalysis?.suggestedTests && Array.isArray(fullAnalysis.suggestedTests) && fullAnalysis.suggestedTests.length > 0;
 
   // ============================================================
   // 🔥 استخراج امتیازات از scorecard_new
@@ -524,43 +523,68 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* ===== Suggested Tests (New Canonical) ===== */}
-        {hasSuggestedTestsNew && (
+        {/* ===== Suggested Tests (با تشخیص خودکار ساختار) ===== */}
+        {hasSuggestedTests && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-2">🧪 Suggested Tests</h3>
             <div className="space-y-2">
-              {fullAnalysis.suggestedTestsNew.map((test: any, idx: number) => (
-                <div key={idx} className="p-2 border-b border-[#d0d0d8] last:border-0">
-                  <p className="font-medium text-[#1a1a2e]">{safeString(test.title)}</p>
-                  {test.purpose && <p className="text-sm text-[#4a4a6a]">Purpose: {safeString(test.purpose)}</p>}
-                  {test.setup && test.setup.length > 0 && (
-                    <div className="text-sm text-[#4a4a6a] mt-1">
-                      <span className="font-medium">Setup:</span>
-                      <ul className="list-disc list-inside ml-2">
-                        {test.setup.map((step: string, i: number) => <li key={i}>{safeString(step)}</li>)}
-                      </ul>
-                    </div>
-                  )}
-                  {test.steps && test.steps.length > 0 && (
-                    <div className="text-sm text-[#4a4a6a] mt-1">
-                      <span className="font-medium">Steps:</span>
-                      <ul className="list-disc list-inside ml-2">
-                        {test.steps.map((step: string, i: number) => <li key={i}>{safeString(step)}</li>)}
-                      </ul>
-                    </div>
-                  )}
-                  {test.expectedResult && (
-                    <div className="text-sm text-[#4a4a6a] mt-1">
-                      <span className="font-medium">Expected:</span> {safeString(test.expectedResult)}
-                    </div>
-                  )}
-                  {test.relatedFindingIds && test.relatedFindingIds.length > 0 && (
-                    <div className="text-xs text-[#6c7086] mt-1">
-                      Related: {test.relatedFindingIds.join(', ')}
-                    </div>
-                  )}
-                </div>
-              ))}
+              {fullAnalysis.suggestedTests.map((test: any, idx: number) => {
+                // تشخیص ساختار داده: اگر test.title و test.steps وجود داشته باشد => جدید (Canonical)
+                const isNew = test && typeof test === 'object' && test.title && test.steps && Array.isArray(test.steps);
+                return (
+                  <div key={idx} className="p-2 border-b border-[#d0d0d8] last:border-0">
+                    {isNew ? (
+                      // ===== نمایش جدید (Canonical) =====
+                      <>
+                        <p className="font-medium text-[#1a1a2e]">{safeString(test.title)}</p>
+                        {test.purpose && <p className="text-sm text-[#4a4a6a]">Purpose: {safeString(test.purpose)}</p>}
+                        {test.setup && test.setup.length > 0 && (
+                          <div className="text-sm text-[#4a4a6a] mt-1">
+                            <span className="font-medium">Setup:</span>
+                            <ul className="list-disc list-inside ml-2">
+                              {test.setup.map((step: string, i: number) => <li key={i}>{safeString(step)}</li>)}
+                            </ul>
+                          </div>
+                        )}
+                        {test.steps && test.steps.length > 0 && (
+                          <div className="text-sm text-[#4a4a6a] mt-1">
+                            <span className="font-medium">Steps:</span>
+                            <ul className="list-disc list-inside ml-2">
+                              {test.steps.map((step: string, i: number) => <li key={i}>{safeString(step)}</li>)}
+                            </ul>
+                          </div>
+                        )}
+                        {test.expectedResult && (
+                          <div className="text-sm text-[#4a4a6a] mt-1">
+                            <span className="font-medium">Expected:</span> {safeString(test.expectedResult)}
+                          </div>
+                        )}
+                        {test.relatedFindingIds && test.relatedFindingIds.length > 0 && (
+                          <div className="text-xs text-[#6c7086] mt-1">
+                            Related: {test.relatedFindingIds.join(', ')}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      // ===== نمایش قدیمی (Legacy) =====
+                      <>
+                        <p className="font-medium text-[#1a1a2e]">{safeString(test.name)}</p>
+                        {test.input && <p className="text-sm text-[#4a4a6a]">Input: {safeString(test.input)}</p>}
+                        {test.expectedOutput && <p className="text-sm text-[#4a4a6a]">Expected: {safeString(test.expectedOutput)}</p>}
+                        {test.type && (
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${
+                            test.type === 'Invalid' ? 'bg-red-100 text-red-700' :
+                            test.type === 'Edge' ? 'bg-yellow-100 text-yellow-700' :
+                            'bg-blue-100 text-blue-700'
+                          }`}>
+                            {safeString(test.type)}
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -707,21 +731,6 @@ export default function AnalysisTab({
             <pre className="mt-2 p-3 bg-[#1a1a2e] text-[#cdd6f4] rounded-md overflow-x-auto text-sm font-mono">
               {safeString(fullAnalysis.improvedCode.code)}
             </pre>
-          </div>
-        )}
-
-        {/* ===== Suggested Tests (Legacy - Fallback) ===== */}
-        {!hasSuggestedTestsNew && hasSuggestedTestsLegacy && (
-          <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
-            <h3 className="font-semibold text-[#4a86f7] mb-2">🧪 Suggested Tests</h3>
-            {safeArray<LegacySuggestedTest>(fullAnalysis.suggestedTests).map((test: LegacySuggestedTest, idx: number) => (
-              <div key={idx} className="p-2 border-b border-[#d0d0d8] last:border-0">
-                <p className="font-medium text-[#1a1a2e]">{safeString(test.name)}</p>
-                {test.input && <p className="text-sm text-[#4a4a6a]">Input: {safeString(test.input)}</p>}
-                {test.expectedOutput && <p className="text-sm text-[#4a4a6a]">Expected: {safeString(test.expectedOutput)}</p>}
-                {test.type && <span className={`text-xs px-2 py-0.5 rounded-full ${test.type === 'Invalid' ? 'bg-red-100 text-red-700' : test.type === 'Edge' ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-100 text-blue-700'}`}>{safeString(test.type)}</span>}
-              </div>
-            ))}
           </div>
         )}
 
