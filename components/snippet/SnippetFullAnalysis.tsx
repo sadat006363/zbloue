@@ -71,7 +71,7 @@ export interface ScorecardLegacy {
   overall?: number;
 }
 
-export type ScoreItemValue = number | { score: number; reason: string; relatedFindings: string[] };
+export type ScoreItemValue = number | { score: number; reason: string; relatedFindingIds: string[] };
 
 export interface ScorecardNew {
   correctness: ScoreItemValue;
@@ -107,7 +107,7 @@ export interface UnifiedTest {
 // ============================================================
 
 export interface SnippetFullAnalysisProps {
-  snippet: any; // 🔥 موقتاً any به دلیل SnippetDataSchema: z.unknown()
+  snippet: any;
 }
 
 // ============================================================
@@ -248,10 +248,22 @@ function severityBadge(severity: string): string {
 // ============================================================
 
 export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProps) {
-  // ===== محاسبه Scorecard با تشخیص مقیاس خودکار =====
+  // ===== Scorecard (با پشتیبانی از هر دو ساختار) =====
   const { scorecardDisplay, scorecardIsNew, scorecardMax } = useMemo(() => {
-    const display = snippet.scorecard_new || snippet.scorecard;
-    const isNew = !!snippet.scorecard_new;
+    // اولویت: audit_result.scorecard > scorecard_new > scorecard
+    let display = null;
+    let isNew = false;
+
+    if (snippet?.audit_result?.scorecard) {
+      display = snippet.audit_result.scorecard;
+      isNew = true;
+    } else if (snippet?.scorecard_new) {
+      display = snippet.scorecard_new;
+      isNew = true;
+    } else if (snippet?.scorecard) {
+      display = snippet.scorecard;
+      isNew = false;
+    }
 
     let max = 10;
 
@@ -273,55 +285,59 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
     }
 
     return { scorecardDisplay: display, scorecardIsNew: isNew, scorecardMax: max };
-  }, [snippet.scorecard_new, snippet.scorecard]);
+  }, [snippet]);
 
   const suggestedTests = useMemo(
-    () => normalizeTests(snippet.suggested_tests_new, snippet.suggested_tests),
-    [snippet.suggested_tests_new, snippet.suggested_tests]
+    () => normalizeTests(
+      snippet?.audit_result?.suggestedTests || snippet?.suggested_tests_new,
+      snippet?.suggested_tests
+    ),
+    [snippet]
   );
 
   const verdictDisplay = useMemo(() => {
-    if (snippet.verdict) return snippet.verdict;
-    if (snippet.final_verdict_summary) {
+    if (snippet?.audit_result?.verdict) return snippet.audit_result.verdict;
+    if (snippet?.verdict) return snippet.verdict;
+    if (snippet?.final_verdict_summary) {
       return {
         status: snippet.final_verdict_approved ? 'production-ready-with-monitoring' : 'requires-major-changes',
         explanation: snippet.final_verdict_summary + (snippet.final_verdict_next_steps ? ` Next steps: ${snippet.final_verdict_next_steps}` : ''),
       };
     }
     return null;
-  }, [snippet.verdict, snippet.final_verdict_summary, snippet.final_verdict_approved, snippet.final_verdict_next_steps]);
+  }, [snippet]);
 
   const hasFindings = useMemo(
-    () => snippet.findings && snippet.findings.length > 0,
-    [snippet.findings]
+    () => !!(snippet?.audit_result?.findings?.length || snippet?.findings?.length),
+    [snippet]
   );
+
   const showLegacyBugEdge = !hasFindings;
 
   const hasContent = useMemo(() => {
-    const result = !!(
-      snippet.card_title ||
-      snippet.key_concept ||
-      snippet.code_walkthrough ||
-      snippet.what_works_well ||
-      (!hasFindings && (snippet.bugs_and_risky_cases || snippet.edge_cases)) ||
-      snippet.performance_analysis ||
-      snippet.security_analysis ||
-      snippet.production_readiness ||
-      snippet.recommended_improvements ||
-      snippet.improved_code ||
-      snippet.suggested_tests ||
-      snippet.scorecard ||
-      snippet.final_verdict_summary ||
+    const result = !!(snippet?.card_title ||
+      snippet?.key_concept ||
+      snippet?.code_walkthrough ||
+      snippet?.what_works_well ||
+      (!hasFindings && (snippet?.bugs_and_risky_cases || snippet?.edge_cases)) ||
+      snippet?.performance_analysis ||
+      snippet?.security_analysis ||
+      snippet?.production_readiness ||
+      snippet?.recommended_improvements ||
+      snippet?.improved_code ||
+      snippet?.suggested_tests ||
+      snippet?.scorecard ||
+      snippet?.final_verdict_summary ||
       hasFindings ||
-      snippet.execution_overview ||
-      snippet.architectural_observations ||
-      snippet.recommended_actions ||
-      snippet.suggested_tests_new ||
-      snippet.complexity ||
-      snippet.scorecard_new ||
-      snippet.verdict ||
-      snippet.limitations
-    );
+      snippet?.execution_overview ||
+      snippet?.architectural_observations ||
+      snippet?.recommended_actions ||
+      snippet?.suggested_tests_new ||
+      snippet?.complexity ||
+      snippet?.scorecard_new ||
+      snippet?.verdict ||
+      snippet?.limitations ||
+      snippet?.audit_result);
 
     if (process.env.NODE_ENV === 'development') {
       logger.debug('[SnippetFullAnalysis] hasContent:', result);
@@ -348,6 +364,30 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
 
   const language = snippet.language || 'javascript';
   const langExtension = languageExtensions[language] || javascript();
+
+  // 🔥 تابع کمکی برای دریافت findings از audit_result یا مستقیم
+  const findings = snippet?.audit_result?.findings || snippet?.findings || [];
+
+  // 🔥 تابع کمکی برای دریافت executionOverview
+  const executionOverview = snippet?.audit_result?.executionOverview || snippet?.execution_overview || null;
+
+  // 🔥 تابع کمکی برای دریافت architecturalObservations
+  const architecturalObservations = snippet?.audit_result?.architecturalObservations || snippet?.architectural_observations || [];
+
+  // 🔥 تابع کمکی برای دریافت recommendedActions
+  const recommendedActions = snippet?.audit_result?.recommendedActions || snippet?.recommended_actions || [];
+
+  // 🔥 تابع کمکی برای دریافت complexity
+  const complexity = snippet?.audit_result?.complexity || snippet?.complexity || null;
+
+  // 🔥 تابع کمکی برای دریافت limitations
+  const limitations = snippet?.audit_result?.limitations || snippet?.limitations || [];
+
+  // 🔥 تابع کمکی برای دریافت improvedCode
+  const improvedCode = snippet?.audit_result?.improvedCode || snippet?.improved_code || null;
+
+  // 🔥 تابع کمکی برای دریافت linkedinPost
+  const linkedinPost = snippet?.audit_result?.linkedinPost || snippet?.linkedin_post || null;
 
   return (
     <div className="mt-8 pt-6 border-t border-[#313244]">
@@ -424,12 +464,13 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
           </>
         )}
 
+        {/* Findings (از audit_result یا مستقیم) */}
         {hasFindings && (
           <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
             <h3 className="text-lg font-semibold text-[#89b4fa]">🔍 Findings</h3>
             <div className="space-y-4 mt-2">
-              {snippet.findings!.map((finding: any) => (
-                <div key={finding.id} className="bg-[#1e1e2e] p-3 rounded-md border border-[#313244]">
+              {findings.map((finding: any, idx: number) => (
+                <div key={finding.id || idx} className="bg-[#1e1e2e] p-3 rounded-md border border-[#313244]">
                   <div className="flex items-start justify-between gap-2">
                     <span className="text-sm font-semibold text-[#89b4fa]">{finding.id}</span>
                     <span className={`text-xs px-2 py-0.5 rounded-full ${severityBadge(finding.severity)}`}>
@@ -478,63 +519,55 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
           </div>
         )}
 
-        {snippet.execution_overview && (
+        {/* Execution Overview */}
+        {executionOverview && (
           <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
             <h3 className="text-lg font-semibold text-[#89b4fa]">⚡ Execution Overview</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2 text-sm">
               <div>
                 <span className="text-[#6c7086]">Entry Points:</span>
                 <ul className="list-disc list-inside text-[#cdd6f4]">
-                  {(snippet.execution_overview.entryPoints ?? []).map((p: string, i: number) => (
-                    <li key={i}>{p}</li>
-                  ))}
+                  {(executionOverview.entryPoints ?? []).map((p: string, i: number) => <li key={i}>{p}</li>)}
                 </ul>
               </div>
               <div>
                 <span className="text-[#6c7086]">Task Submission Points:</span>
                 <ul className="list-disc list-inside text-[#cdd6f4]">
-                  {(snippet.execution_overview.taskSubmissionPoints ?? []).map((p: string, i: number) => (
-                    <li key={i}>{p}</li>
-                  ))}
+                  {(executionOverview.taskSubmissionPoints ?? []).map((p: string, i: number) => <li key={i}>{p}</li>)}
                 </ul>
               </div>
               <div>
                 <span className="text-[#6c7086]">Blocking Wait Points:</span>
                 <ul className="list-disc list-inside text-[#cdd6f4]">
-                  {(snippet.execution_overview.blockingWaitPoints ?? []).map((p: string, i: number) => (
-                    <li key={i}>{p}</li>
-                  ))}
+                  {(executionOverview.blockingWaitPoints ?? []).map((p: string, i: number) => <li key={i}>{p}</li>)}
                 </ul>
               </div>
               <div>
                 <span className="text-[#6c7086]">Shared Resources:</span>
                 <ul className="list-disc list-inside text-[#cdd6f4]">
-                  {(snippet.execution_overview.sharedResources ?? []).map((p: string, i: number) => (
-                    <li key={i}>{p}</li>
-                  ))}
+                  {(executionOverview.sharedResources ?? []).map((p: string, i: number) => <li key={i}>{p}</li>)}
                 </ul>
               </div>
               <div className="md:col-span-2">
                 <span className="text-[#6c7086]">Resource Lifecycle:</span>
                 <ul className="list-disc list-inside text-[#cdd6f4]">
-                  {(snippet.execution_overview.resourceLifecycle ?? []).map((p: string, i: number) => (
-                    <li key={i}>{p}</li>
-                  ))}
+                  {(executionOverview.resourceLifecycle ?? []).map((p: string, i: number) => <li key={i}>{p}</li>)}
                 </ul>
               </div>
             </div>
           </div>
         )}
 
-        {snippet.architectural_observations && snippet.architectural_observations.length > 0 && (
+        {/* Architectural Observations */}
+        {architecturalObservations.length > 0 && (
           <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
             <h3 className="text-lg font-semibold text-[#89b4fa]">🏗️ Architectural Observations</h3>
             <div className="space-y-2 mt-2">
-              {snippet.architectural_observations.map((obs: any, idx: number) => (
+              {architecturalObservations.map((obs: any, idx: number) => (
                 <div key={idx} className="border-b border-[#313244] pb-2 last:border-0">
                   <p className="font-medium text-[#89b4fa]">{obs.title}</p>
                   <p className="text-sm text-[#cdd6f4]">{obs.explanation}</p>
-                  {obs.relatedFindingIds.length > 0 && (
+                  {obs.relatedFindingIds && obs.relatedFindingIds.length > 0 && (
                     <p className="text-xs text-[#6c7086]">Related findings: {obs.relatedFindingIds.join(', ')}</p>
                   )}
                 </div>
@@ -543,11 +576,12 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
           </div>
         )}
 
-        {snippet.recommended_actions && snippet.recommended_actions.length > 0 && (
+        {/* Recommended Actions */}
+        {recommendedActions.length > 0 && (
           <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
             <h3 className="text-lg font-semibold text-[#a6e3a1]">🔧 Recommended Actions</h3>
             <div className="space-y-2 mt-2">
-              {snippet.recommended_actions.map((action: any, idx: number) => (
+              {recommendedActions.map((action: any, idx: number) => (
                 <div key={idx} className="flex items-start gap-2 border-b border-[#313244] pb-2 last:border-0">
                   <span className="text-xs text-[#6c7086] min-w-[24px]">#{action.priority}</span>
                   <div className="flex-1">
@@ -558,7 +592,7 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
                       </span>
                     </div>
                     <p className="text-sm text-[#cdd6f4]">{action.action}</p>
-                    {action.relatedFindingIds.length > 0 && (
+                    {action.relatedFindingIds && action.relatedFindingIds.length > 0 && (
                       <p className="text-xs text-[#6c7086]">Related: {action.relatedFindingIds.join(', ')}</p>
                     )}
                   </div>
@@ -568,70 +602,49 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
           </div>
         )}
 
-        {snippet.complexity && (
+        {/* Complexity */}
+        {complexity && (
           <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
             <h3 className="text-lg font-semibold text-[#89b4fa]">📈 Complexity</h3>
             <div className="grid grid-cols-2 gap-2 mt-2 text-sm">
-              {'time' in snippet.complexity ? (
-                // Legacy shape
-                <>
-                  <div>
-                    <span className="text-[#6c7086]">Time:</span>
-                    <span className="text-[#cdd6f4] ml-2">{snippet.complexity.time}</span>
-                  </div>
-                  <div>
-                    <span className="text-[#6c7086]">Space:</span>
-                    <span className="text-[#cdd6f4] ml-2">{snippet.complexity.space}</span>
-                  </div>
-                  <div className="col-span-2">
-                    <span className="text-[#6c7086]">Resource Growth:</span>
-                    <span className="text-[#cdd6f4] ml-2">{snippet.complexity.resourceGrowth}</span>
-                  </div>
-                  {snippet.complexity.assumptions.length > 0 && (
-                    <div className="col-span-2">
-                      <span className="text-[#6c7086]">Assumptions:</span>
-                      <ul className="list-disc list-inside text-[#cdd6f4]">
-                        {snippet.complexity.assumptions.map((a: string, i: number) => <li key={i}>{a}</li>)}
-                      </ul>
-                    </div>
-                  )}
-                </>
-              ) : (
-                // Canonical shape (with applicable)
+              {complexity.applicable ? (
                 <>
                   <div className="col-span-2">
                     <span className="text-[#6c7086]">Expression:</span>
-                    <span className="text-[#cdd6f4] ml-2">{snippet.complexity.expression || 'N/A'}</span>
+                    <span className="text-[#cdd6f4] ml-2">{complexity.expression || 'N/A'}</span>
                   </div>
                   <div className="col-span-2">
                     <span className="text-[#6c7086]">Explanation:</span>
-                    <span className="text-[#cdd6f4] ml-2">{snippet.complexity.explanation || 'N/A'}</span>
+                    <span className="text-[#cdd6f4] ml-2">{complexity.explanation || 'N/A'}</span>
                   </div>
-                  {snippet.complexity.variables && snippet.complexity.variables.length > 0 && (
+                  {complexity.variables && complexity.variables.length > 0 && (
                     <div className="col-span-2">
                       <span className="text-[#6c7086]">Variables:</span>
                       <ul className="list-disc list-inside text-[#cdd6f4]">
-                        {snippet.complexity.variables.map((v: any, i: number) => (
+                        {complexity.variables.map((v: any, i: number) => (
                           <li key={i}>{v.symbol}: {v.definition}</li>
                         ))}
                       </ul>
                     </div>
                   )}
-                  {snippet.complexity.assumptions && snippet.complexity.assumptions.length > 0 && (
+                  {complexity.assumptions && complexity.assumptions.length > 0 && (
                     <div className="col-span-2">
                       <span className="text-[#6c7086]">Assumptions:</span>
                       <ul className="list-disc list-inside text-[#cdd6f4]">
-                        {snippet.complexity.assumptions.map((a: string, i: number) => <li key={i}>{a}</li>)}
+                        {complexity.assumptions.map((a: string, i: number) => <li key={i}>{a}</li>)}
                       </ul>
                     </div>
                   )}
                 </>
+              ) : (
+                <div className="col-span-2 text-[#6c7086]">Not applicable</div>
               )}
             </div>
           </div>
         )}
 
-        {snippet.performance_analysis && !snippet.complexity && (
+        {/* Performance Analysis (legacy fallback) */}
+        {snippet.performance_analysis && !complexity && (
           <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
             <h3 className="text-lg font-semibold text-[#89b4fa]">⚡ Performance Analysis</h3>
             {renderValue(snippet.performance_analysis)}
@@ -652,7 +665,7 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
           </div>
         )}
 
-        {snippet.recommended_improvements && snippet.recommended_improvements.length > 0 && !snippet.recommended_actions && (
+        {snippet.recommended_improvements && snippet.recommended_improvements.length > 0 && !recommendedActions.length && (
           <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
             <h3 className="text-lg font-semibold text-[#a6e3a1]">🔧 Recommended Improvements</h3>
             <ul className="list-disc list-inside space-y-1 text-[#cdd6f4]">
@@ -667,12 +680,13 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
           </div>
         )}
 
-        {snippet.improved_code && (
+        {/* Improved Code */}
+        {improvedCode && improvedCode.available && improvedCode.code && (
           <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
             <h3 className="text-lg font-semibold text-[#89b4fa]">✨ Improved Code</h3>
             <div className="mt-2 border border-[#313244] rounded-lg overflow-hidden">
               <CodeMirror
-                value={snippet.improved_code}
+                value={improvedCode.code}
                 height="auto"
                 theme="dark"
                 extensions={[langExtension, EditorView.lineWrapping]}
@@ -690,6 +704,7 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
           </div>
         )}
 
+        {/* Suggested Tests */}
         {suggestedTests.length > 0 && (
           <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
             <h3 className="text-lg font-semibold text-[#89b4fa]">🧪 Suggested Tests</h3>
@@ -698,12 +713,12 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
                 <div key={idx} className="border-b border-[#313244] pb-2 last:border-0">
                   <p className="font-medium text-[#89b4fa]">{test.title}</p>
                   {test.purpose && <p className="text-sm text-[#cdd6f4]">{test.purpose}</p>}
-                  {test.setup.length > 0 && (
+                  {test.setup && test.setup.length > 0 && (
                     <div className="text-xs text-[#6c7086] mt-1">
                       Setup: {test.setup.join('; ')}
                     </div>
                   )}
-                  {test.steps.length > 0 && (
+                  {test.steps && test.steps.length > 0 && (
                     <div className="text-xs text-[#6c7086] mt-1">
                       Steps: {test.steps.join('; ')}
                     </div>
@@ -724,6 +739,7 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
           </div>
         )}
 
+        {/* Scorecard */}
         {scorecardDisplay && (
           <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
             <h3 className="text-lg font-semibold text-[#89b4fa]">
@@ -753,6 +769,7 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
           </div>
         )}
 
+        {/* Verdict */}
         {verdictDisplay && (
           <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
             <h3 className="text-lg font-semibold text-[#89b4fa]">🏁 Verdict</h3>
@@ -775,14 +792,23 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
           </div>
         )}
 
-        {snippet.limitations && snippet.limitations.length > 0 && (
+        {/* Limitations */}
+        {limitations.length > 0 && (
           <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
             <h3 className="text-lg font-semibold text-[#f38ba8]">⚠️ Limitations</h3>
             <ul className="list-disc list-inside space-y-1 mt-2 text-sm text-[#a6adc8]">
-              {snippet.limitations.map((lim: string, idx: number) => (
+              {limitations.map((lim: string, idx: number) => (
                 <li key={idx}>{lim}</li>
               ))}
             </ul>
+          </div>
+        )}
+
+        {/* LinkedIn Post */}
+        {linkedinPost && (
+          <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
+            <h3 className="text-lg font-semibold text-[#89b4fa]">💼 LinkedIn Post</h3>
+            <p className="text-sm text-[#cdd6f4] mt-1 whitespace-pre-wrap">{linkedinPost}</p>
           </div>
         )}
       </div>

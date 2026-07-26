@@ -29,24 +29,12 @@ import {
 
 import logger from '@/lib/logger';
 
-// ============================================================
-// Type aliases for inferred types
-// ============================================================
-
 type CompletionStatus = z.infer<typeof CompletionStatusSchema>;
 type AppliedSpecialization = z.infer<typeof SpecializationSchema>;
 type Mechanism = z.infer<typeof MechanismSchema>;
 
-// ============================================================
-// Constants
-// ============================================================
-
 const DEFAULT_TITLE = 'Code Analysis Report';
 const DEFAULT_LINKEDIN_POST = 'Check out this code analysis! #Zbloue';
-
-// ============================================================
-// Type Guards & Helpers
-// ============================================================
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -81,10 +69,6 @@ function sanitizeEnum<T extends string>(
   return fallback;
 }
 
-// ============================================================
-// Title Normalization
-// ============================================================
-
 function normalizeTitle(source: unknown, summary?: string): string {
   const title = getSafeString(source);
   if (title.length > 0) return title;
@@ -95,10 +79,6 @@ function normalizeTitle(source: unknown, summary?: string): string {
   return DEFAULT_TITLE;
 }
 
-// ============================================================
-// Completion Status Normalization
-// ============================================================
-
 function normalizeCompletionStatus(source: unknown): CompletionStatus {
   const status = getSafeString(source);
   if (status === 'complete' || status === 'partially-complete') {
@@ -107,17 +87,9 @@ function normalizeCompletionStatus(source: unknown): CompletionStatus {
   return 'complete';
 }
 
-// ============================================================
-// Repair Applied Normalization
-// ============================================================
-
 function normalizeRepairApplied(source: unknown): boolean {
   return Boolean(source);
 }
-
-// ============================================================
-// Applied Specializations Normalization
-// ============================================================
 
 function normalizeAppliedSpecializations(source: unknown): AppliedSpecialization[] {
   const arr = getSafeArray<unknown>(source, []);
@@ -129,10 +101,6 @@ function normalizeAppliedSpecializations(source: unknown): AppliedSpecialization
   }
   return result;
 }
-
-// ============================================================
-// Analysis Coverage Normalization
-// ============================================================
 
 const ALL_DIMENSIONS = [
   'correctness',
@@ -200,10 +168,6 @@ function normalizeAnalysisCoverage(source: unknown): AnalysisCoverageItem[] {
   return result;
 }
 
-// ============================================================
-// Score Normalization (0-100 Object with applicable flag)
-// ============================================================
-
 function normalizeScore(value: unknown, fallback: number = 0): number {
   if (typeof value === 'number' && isFinite(value)) {
     if (value <= 10 && value >= 0) {
@@ -231,8 +195,8 @@ function normalizeScoreItem(
   if (isObject(value)) {
     const score = normalizeScore(value.score, fallback);
     const reason = typeof value.reason === 'string' ? value.reason.trim() : defaultReason;
-    const relatedFindings = Array.isArray(value.relatedFindings)
-      ? value.relatedFindings.filter((id): id is string => typeof id === 'string')
+    const relatedFindingIds = Array.isArray(value.relatedFindingIds)
+      ? value.relatedFindingIds.filter((id): id is string => typeof id === 'string')
       : [];
 
     if (typeof score === 'number' && !isNaN(score) && score >= 0) {
@@ -240,14 +204,14 @@ function normalizeScoreItem(
         applicable: true,
         score,
         reason: reason || 'Score derived from data.',
-        relatedFindings,
+        relatedFindingIds,
       };
     } else {
       return {
         applicable: false,
         score: null,
         reason: reason || 'No score available.',
-        relatedFindings: [],
+        relatedFindingIds: [],
       };
     }
   }
@@ -258,14 +222,14 @@ function normalizeScoreItem(
       applicable: true,
       score,
       reason: defaultReason || 'Score derived from legacy data.',
-      relatedFindings: [],
+      relatedFindingIds: [],
     };
   } else {
     return {
       applicable: false,
       score: null,
       reason: defaultReason || 'No score available.',
-      relatedFindings: [],
+      relatedFindingIds: [],
     };
   }
 }
@@ -282,10 +246,6 @@ function normalizeScorecard(source: unknown): AuditScorecard {
     productionReadiness: normalizeScoreItem(input.productionReadiness, 0, 'Production readiness assessment.'),
   };
 }
-
-// ============================================================
-// Complexity Normalization
-// ============================================================
 
 function normalizeComplexity(source: unknown): Complexity {
   const input = getSafeObject(source);
@@ -346,10 +306,6 @@ function extractVariables(expression: string): Array<{ symbol: string; definitio
   return variables;
 }
 
-// ============================================================
-// Verdict Normalization
-// ============================================================
-
 function normalizeVerdict(source: unknown): { status: VerdictStatus; explanation: string } {
   const input = getSafeObject(source);
 
@@ -374,10 +330,6 @@ function normalizeVerdict(source: unknown): { status: VerdictStatus; explanation
 
   return { status, explanation };
 }
-
-// ============================================================
-// ImprovedCode Normalization
-// ============================================================
 
 function normalizeImprovedCode(source: unknown): ImprovedCode {
   const input = getSafeObject(source);
@@ -408,16 +360,9 @@ function normalizeImprovedCode(source: unknown): ImprovedCode {
   };
 }
 
-// ============================================================
-// Finding Normalization (با حفظ محتوای اصلی و عدم استفاده از placeholderهای بی‌معنی)
-// ============================================================
-
 function normalizeFinding(finding: unknown, index: number, usedIds: Set<string>): AuditFinding {
   const f = getSafeObject(finding);
 
-  // ============================================================
-  // 🔥 1. نرمالایز کردن evidence (با حفظ داده‌های موجود)
-  // ============================================================
   const evidenceList = getSafeArray<unknown>(f.evidence, []);
   const normalizedEvidence = evidenceList.map((e: unknown) => {
     const ev = getSafeObject(e);
@@ -434,9 +379,6 @@ function normalizeFinding(finding: unknown, index: number, usedIds: Set<string>)
     };
   });
 
-  // ============================================================
-  // 🔥 2. نرمالایز کردن testToReproduce
-  // ============================================================
   let testToReproduce = null;
   const testRaw = f.testToReproduce ?? f.test;
   if (isObject(testRaw)) {
@@ -452,9 +394,6 @@ function normalizeFinding(finding: unknown, index: number, usedIds: Set<string>)
     }
   }
 
-  // ============================================================
-  // 🔥 3. ساخت ID یکتا
-  // ============================================================
   let id = getSafeString(f.id, `F-${String(index + 1).padStart(3, '0')}`);
   if (!/^F-\d{3,}$/.test(id)) {
     id = `F-${String(index + 1).padStart(3, '0')}`;
@@ -469,9 +408,6 @@ function normalizeFinding(finding: unknown, index: number, usedIds: Set<string>)
   }
   usedIds.add(finalId);
 
-  // ============================================================
-  // 🔥 4. category و mechanisms
-  // ============================================================
   const legacyCategory = getSafeString(f.category ?? f.type, 'other');
   const broadCategory = mapToBroadCategory(legacyCategory);
   
@@ -482,21 +418,9 @@ function normalizeFinding(finding: unknown, index: number, usedIds: Set<string>)
       return result.success;
     });
 
-  // ============================================================
-  // 🔥 5. فیلدهای اصلی (با حفظ محتوای اصلی هوش)
-  //    اگر فیلد خالی بود، به‌جای placeholder بی‌معنی، null یا undefined بگذاریم
-  // ============================================================
-  const title = getSafeString(f.title, getSafeString(f.name, 'Untitled Finding'));
-  const consequence = getSafeString(f.consequence, getSafeString(f.impact, getSafeString(f.effect, '')));
-  const technicalExplanation = getSafeString(f.technicalExplanation, getSafeString(f.details, ''));
-  const remediation = getSafeString(f.remediation, getSafeString(f.fix, getSafeString(f.solution, '')));
-  const executionPath = getStringArray(f.executionPath) || getStringArray(f.path) || [];
-  const triggerConditions = getStringArray(f.triggerConditions) || getStringArray(f.conditions) || [];
-  const relatedSymbols = getStringArray(f.relatedSymbols) || getStringArray(f.symbols) || [];
-
   return {
     id: finalId,
-    title,
+    title: getSafeString(f.title, getSafeString(f.name, 'Untitled Finding')),
     category: broadCategory,
     mechanisms: validMechanisms,
     severity: sanitizeEnum(
@@ -510,12 +434,12 @@ function normalizeFinding(finding: unknown, index: number, usedIds: Set<string>)
       'conditional'
     ),
     evidence: normalizedEvidence,
-    executionPath,
-    triggerConditions,
-    consequence: consequence || undefined as any, // اگر خالی بود، undefined
-    technicalExplanation: technicalExplanation || undefined as any, // اگر خالی بود، undefined
-    remediation: remediation || undefined as any, // اگر خالی بود، undefined
-    relatedSymbols,
+    executionPath: getStringArray(f.executionPath) || getStringArray(f.path) || [],
+    triggerConditions: getStringArray(f.triggerConditions) || getStringArray(f.conditions) || [],
+    consequence: getSafeString(f.consequence, getSafeString(f.impact, getSafeString(f.effect, 'No consequence provided.'))),
+    technicalExplanation: getSafeString(f.technicalExplanation, getSafeString(f.details, 'No technical explanation provided.')),
+    remediation: getSafeString(f.remediation, getSafeString(f.fix, getSafeString(f.solution, 'No remediation provided.'))),
+    relatedSymbols: getStringArray(f.relatedSymbols) || getStringArray(f.symbols) || [],
     testToReproduce,
   };
 }
@@ -550,9 +474,6 @@ function mapToBroadCategory(legacy: string): AuditFinding['category'] {
   return mapping[legacy] || 'other';
 }
 
-/**
- * Extract mechanism strings from a finding, then filter to only those valid.
- */
 function extractMechanisms(finding: Record<string, unknown>): string[] {
   const mechanisms: string[] = [];
   const legacyCategory = getSafeString(finding.category ?? finding.type);
@@ -589,10 +510,6 @@ function extractMechanisms(finding: Record<string, unknown>): string[] {
   return mechanisms;
 }
 
-// ============================================================
-// Execution Overview Normalization
-// ============================================================
-
 function normalizeExecutionOverview(source: unknown): ExecutionOverview {
   const input = getSafeObject(source);
   return {
@@ -603,10 +520,6 @@ function normalizeExecutionOverview(source: unknown): ExecutionOverview {
     resourceLifecycle: getStringArray(input.resourceLifecycle),
   };
 }
-
-// ============================================================
-// Architectural Observations Normalization
-// ============================================================
 
 function normalizeArchitecturalObservations(
   source: unknown,
@@ -623,10 +536,6 @@ function normalizeArchitecturalObservations(
     })
     .filter((obs) => obs.title.length > 0 || obs.explanation.length > 0);
 }
-
-// ============================================================
-// Recommended Actions Normalization
-// ============================================================
 
 function normalizeRecommendedActions(
   source: unknown,
@@ -648,10 +557,6 @@ function normalizeRecommendedActions(
     .map((act, index) => ({ ...act, priority: index + 1 }));
 }
 
-// ============================================================
-// Suggested Tests Normalization
-// ============================================================
-
 function normalizeSuggestedTests(
   source: unknown,
   findingIds: Set<string>
@@ -671,25 +576,9 @@ function normalizeSuggestedTests(
     .filter((test) => test.title.length > 0 || test.purpose.length > 0);
 }
 
-// ============================================================
-// Language Normalization
-// ============================================================
-
 function normalizeLanguage(source: unknown): string {
   return getSafeString(source, 'unknown');
 }
-
-function normalizeResponseLanguage(source: unknown): 'English' | 'Persian' | null {
-  const value = getSafeString(source);
-  if (value === 'English' || value === 'Persian') {
-    return value;
-  }
-  return null;
-}
-
-// ============================================================
-// Helper: Create minimal audit from partial data
-// ============================================================
 
 function createMinimalAuditFromPartial(
   raw: unknown,
@@ -709,7 +598,6 @@ function createMinimalAuditFromPartial(
       repairApplied: true,
       title,
       language: language || 'unknown',
-      responseLanguage: normalizeResponseLanguage(input.responseLanguage),
       analysisCoverage: normalizeAnalysisCoverage(input.analysisCoverage ?? input.coverage ?? {}),
       summary: summary || 'Partial analysis due to schema mismatch.',
       executionOverview: normalizeExecutionOverview(input.executionOverview ?? input.overview ?? {}),
@@ -734,7 +622,7 @@ function createMinimalAuditFromPartial(
       verdict: normalizeVerdict(input.verdict ?? input.finalVerdict ?? {}),
       limitations: getStringArray(input.limitations).length > 0 ? getStringArray(input.limitations) : ['Analysis is incomplete due to data validation issues.'],
       improvedCode: normalizeImprovedCode(input.improvedCode ?? input.improved_code ?? {}),
-      linkedin_post: getSafeString(input.linkedin_post ?? input.linkedinPost) || DEFAULT_LINKEDIN_POST,
+      linkedinPost: getSafeString(input.linkedinPost ?? input.linkedin_post) || DEFAULT_LINKEDIN_POST,
     };
 
     return minimal;
@@ -743,10 +631,6 @@ function createMinimalAuditFromPartial(
     return null;
   }
 }
-
-// ============================================================
-// Main Normalizer
-// ============================================================
 
 export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
   const startTime = Date.now();
@@ -763,7 +647,6 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
   );
 
   const language = normalizeLanguage(input.language);
-  const responseLanguage = normalizeResponseLanguage(input.responseLanguage);
 
   const findingsSource =
     input.findings ??
@@ -775,17 +658,9 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
   const findingsArray = getSafeArray<unknown>(findingsSource, []);
   const usedIds = new Set<string>();
 
-  // ============================================================
-  // 🔥 نرمالایز کردن Findings با حفظ محتوای اصلی
-  // ============================================================
   const normalizedFindings: AuditFinding[] = findingsArray
     .map((f: unknown, index: number) => normalizeFinding(f, index, usedIds))
-    .filter((finding) => {
-      // حداقل یک فیلد معتبر داشته باشد (عنوان، شواهد، یا توضیح فنی)
-      return finding.title.trim().length > 0 || 
-             finding.evidence.length > 0 || 
-             (finding.technicalExplanation && finding.technicalExplanation.length > 0);
-    });
+    .filter((finding) => finding.title.trim().length > 0 || finding.evidence.length > 0);
 
   const findingIds = new Set(normalizedFindings.map((f) => f.id));
 
@@ -839,10 +714,10 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
   const limitations = getStringArray(input.limitations);
 
   let linkedinPost =
-    typeof input.linkedin_post === 'string'
-      ? input.linkedin_post.trim()
-      : typeof input.linkedinPost === 'string'
-        ? input.linkedinPost.trim()
+    typeof input.linkedinPost === 'string'
+      ? input.linkedinPost.trim()
+      : typeof input.linkedin_post === 'string'
+        ? input.linkedin_post.trim()
         : '';
 
   if (!linkedinPost) {
@@ -861,7 +736,6 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
     repairApplied,
     title,
     language,
-    responseLanguage,
     analysisCoverage,
     summary,
     executionOverview,
@@ -874,7 +748,7 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
     verdict,
     limitations,
     improvedCode,
-    linkedin_post: linkedinPost,
+    linkedinPost,
   };
 
   try {
@@ -889,7 +763,6 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
       logger.info('[Normalizer] Returning minimal audit with partial data');
       return minimal;
     }
-    // در نهایت، همان داده‌های ناقص را با لاگ برگردان
     logger.error('[Normalizer] Returning partial data as fallback');
     return result;
   }

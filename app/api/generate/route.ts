@@ -118,9 +118,8 @@ function validateResponse(result: unknown): LegacyGenerateResponse {
  * while also preserving all canonical fields for storage and UI.
  */
 function mapCanonicalToLegacy(canonical: any): LegacyGenerateResponse {
-  // ساخت یک شیء واحد با تمام فیلدها (بدون تکرار نام)
-  return {
-    // ===== فیلدهای Legacy اصلی =====
+  // فیلدهای Legacy اصلی
+  const legacy: LegacyGenerateResponse = {
     analysis: canonical.summary || '',
     card_title: canonical.title || 'Code Analysis',
     key_concept: canonical.summary?.slice(0, 2000) || '',
@@ -129,7 +128,7 @@ function mapCanonicalToLegacy(canonical: any): LegacyGenerateResponse {
     optimization: canonical.recommendedActions?.length
       ? canonical.recommendedActions.map((a: any) => a.title).join('; ')
       : '-',
-    linkedin_post: canonical.linkedin_post || 'Check out this code analysis! #Zbloue',
+    linkedin_post: canonical.linkedinPost || 'Check out this code analysis! #Zbloue',
     codeWalkthrough: [],
     whatWorksWell: [],
     bugsAndRiskyCases: [],
@@ -145,9 +144,8 @@ function mapCanonicalToLegacy(canonical: any): LegacyGenerateResponse {
           notes: canonical.improvedCode.notes || '',
         }
       : undefined,
-    // 🔥 استفاده از suggestedTests برای داده‌های جدید
-    suggestedTests: canonical.suggestedTests || [], // داده‌های جدید در اینجا قرار می‌گیرند
-    // 🔥 scorecard: undefined حذف شد تا با مقدار کانونیکال تداخل نداشته باشد
+    suggestedTests: [],
+    scorecard: undefined,
     finalVerdict: canonical.verdict
       ? {
           summary: canonical.verdict.explanation,
@@ -156,14 +154,14 @@ function mapCanonicalToLegacy(canonical: any): LegacyGenerateResponse {
         }
       : undefined,
     error: undefined,
-
-    // ===== فیلدهای کانونیکال (برای ذخیره‌سازی و نمایش Full Analysis) =====
+    // فیلدهای کانونیکال برای ذخیره‌سازی در دیتابیس و نمایش Full Analysis
     findings: canonical.findings || [],
     executionOverview: canonical.executionOverview || null,
     architecturalObservations: canonical.architecturalObservations || [],
     recommendedActions: canonical.recommendedActions || [],
+    suggestedTests: canonical.suggestedTests || [],
     complexity: canonical.complexity || null,
-    scorecard: canonical.scorecard || null, // تنها یک بار تعریف شده
+    scorecard: canonical.scorecard || null,
     verdict: canonical.verdict || null,
     limitations: canonical.limitations || [],
     analysisCoverage: canonical.analysisCoverage || [],
@@ -173,8 +171,11 @@ function mapCanonicalToLegacy(canonical: any): LegacyGenerateResponse {
     title: canonical.title || 'Code Analysis',
     summary: canonical.summary || '',
     debug_trace: canonical.debug_trace || undefined,
+    // 🔥 اضافه کردن audit_result برای ذخیره‌سازی کامل
     audit_result: canonical,
   };
+
+  return legacy;
 }
 
 // ============================================================

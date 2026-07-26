@@ -18,7 +18,6 @@ export const ConfidenceSchema = z.enum(['definite', 'likely', 'conditional']);
 
 export const FindingIdSchema = z.string().regex(/^F-\d{3,}$/, 'Finding ID must match F-XXX');
 
-// ===== New taxonomy =====
 export const BroadCategorySchema = z.enum([
   'correctness',
   'concurrency',
@@ -55,20 +54,16 @@ export const MechanismSchema = z.enum([
   'retry-amplification',
 ]);
 
-// ===== Specializations =====
 export const SpecializationSchema = z.enum(['concurrency']);
 
-// ===== Coverage status =====
 export const CoverageStatusSchema = z.enum(['analyzed', 'not-applicable', 'limited']);
 
-// ===== Completion status (separate from repair) =====
 export const CompletionStatusSchema = z.enum(['complete', 'partially-complete']);
 
 // ============================================================
-// 3. Nested schemas (strict)
+// 3. Nested schemas
 // ============================================================
 
-// ---- Evidence ----
 export const EvidenceItemSchema = z
   .object({
     startLine: z.number().int().positive(),
@@ -81,21 +76,20 @@ export const EvidenceItemSchema = z
   })
   .strict();
 
-// ---- Finding (new taxonomy) ----
 export const AuditFindingSchema = z
   .object({
     id: FindingIdSchema,
     title: NonEmptyTextSchema,
     category: BroadCategorySchema,
-    mechanisms: z.array(MechanismSchema).default([]), // ✅ اصلاح: default []
+    mechanisms: z.array(MechanismSchema).default([]),
     severity: SeveritySchema,
     confidence: ConfidenceSchema,
-    evidence: z.array(EvidenceItemSchema).default([]), // ✅ اصلاح: default []
-    executionPath: z.array(NonEmptyTextSchema).default([]), // ✅ اصلاح: default []
-    triggerConditions: z.array(z.string()).default([]), // ✅ اصلاح: default [] و قبول هر string
-    consequence: z.string().default('No consequence provided.'), // ✅ اصلاح: default
-    technicalExplanation: z.string().default('No technical explanation provided.'), // ✅ اصلاح: default
-    remediation: z.string().default('No remediation provided.'), // ✅ اصلاح: default
+    evidence: z.array(EvidenceItemSchema).default([]),
+    executionPath: z.array(NonEmptyTextSchema).default([]),
+    triggerConditions: z.array(z.string()).default([]),
+    consequence: z.string().default('No consequence provided.'),
+    technicalExplanation: z.string().default('No technical explanation provided.'),
+    remediation: z.string().default('No remediation provided.'),
     relatedSymbols: z.array(z.string()).default([]),
     testToReproduce: z
       .object({
@@ -105,17 +99,16 @@ export const AuditFindingSchema = z
         expectedResult: NonEmptyTextSchema,
       })
       .nullable()
-      .default(null), // ✅ اصلاح: default null
+      .default(null),
   })
   .strict();
 
-// ---- Scorecard item (discriminated union for applicability) ----
 export const ApplicableScoreItemSchema = z
   .object({
     applicable: z.literal(true),
     score: z.number().int().min(0).max(100),
     reason: NonEmptyTextSchema,
-    relatedFindings: z.array(z.string()).default([]), // ✅ اصلاح: قبول هر string به جای FindingIdSchema
+    relatedFindingIds: z.array(z.string()).default([]),
   })
   .strict();
 
@@ -124,7 +117,7 @@ export const NotApplicableScoreItemSchema = z
     applicable: z.literal(false),
     score: z.null(),
     reason: NonEmptyTextSchema,
-    relatedFindings: z.array(z.never()), // must be empty
+    relatedFindingIds: z.array(z.never()),
   })
   .strict();
 
@@ -133,7 +126,6 @@ export const ScoreItemSchema = z.discriminatedUnion('applicable', [
   NotApplicableScoreItemSchema,
 ]);
 
-// ---- Scorecard ----
 export const AuditScorecardSchema = z
   .object({
     correctness: ScoreItemSchema,
@@ -146,7 +138,6 @@ export const AuditScorecardSchema = z
   })
   .strict();
 
-// ---- ImprovedCode (discriminated union) ----
 export const AvailableImprovedCodeSchema = z
   .object({
     available: z.literal(true),
@@ -168,18 +159,16 @@ export const ImprovedCodeSchema = z.discriminatedUnion('available', [
   UnavailableImprovedCodeSchema,
 ]);
 
-// ---- Recommended action ----
 export const RecommendedActionSchema = z
   .object({
     priority: z.number().int().positive(),
     severity: SeveritySchema,
     title: NonEmptyTextSchema,
     action: NonEmptyTextSchema,
-    relatedFindingIds: z.array(z.string()).default([]), // ✅ اصلاح: قبول هر string
+    relatedFindingIds: z.array(z.string()).default([]),
   })
   .strict();
 
-// ---- Analysis coverage ----
 export const AnalysisCoverageItemSchema = z
   .object({
     dimension: z.enum([
@@ -205,7 +194,6 @@ export const AnalysisCoverageItemSchema = z
   })
   .strict();
 
-// ---- Execution overview ----
 export const ExecutionOverviewSchema = z
   .object({
     entryPoints: z.array(z.string()).default([]),
@@ -216,16 +204,14 @@ export const ExecutionOverviewSchema = z
   })
   .strict();
 
-// ---- Architectural observation ----
 export const ArchitecturalObservationSchema = z
   .object({
     title: NonEmptyTextSchema,
     explanation: NonEmptyTextSchema,
-    relatedFindingIds: z.array(z.string()).default([]), // ✅ اصلاح: قبول هر string
+    relatedFindingIds: z.array(z.string()).default([]),
   })
   .strict();
 
-// ---- Suggested test ----
 export const SuggestedTestSchema = z
   .object({
     title: NonEmptyTextSchema,
@@ -233,11 +219,10 @@ export const SuggestedTestSchema = z
     setup: z.array(z.string()),
     steps: z.array(NonEmptyTextSchema).min(1),
     expectedResult: NonEmptyTextSchema,
-    relatedFindingIds: z.array(z.string()).default([]), // ✅ اصلاح: قبول هر string
+    relatedFindingIds: z.array(z.string()).default([]),
   })
   .strict();
 
-// ---- Complexity variable ----
 export const ComplexityVariableSchema = z
   .object({
     symbol: NonEmptyTextSchema,
@@ -245,7 +230,6 @@ export const ComplexityVariableSchema = z
   })
   .strict();
 
-// ---- Complexity (discriminated union) ----
 export const ApplicableComplexitySchema = z
   .object({
     applicable: z.literal(true),
@@ -271,7 +255,6 @@ export const ComplexitySchema = z.discriminatedUnion('applicable', [
   InapplicableComplexitySchema,
 ]);
 
-// ---- Verdict ----
 export const VerdictStatusSchema = z.enum([
   'not-production-ready',
   'requires-major-changes',
@@ -289,62 +272,31 @@ export const VerdictSchema = z
   .strict();
 
 // ============================================================
-// 4. Top-level Canonical Schema (با انعطاف‌پذیری بیشتر)
+// 4. Top-level Canonical Schema (نسخه نهایی بدون responseLanguage)
 // ============================================================
 
 export const AdvancedAuditResultSchema = z
   .object({
-    // ---- Metadata ----
     schemaVersion: z.literal('1.0'),
     auditType: z.literal('comprehensive'),
     appliedSpecializations: z.array(SpecializationSchema).default([]),
-
     completionStatus: CompletionStatusSchema,
     repairApplied: z.boolean(),
-
-    // ---- Title and language ----
     title: NonEmptyTextSchema,
     language: z.string().min(1),
-    responseLanguage: z.enum(['English', 'Persian']).nullable(),
-
-    // ---- Coverage ----
-    analysisCoverage: z.array(AnalysisCoverageItemSchema),
-
-    // ---- Summary ----
     summary: NonEmptyTextSchema,
-
-    // ---- Execution overview ----
+    analysisCoverage: z.array(AnalysisCoverageItemSchema),
     executionOverview: ExecutionOverviewSchema,
-
-    // ---- Findings (با default) ----
     findings: z.array(AuditFindingSchema).default([]),
-
-    // ---- Architectural observations ----
     architecturalObservations: z.array(ArchitecturalObservationSchema).default([]),
-
-    // ---- Recommended actions ----
     recommendedActions: z.array(RecommendedActionSchema).default([]),
-
-    // ---- Suggested tests ----
     suggestedTests: z.array(SuggestedTestSchema).default([]),
-
-    // ---- Complexity ----
     complexity: ComplexitySchema,
-
-    // ---- Scorecard ----
     scorecard: AuditScorecardSchema,
-
-    // ---- Verdict ----
     verdict: VerdictSchema,
-
-    // ---- Limitations ----
     limitations: z.array(NonEmptyTextSchema).default([]),
-
-    // ---- Improved code ----
     improvedCode: ImprovedCodeSchema,
-
-    // ---- LinkedIn post ----
-    linkedin_post: z.string().trim().min(1, 'LinkedIn post must not be empty').max(300, 'LinkedIn post must be at most 300 characters'),
+    linkedinPost: z.string().trim().min(1, 'LinkedIn post must not be empty').max(300, 'LinkedIn post must be at most 300 characters'),
   })
   .strict();
 
@@ -353,8 +305,6 @@ export const AdvancedAuditResultSchema = z
 // ============================================================
 
 export type AdvancedAuditResult = z.infer<typeof AdvancedAuditResultSchema>;
-
-// Re‑export key types for convenience
 export type Severity = z.infer<typeof SeveritySchema>;
 export type Confidence = z.infer<typeof ConfidenceSchema>;
 export type FindingCategory = z.infer<typeof BroadCategorySchema>;

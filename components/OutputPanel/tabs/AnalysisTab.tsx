@@ -24,7 +24,7 @@ interface AnalysisTabProps {
   onDownloadFullAnalysis?: () => void;
 }
 
-// ===== Helper: detect JSON and extract readable text (enhanced) =====
+// ===== Helper: detect JSON and extract readable text =====
 function formatText(text: string): string {
   if (!text) return '';
   const trimmed = text.trim();
@@ -57,7 +57,7 @@ function formatText(text: string): string {
   return text;
 }
 
-// ===== Clean markdown (with JSON detection) =====
+// ===== Clean markdown =====
 const cleanMarkdown = (text: string) => {
   if (!text) return '';
   const formatted = formatText(text);
@@ -71,7 +71,7 @@ const cleanMarkdown = (text: string) => {
   return cleaned;
 };
 
-// ===== Clean text for copy (with JSON detection) =====
+// ===== Clean text for copy =====
 const cleanTextForCopy = (text: string) => {
   if (!text) return '';
   const formatted = formatText(text);
@@ -112,9 +112,7 @@ export default function AnalysisTab({
 }: AnalysisTabProps) {
   const [copySuccess, setCopySuccess] = useState(false);
 
-  // ============================================================
-  // 🔥 تشخیص وجود فیلدهای کانونیکال
-  // ============================================================
+  // 🔥 تشخیص وجود فیلدهای کانونیکال (از audit_result یا مستقیم)
   const hasFindings = fullAnalysis?.findings && Array.isArray(fullAnalysis.findings) && fullAnalysis.findings.length > 0;
   const hasExecutionOverview = fullAnalysis?.executionOverview && typeof fullAnalysis.executionOverview === 'object';
   const hasArchitecturalObservations = fullAnalysis?.architecturalObservations && Array.isArray(fullAnalysis.architecturalObservations) && fullAnalysis.architecturalObservations.length > 0;
@@ -123,10 +121,9 @@ export default function AnalysisTab({
   const hasLimitations = fullAnalysis?.limitations && Array.isArray(fullAnalysis.limitations) && fullAnalysis.limitations.length > 0;
   const hasScorecardNew = fullAnalysis?.scorecard && typeof fullAnalysis.scorecard === 'object';
   const hasSuggestedTests = fullAnalysis?.suggestedTests && Array.isArray(fullAnalysis.suggestedTests) && fullAnalysis.suggestedTests.length > 0;
+  const hasLinkedInPost = fullAnalysis?.linkedinPost && typeof fullAnalysis.linkedinPost === 'string' && fullAnalysis.linkedinPost.length > 0;
 
-  // ============================================================
-  // 🔥 استخراج امتیازات از scorecard_new
-  // ============================================================
+  // 🔥 استخراج امتیازات از scorecard
   const getScoreValue = (scoreItem: any): number | null => {
     if (!scoreItem) return null;
     if (typeof scoreItem === 'number') return scoreItem;
@@ -138,9 +135,7 @@ export default function AnalysisTab({
 
   const scorecardDisplay = hasScorecardNew ? fullAnalysis.scorecard : null;
 
-  // ============================================================
-  // 🔥 تابع کپی و دانلود (ادغام با legacy)
-  // ============================================================
+  // ===== تابع کپی و دانلود =====
   const getAnalysisText = () => {
     if (!fullAnalysis) return '';
 
@@ -304,18 +299,15 @@ export default function AnalysisTab({
     URL.revokeObjectURL(url);
   };
 
-  // ============================================================
-  // 🔥 نمایش Advanced (با فیلدهای کانونیکال)
-  // ============================================================
+  // ===== نمایش Advanced =====
   if (isAdvanced && fullAnalysis) {
     return (
       <div className="space-y-6">
-        {/* ===== Header with Copy/Download ===== */}
+        {/* Header */}
         <div className="flex justify-end items-center gap-3 pb-2 border-b-2 border-[#e8e8f0]">
           <button
             onClick={handleCopy}
             className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md transition border border-[#d0d0d8] text-[#4a4a6a] hover:text-[#4a86f7] hover:bg-[#f1f3f5]"
-            title="Copy full analysis"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
@@ -325,7 +317,6 @@ export default function AnalysisTab({
           <button
             onClick={handleDownload}
             className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md transition border border-[#d0d0d8] text-[#4a4a6a] hover:text-[#4a86f7] hover:bg-[#f1f3f5]"
-            title="Download analysis as text file"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -334,7 +325,7 @@ export default function AnalysisTab({
           </button>
         </div>
 
-        {/* ===== Title and Summary ===== */}
+        {/* Title and Summary */}
         <div>
           <h2 className="text-2xl font-bold text-[#1a1a2e]">{safeString(fullAnalysis.card_title || fullAnalysis.title || 'Advanced Analysis')}</h2>
           {fullAnalysis.key_concept && (
@@ -349,7 +340,7 @@ export default function AnalysisTab({
           )}
         </div>
 
-        {/* ===== Findings (کانونیکال) ===== */}
+        {/* Findings */}
         {hasFindings && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-3">🔍 Findings</h3>
@@ -401,7 +392,7 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* ===== Execution Overview ===== */}
+        {/* Execution Overview */}
         {hasExecutionOverview && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-2">⚡ Execution Overview</h3>
@@ -440,7 +431,7 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* ===== Architectural Observations ===== */}
+        {/* Architectural Observations */}
         {hasArchitecturalObservations && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-2">🏗️ Architectural Observations</h3>
@@ -458,7 +449,7 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* ===== Recommended Actions ===== */}
+        {/* Recommended Actions */}
         {hasRecommendedActions && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-2">🔧 Recommended Actions</h3>
@@ -484,7 +475,7 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* ===== Complexity ===== */}
+        {/* Complexity */}
         {hasComplexity && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-2">📈 Complexity</h3>
@@ -523,18 +514,16 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* ===== Suggested Tests (با تشخیص خودکار ساختار) ===== */}
+        {/* Suggested Tests (با تشخیص خودکار ساختار) */}
         {hasSuggestedTests && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-2">🧪 Suggested Tests</h3>
             <div className="space-y-2">
               {(fullAnalysis.suggestedTests ?? []).map((test: any, idx: number) => {
-                // تشخیص ساختار داده: اگر test.title و test.steps وجود داشته باشد => جدید (Canonical)
                 const isNew = test && typeof test === 'object' && test.title && test.steps && Array.isArray(test.steps);
                 return (
                   <div key={idx} className="p-2 border-b border-[#d0d0d8] last:border-0">
                     {isNew ? (
-                      // ===== نمایش جدید (Canonical) =====
                       <>
                         <p className="font-medium text-[#1a1a2e]">{safeString(test.title)}</p>
                         {test.purpose && <p className="text-sm text-[#4a4a6a]">Purpose: {safeString(test.purpose)}</p>}
@@ -566,17 +555,13 @@ export default function AnalysisTab({
                         )}
                       </>
                     ) : (
-                      // ===== نمایش قدیمی (Legacy) =====
+                      // Legacy format
                       <>
                         <p className="font-medium text-[#1a1a2e]">{safeString(test.name)}</p>
                         {test.input && <p className="text-sm text-[#4a4a6a]">Input: {safeString(test.input)}</p>}
                         {test.expectedOutput && <p className="text-sm text-[#4a4a6a]">Expected: {safeString(test.expectedOutput)}</p>}
                         {test.type && (
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${
-                            test.type === 'Invalid' ? 'bg-red-100 text-red-700' :
-                            test.type === 'Edge' ? 'bg-yellow-100 text-yellow-700' :
-                            'bg-blue-100 text-blue-700'
-                          }`}>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${test.type === 'Invalid' ? 'bg-red-100 text-red-700' : test.type === 'Edge' ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-100 text-blue-700'}`}>
                             {safeString(test.type)}
                           </span>
                         )}
@@ -589,7 +574,7 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* ===== Legacy sections (for backward compatibility) ===== */}
+        {/* Legacy sections (for backward compatibility) */}
         {safeArray(fullAnalysis.codeWalkthrough).length > 0 && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-2">🧩 Code Walkthrough</h3>
@@ -734,7 +719,7 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* ===== Scorecard (با پشتیبانی از scorecard_new) ===== */}
+        {/* Scorecard */}
         {hasScorecardNew && scorecardDisplay && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-2">📊 Scorecard</h3>
@@ -756,7 +741,7 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* ===== Verdict ===== */}
+        {/* Verdict */}
         {fullAnalysis.verdict && (
           <div className={`p-4 rounded-lg border ${fullAnalysis.verdict.status === 'approved' || fullAnalysis.verdict.status === 'approved-with-suggestions' ? 'bg-green-50 border-green-200' : 'bg-orange-50 border-orange-200'}`}>
             <h3 className="font-semibold text-[#1a1a2e]">🏁 Verdict</h3>
@@ -767,7 +752,7 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* ===== Limitations ===== */}
+        {/* Limitations */}
         {hasLimitations && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#e53935] mb-2">⚠️ Limitations</h3>
@@ -777,7 +762,15 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* ===== Debug info (if available) ===== */}
+        {/* LinkedIn Post (جدید) */}
+        {hasLinkedInPost && (
+          <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
+            <h3 className="font-semibold text-[#4a86f7] mb-2">💼 LinkedIn Post</h3>
+            <p className="text-sm text-[#4a4a6a] whitespace-pre-wrap">{safeString(fullAnalysis.linkedinPost)}</p>
+          </div>
+        )}
+
+        {/* Debug info */}
         {(fullAnalysis as any).debug_trace && process.env.NODE_ENV === 'development' && (
           <details className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <summary className="cursor-pointer text-sm font-medium text-[#1a1a2e]">🔍 Debug Trace</summary>
@@ -790,9 +783,7 @@ export default function AnalysisTab({
     );
   }
 
-  // ============================================================
-  // 🔥 Simple / Medium mode
-  // ============================================================
+  // ===== Simple / Medium mode =====
   if (!quickAnalysisText) {
     return <div className="text-[#4a4a6a]">No quick analysis available.</div>;
   }
