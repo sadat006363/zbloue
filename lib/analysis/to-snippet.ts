@@ -26,7 +26,7 @@ export function toSnippetInsert(
 ): SnippetInsert {
   const now = new Date().toISOString();
 
-  // 🔥 استفاده از as SnippetInsert برای bypass کردن TypeScript
+  // 🔥 فقط فیلدهای ضروری در Root باقی می‌مانند
   const row = {
     // ===== Primary keys =====
     slug: context.slug,
@@ -45,15 +45,15 @@ export function toSnippetInsert(
     // تمام داده‌های تحلیلی فقط در اینجا ذخیره می‌شوند
     audit_result: audit as any,
 
-    // ===== فیلدهای Legacy - همه nullable هستند =====
+    // ===== 🔥 همه فیلدهای Legacy = null =====
     card_title: null,
     key_concept: null,
     what_this_code_does: null,
     debug_analysis: null,
     optimization: null,
     linkedin_post: null,
+    summary: null,
 
-    // Legacy fields - all null
     code_walkthrough: null,
     what_works_well: null,
     bugs_and_risky_cases: null,
@@ -69,7 +69,6 @@ export function toSnippetInsert(
     final_verdict_approved: null,
     final_verdict_next_steps: null,
 
-    // Advanced fields - all null (data in audit_result)
     findings: null,
     execution_overview: null,
     architectural_observations: null,

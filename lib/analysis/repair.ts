@@ -166,6 +166,24 @@ function sanitizeRepairedData(data: any): any {
     cleaned.completionStatus = 'partially-complete';
   }
 
+  // 🔥 10. 🔥 🔥 🔥 کاهش confidence برای Queue-related findings 🔥 🔥 🔥
+  if (Array.isArray(cleaned.findings)) {
+    cleaned.findings = cleaned.findings.map((finding: any) => {
+      // اگر finding مربوط به Queue Contract باشد و confidence = definite باشد
+      if (finding.title && 
+          (finding.title.includes('Queue Contract') || 
+           finding.title.includes('queue') || 
+           finding.title.includes('Queue')) && 
+          finding.confidence === 'definite') {
+        return {
+          ...finding,
+          confidence: 'likely', // ← از definite به likely
+        };
+      }
+      return finding;
+    });
+  }
+
   return cleaned;
 }
 

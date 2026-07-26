@@ -60,7 +60,7 @@ async function generateUniqueSlug(retries = MAX_SLUG_RETRIES): Promise<string> {
 }
 
 // ============================================================
-// 3. POST Handler - فقط فیلدهای ضروری در root
+// 3. POST Handler
 // ============================================================
 
 export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
@@ -188,7 +188,7 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
   }
 
   // ============================================================
-  // 🔥 Response: فقط فیلدهای ضروری در root
+  // 🔥 Response: فقط فیلدهای ضروری در Root
   // ============================================================
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || '';
