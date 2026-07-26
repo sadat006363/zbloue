@@ -11,8 +11,6 @@ import { getBaseSystemInstructions } from './analysis/prompts/base';
 
 function buildSimplePrompt(code: string, language: string): string {
   return `
-${getBaseSystemInstructions()}
-
 You are a friendly programming mentor. Provide a simple, high-level explanation of the following code.
 Focus on:
 - What the code does overall.
@@ -28,8 +26,6 @@ Return your analysis as plain text (not JSON). Do not wrap it in Markdown code b
 
 function buildMediumPrompt(code: string, language: string): string {
   return `
-${getBaseSystemInstructions()}
-
 You are a senior developer. Provide a detailed analysis of the following code.
 Include:
 - A high-level summary.
@@ -79,14 +75,10 @@ function extractTextFromResponse(content: unknown): string {
   }
   const trimmed = content.trim();
 
-  // If it looks like JSON, try to parse it
   if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
     try {
       const parsed = JSON.parse(trimmed);
-
-      // If it's an object, try to find a text field
       if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
-        // Comprehensive list of possible keys that might contain the answer
         const possibleKeys = [
           'analysis', 'summary', 'explanation', 'text',
           'response', 'output', 'result', 'content', 'message',
@@ -98,20 +90,14 @@ function extractTextFromResponse(content: unknown): string {
             return parsed[key];
           }
         }
-        // If only one key exists and it's a string, return it
         const keys = Object.keys(parsed);
         if (keys.length === 1 && typeof parsed[keys[0]] === 'string') {
           return parsed[keys[0]];
         }
-        // Otherwise, return a readable representation of the object
-        // (this should rarely happen, but fallback to pretty-print)
         return `[Analysis Result]\n${JSON.stringify(parsed, null, 2)}`;
       }
-
-      // If it's an array or other, pretty-print
       return JSON.stringify(parsed, null, 2);
     } catch {
-      // Not valid JSON, return as is
       return content;
     }
   }
@@ -133,10 +119,10 @@ export async function generateEducationalContent(
   let userPrompt: string;
 
   if (mode === 'simple') {
-    systemPrompt = getBaseSystemInstructions();
+    systemPrompt = 'You are a friendly programming mentor. Return your response as plain text.';
     userPrompt = buildSimplePrompt(code, language);
   } else if (mode === 'medium') {
-    systemPrompt = getBaseSystemInstructions();
+    systemPrompt = 'You are a senior developer. Return your response as plain text.';
     userPrompt = buildMediumPrompt(code, language);
   } else {
     systemPrompt = 'You are an expert code auditor. Return only valid JSON.';
@@ -145,10 +131,9 @@ export async function generateEducationalContent(
 
   try {
     if (mode === 'simple' || mode === 'medium') {
-      // 🔥 Pass the mode explicitly so that the correct model is used
       const content = await callOpenAI(systemPrompt, userPrompt, {
         responseFormat: 'text',
-        mode: mode, // 'simple' or 'medium'
+        mode: mode,
       });
       const text = extractTextFromResponse(content);
 
@@ -162,7 +147,6 @@ export async function generateEducationalContent(
         linkedin_post: 'Check out this code analysis! #Zbloue',
       };
     } else {
-      // advanced: JSON response
       const content = await callOpenAIJson<any>(systemPrompt, userPrompt, {
         responseFormat: 'json_object',
         mode: 'advanced',
@@ -178,7 +162,7 @@ export async function generateEducationalContent(
         optimization: parsed.recommendedActions?.length
           ? parsed.recommendedActions.map((a: any) => a.title).join('; ')
           : '-',
-        linkedin_post: parsed.linkedin_post || 'Check out this code analysis! #Zbloue',
+        linkedin_post: parsed.linkedinPost || 'Check out this code analysis! #Zbloue',
         codeWalkthrough: [],
         whatWorksWell: [],
         bugsAndRiskyCases: [],
