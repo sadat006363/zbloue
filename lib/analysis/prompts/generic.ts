@@ -52,7 +52,7 @@ Keep identifiers, code, enum values, IDs, and schema keys unchanged.
 You must return a JSON object with the following structure. **All fields are mandatory and must contain meaningful values.**
 
 {
-  "schemaVersion": "1.0",
+  "schemaVersion": "1.0.0",
   "auditType": "comprehensive",
   "appliedSpecializations": [],
   "completionStatus": "complete",

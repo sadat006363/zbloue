@@ -277,7 +277,7 @@ export const VerdictSchema = z
 
 export const AdvancedAuditResultSchema = z
   .object({
-    schemaVersion: z.literal('1.0'),
+    schemaVersion: z.literal('1.0.0'),
     auditType: z.literal('comprehensive'),
     appliedSpecializations: z.array(SpecializationSchema).default([]),
     completionStatus: CompletionStatusSchema,

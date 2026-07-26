@@ -6,9 +6,6 @@ import type { Database } from '@/types/supabase';
 type SnippetInsert = Database['public']['Tables']['snippets']['Insert'];
 type SnippetRow = Database['public']['Tables']['snippets']['Row'];
 
-/**
- * زمینه مورد نیاز برای ایجاد یک Snippet از Audit
- */
 export interface SnippetCreationContext {
   rawCode: string;
   sourceLanguage: string;
@@ -36,7 +33,6 @@ export function toSnippetInsert(
     language: context.sourceLanguage,
 
     // 🔥 فیلدهای Legacy را با مقادیر پیش‌فرض یا از audit_result پر می‌کنیم
-    // تا ستون‌های اجباری دیتابیس خالی نمانند
     card_title: audit.title || 'Code Analysis',
     key_concept: audit.summary?.slice(0, 2000) || '',
     what_this_code_does: audit.executionOverview?.entryPoints?.join(', ') || '',
@@ -55,7 +51,6 @@ export function toSnippetInsert(
     created_at: now,
     schema_version: '1.0',
 
-    // ===== فیلدهای Legacy را `null` می‌گذاریم چون از `audit_result` استخراج می‌شوند =====
     code_walkthrough: null,
     what_works_well: null,
     bugs_and_risky_cases: null,
@@ -71,7 +66,6 @@ export function toSnippetInsert(
     final_verdict_approved: null,
     final_verdict_next_steps: null,
 
-    // ===== فیلدهای Advanced (JSONB) را `null` می‌گذاریم =====
     findings: null,
     execution_overview: null,
     architectural_observations: null,
@@ -82,7 +76,6 @@ export function toSnippetInsert(
     verdict: null,
     limitations: null,
 
-    // 🔥 فقط `audit_result` را به‌عنوان JSONB ذخیره می‌کنیم
     audit_result: audit as any,
   };
 
@@ -125,9 +118,6 @@ export function legacyRowToAudit(row: SnippetRow | any): AdvancedAuditResult | n
        row.execution_overview.taskSubmissionPoints?.length > 0 ||
        row.execution_overview.blockingWaitPoints?.length > 0);
 
-    // ============================================================
-    // 1️⃣ نرمالایز کردن complexity
-    // ============================================================
     let complexity = row.complexity || {};
     if (typeof complexity.applicable !== 'boolean') {
       complexity = {
@@ -139,9 +129,6 @@ export function legacyRowToAudit(row: SnippetRow | any): AdvancedAuditResult | n
       };
     }
 
-    // ============================================================
-    // 2️⃣ نرمالایز کردن scorecard
-    // ============================================================
     let scorecard: any = row.scorecard_new || row.scorecard || null;
     if (!scorecard || typeof scorecard !== 'object') {
       scorecard = {
@@ -155,9 +142,6 @@ export function legacyRowToAudit(row: SnippetRow | any): AdvancedAuditResult | n
       };
     }
 
-    // ============================================================
-    // 3️⃣ improvedCode
-    // ============================================================
     let improvedCode: any;
     if (row.improved_code_jsonb) {
       improvedCode = row.improved_code_jsonb;
@@ -175,9 +159,6 @@ export function legacyRowToAudit(row: SnippetRow | any): AdvancedAuditResult | n
       };
     }
 
-    // ============================================================
-    // 4️⃣ verdict
-    // ============================================================
     let verdict: any;
     if (row.verdict) {
       verdict = row.verdict;
@@ -193,9 +174,6 @@ export function legacyRowToAudit(row: SnippetRow | any): AdvancedAuditResult | n
       };
     }
 
-    // ============================================================
-    // 5️⃣ analysisCoverage
-    // ============================================================
     const coverageDimensions = [
       'correctness',
       'security',
@@ -223,9 +201,6 @@ export function legacyRowToAudit(row: SnippetRow | any): AdvancedAuditResult | n
       limitation: null,
     }));
 
-    // ============================================================
-    // 6️⃣ ساخت Audit نهایی
-    // ============================================================
     const audit: Partial<AdvancedAuditResult> = {
       schemaVersion: '1.0',
       auditType: 'comprehensive',
@@ -267,10 +242,6 @@ export function legacyRowToAudit(row: SnippetRow | any): AdvancedAuditResult | n
     return null;
   }
 }
-
-// ============================================================
-// 🔥 اعتبارسنجی Context ورودی
-// ============================================================
 
 export function isValidSnippetContext(context: SnippetCreationContext): boolean {
   if (!context.rawCode || context.rawCode.trim().length === 0) {

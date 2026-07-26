@@ -24,7 +24,6 @@ interface AnalysisTabProps {
   onDownloadFullAnalysis?: () => void;
 }
 
-// ===== Helper: detect JSON and extract readable text =====
 function formatText(text: string): string {
   if (!text) return '';
   const trimmed = text.trim();
@@ -57,7 +56,6 @@ function formatText(text: string): string {
   return text;
 }
 
-// ===== Clean markdown =====
 const cleanMarkdown = (text: string) => {
   if (!text) return '';
   const formatted = formatText(text);
@@ -71,7 +69,6 @@ const cleanMarkdown = (text: string) => {
   return cleaned;
 };
 
-// ===== Clean text for copy =====
 const cleanTextForCopy = (text: string) => {
   if (!text) return '';
   const formatted = formatText(text);
@@ -85,12 +82,10 @@ const cleanTextForCopy = (text: string) => {
   return cleaned;
 };
 
-// ===== Safe array helper =====
 const safeArray = <T,>(arr: T[] | undefined | null): T[] => {
   return Array.isArray(arr) ? arr : [];
 };
 
-// ===== Severity badge helper =====
 function severityBadge(severity: string): string {
   const map: Record<string, string> = {
     critical: 'bg-red-500/20 text-red-400 border border-red-500/30',
@@ -112,7 +107,6 @@ export default function AnalysisTab({
 }: AnalysisTabProps) {
   const [copySuccess, setCopySuccess] = useState(false);
 
-  // 🔥 تشخیص وجود فیلدهای کانونیکال (از audit_result یا مستقیم)
   const hasFindings = fullAnalysis?.findings && Array.isArray(fullAnalysis.findings) && fullAnalysis.findings.length > 0;
   const hasExecutionOverview = fullAnalysis?.executionOverview && typeof fullAnalysis.executionOverview === 'object';
   const hasArchitecturalObservations = fullAnalysis?.architecturalObservations && Array.isArray(fullAnalysis.architecturalObservations) && fullAnalysis.architecturalObservations.length > 0;
@@ -121,10 +115,8 @@ export default function AnalysisTab({
   const hasLimitations = fullAnalysis?.limitations && Array.isArray(fullAnalysis.limitations) && fullAnalysis.limitations.length > 0;
   const hasScorecardNew = fullAnalysis?.scorecard && typeof fullAnalysis.scorecard === 'object';
   const hasSuggestedTests = fullAnalysis?.suggestedTests && Array.isArray(fullAnalysis.suggestedTests) && fullAnalysis.suggestedTests.length > 0;
-  // 🔥 اصلاح: استفاده از linkedin_post (Legacy) به‌جای linkedinPost
   const hasLinkedInPost = fullAnalysis?.linkedin_post && typeof fullAnalysis.linkedin_post === 'string' && fullAnalysis.linkedin_post.length > 0;
 
-  // 🔥 استخراج امتیازات از scorecard
   const getScoreValue = (scoreItem: any): number | null => {
     if (!scoreItem) return null;
     if (typeof scoreItem === 'number') return scoreItem;
@@ -136,7 +128,6 @@ export default function AnalysisTab({
 
   const scorecardDisplay = hasScorecardNew ? fullAnalysis.scorecard : null;
 
-  // ===== تابع کپی و دانلود =====
   const getAnalysisText = () => {
     if (!fullAnalysis) return '';
 
@@ -152,7 +143,6 @@ export default function AnalysisTab({
         text += `📝 Summary:\n${safeString(fullAnalysis.summary)}\n\n`;
       }
 
-      // Findings
       if (hasFindings) {
         text += `🔍 Findings:\n`;
         fullAnalysis.findings.forEach((f: any) => {
@@ -172,7 +162,6 @@ export default function AnalysisTab({
         text += `\n`;
       }
 
-      // Execution Overview
       if (hasExecutionOverview) {
         const eo = fullAnalysis.executionOverview;
         text += `⚡ Execution Overview:\n`;
@@ -194,7 +183,6 @@ export default function AnalysisTab({
         text += `\n`;
       }
 
-      // Architectural Observations
       if (hasArchitecturalObservations) {
         text += `🏗️ Architectural Observations:\n`;
         fullAnalysis.architecturalObservations.forEach((obs: any) => {
@@ -203,7 +191,6 @@ export default function AnalysisTab({
         text += `\n`;
       }
 
-      // Recommended Actions
       if (hasRecommendedActions) {
         text += `🔧 Recommended Actions:\n`;
         fullAnalysis.recommendedActions.forEach((action: any) => {
@@ -213,7 +200,6 @@ export default function AnalysisTab({
         text += `\n`;
       }
 
-      // Complexity
       if (hasComplexity) {
         const c = fullAnalysis.complexity;
         text += `📈 Complexity:\n`;
@@ -235,7 +221,6 @@ export default function AnalysisTab({
         text += `\n`;
       }
 
-      // Scorecard
       if (hasScorecardNew) {
         const sc = fullAnalysis.scorecard as any;
         if (sc && typeof sc === 'object') {
@@ -253,7 +238,6 @@ export default function AnalysisTab({
         }
       }
 
-      // Verdict
       if (fullAnalysis.verdict) {
         text += `🏁 Verdict:\n`;
         text += `  Status: ${safeString(fullAnalysis.verdict.status)}\n`;
@@ -261,7 +245,6 @@ export default function AnalysisTab({
         text += `\n`;
       }
 
-      // Limitations
       if (hasLimitations) {
         text += `⚠️ Limitations:\n`;
         fullAnalysis.limitations.forEach((lim: string) => {
@@ -300,11 +283,9 @@ export default function AnalysisTab({
     URL.revokeObjectURL(url);
   };
 
-  // ===== نمایش Advanced =====
   if (isAdvanced && fullAnalysis) {
     return (
       <div className="space-y-6">
-        {/* Header */}
         <div className="flex justify-end items-center gap-3 pb-2 border-b-2 border-[#e8e8f0]">
           <button
             onClick={handleCopy}
@@ -326,7 +307,6 @@ export default function AnalysisTab({
           </button>
         </div>
 
-        {/* Title and Summary */}
         <div>
           <h2 className="text-2xl font-bold text-[#1a1a2e]">{safeString(fullAnalysis.card_title || fullAnalysis.title || 'Advanced Analysis')}</h2>
           {fullAnalysis.key_concept && (
@@ -341,7 +321,6 @@ export default function AnalysisTab({
           )}
         </div>
 
-        {/* Findings */}
         {hasFindings && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-3">🔍 Findings</h3>
@@ -393,7 +372,6 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* Execution Overview */}
         {hasExecutionOverview && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-2">⚡ Execution Overview</h3>
@@ -432,7 +410,6 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* Architectural Observations */}
         {hasArchitecturalObservations && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-2">🏗️ Architectural Observations</h3>
@@ -450,7 +427,6 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* Recommended Actions */}
         {hasRecommendedActions && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-2">🔧 Recommended Actions</h3>
@@ -476,7 +452,6 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* Complexity */}
         {hasComplexity && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-2">📈 Complexity</h3>
@@ -515,7 +490,6 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* Suggested Tests (با تشخیص خودکار ساختار) */}
         {hasSuggestedTests && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-2">🧪 Suggested Tests</h3>
@@ -556,7 +530,6 @@ export default function AnalysisTab({
                         )}
                       </>
                     ) : (
-                      // Legacy format
                       <>
                         <p className="font-medium text-[#1a1a2e]">{safeString(test.name)}</p>
                         {test.input && <p className="text-sm text-[#4a4a6a]">Input: {safeString(test.input)}</p>}
@@ -575,7 +548,6 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* Legacy sections (for backward compatibility) */}
         {safeArray(fullAnalysis.codeWalkthrough).length > 0 && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-2">🧩 Code Walkthrough</h3>
@@ -720,7 +692,6 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* Scorecard */}
         {hasScorecardNew && scorecardDisplay && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-2">📊 Scorecard</h3>
@@ -742,7 +713,6 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* Verdict */}
         {fullAnalysis.verdict && (
           <div className={`p-4 rounded-lg border ${fullAnalysis.verdict.status === 'approved' || fullAnalysis.verdict.status === 'approved-with-suggestions' ? 'bg-green-50 border-green-200' : 'bg-orange-50 border-orange-200'}`}>
             <h3 className="font-semibold text-[#1a1a2e]">🏁 Verdict</h3>
@@ -753,7 +723,6 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* Limitations */}
         {hasLimitations && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#e53935] mb-2">⚠️ Limitations</h3>
@@ -763,7 +732,6 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* LinkedIn Post (با استفاده از linkedin_post) */}
         {hasLinkedInPost && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-2">💼 LinkedIn Post</h3>
@@ -771,7 +739,6 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* Debug info */}
         {(fullAnalysis as any).debug_trace && process.env.NODE_ENV === 'development' && (
           <details className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <summary className="cursor-pointer text-sm font-medium text-[#1a1a2e]">🔍 Debug Trace</summary>
@@ -784,7 +751,6 @@ export default function AnalysisTab({
     );
   }
 
-  // ===== Simple / Medium mode =====
   if (!quickAnalysisText) {
     return <div className="text-[#4a4a6a]">No quick analysis available.</div>;
   }

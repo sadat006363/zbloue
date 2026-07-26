@@ -28,9 +28,6 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-// ============================================================
-// 🔥 Helper: safe slice
-// ============================================================
 function safeSlice(value: unknown, start: number, end?: number): string {
   if (typeof value === 'string') {
     return value.slice(start, end);
@@ -38,9 +35,6 @@ function safeSlice(value: unknown, start: number, end?: number): string {
   return '';
 }
 
-// ============================================================
-// 🔥 Helper: extract text from possible JSON response
-// ============================================================
 function extractTextFromAnalysis(value: unknown): string {
   if (typeof value !== 'string') {
     return String(value);
@@ -75,9 +69,6 @@ function extractTextFromAnalysis(value: unknown): string {
   return value;
 }
 
-// ============================================================
-// 🔥 Helper: Convert legacy response to UI-friendly format
-// ============================================================
 function normalizeLegacyResponse(data: LegacyGenerateResponse): {
   card_title: string;
   key_concept: string;
@@ -123,9 +114,6 @@ function normalizeLegacyResponse(data: LegacyGenerateResponse): {
   };
 }
 
-// ============================================================
-// 🔥 Helper: Build PromptInfo from response (safe)
-// ============================================================
 function buildPromptInfo(
   mode: AnalysisMode,
   data: LegacyGenerateResponse,
@@ -178,7 +166,6 @@ export default function HomePage() {
     dispatch({ type: 'SET_ERROR', payload: null });
   }, [dispatch]);
 
-  // ===== Generate analysis =====
   const handleGenerate = useCallback(async () => {
     if (!code.trim()) {
       setErrorMessage('Please enter some code to analyze.');
@@ -212,16 +199,13 @@ export default function HomePage() {
       const normalizedGithubUsername = githubUsername && githubUsername.trim() !== '' ? githubUsername : undefined;
       const normalizedAvatarUrl = avatarUrl && avatarUrl.trim() !== '' ? avatarUrl : undefined;
 
-      // ============================================================
       // 🔥 ساخت saveData با فقط audit_result و فیلدهای ضروری
-      // ============================================================
       const saveData = {
         code: cleanedCode,
         language,
         username: normalizedUsername,
         github_username: normalizedGithubUsername,
         avatar_url: normalizedAvatarUrl,
-        // 🔥 فقط audit_result را ارسال می‌کنیم
         audit_result: genData.audit_result,
       };
 
@@ -231,7 +215,6 @@ export default function HomePage() {
         throw new Error(saveResult.error || 'Failed to save snippet');
       }
 
-      // ساخت snippetData برای UI (از audit_result و پاسخ save)
       const snippetData: Snippet = {
         id: saveResult.id,
         slug: saveResult.slug,
@@ -311,7 +294,6 @@ export default function HomePage() {
     }
   }, [code, language, mode, username, githubUsername, avatarUrl, dispatch, clearError]);
 
-  // ===== Generate line-by-line explanation =====
   const handleExplain = useCallback(async () => {
     if (!code.trim()) {
       setErrorMessage('Please enter some code to explain.');
@@ -349,7 +331,6 @@ export default function HomePage() {
     }
   }, [code, language, mode, outputs, dispatch, clearError]);
 
-  // ===== Generate prompt =====
   const handleGeneratePrompt = useCallback(async () => {
     if (!code.trim()) {
       setErrorMessage('Please enter some code to generate a prompt.');
@@ -387,7 +368,6 @@ export default function HomePage() {
     }
   }, [code, language, mode, outputs, dispatch, clearError]);
 
-  // ===== Convert code =====
   const handleConvert = useCallback(async (targetLang: string) => {
     if (!code.trim()) {
       setErrorMessage('Please enter some code to convert.');
@@ -410,13 +390,11 @@ export default function HomePage() {
     }
   }, [code, language, dispatch, clearError]);
 
-  // ===== Clear all =====
   const handleClear = useCallback(() => {
     dispatch({ type: 'CLEAR_ALL' });
     clearError();
   }, [dispatch, clearError]);
 
-  // ===== Update username =====
   const handleUsernameChange = useCallback((name: string) => {
     dispatch({ type: 'SET_USERNAME', payload: name });
   }, [dispatch]);
@@ -425,13 +403,11 @@ export default function HomePage() {
     dispatch({ type: 'SET_GITHUB_USERNAME', payload: name });
   }, [dispatch]);
 
-  // ===== Toast =====
   const showToast = useCallback((message: string) => {
     dispatch({ type: 'SET_TOAST', payload: message });
     setTimeout(() => dispatch({ type: 'SET_TOAST', payload: null }), 3000);
   }, [dispatch]);
 
-  // ===== Keyboard shortcut: Ctrl+Enter =====
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {

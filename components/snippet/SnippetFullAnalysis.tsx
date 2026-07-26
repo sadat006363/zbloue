@@ -29,10 +29,6 @@ import {
   LegacyScorecard,
 } from '@/types';
 
-// ============================================================
-// Types
-// ============================================================
-
 export interface Evidence {
   startLine: number;
   endLine: number;
@@ -102,17 +98,9 @@ export interface UnifiedTest {
   };
 }
 
-// ============================================================
-// Component Props
-// ============================================================
-
 export interface SnippetFullAnalysisProps {
   snippet: any;
 }
-
-// ============================================================
-// Language extension mapping
-// ============================================================
 
 const languageExtensions: Record<string, Extension> = {
   javascript: javascript(),
@@ -127,10 +115,6 @@ const languageExtensions: Record<string, Extension> = {
   cpp: cpp(),
   php: php(),
 };
-
-// ============================================================
-// Helper functions
-// ============================================================
 
 function renderValue(value: unknown): React.ReactNode {
   if (value === null || value === undefined) {
@@ -243,14 +227,8 @@ function severityBadge(severity: string): string {
   return map[severity] || map.info;
 }
 
-// ============================================================
-// Main Component
-// ============================================================
-
 export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProps) {
-  // ===== Scorecard (با پشتیبانی از هر دو ساختار) =====
   const { scorecardDisplay, scorecardIsNew, scorecardMax } = useMemo(() => {
-    // اولویت: audit_result.scorecard > scorecard_new > scorecard
     let display = null;
     let isNew = false;
 
@@ -365,28 +343,13 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
   const language = snippet.language || 'javascript';
   const langExtension = languageExtensions[language] || javascript();
 
-  // 🔥 تابع کمکی برای دریافت findings از audit_result یا مستقیم
   const findings = snippet?.audit_result?.findings || snippet?.findings || [];
-
-  // 🔥 تابع کمکی برای دریافت executionOverview
   const executionOverview = snippet?.audit_result?.executionOverview || snippet?.execution_overview || null;
-
-  // 🔥 تابع کمکی برای دریافت architecturalObservations
   const architecturalObservations = snippet?.audit_result?.architecturalObservations || snippet?.architectural_observations || [];
-
-  // 🔥 تابع کمکی برای دریافت recommendedActions
   const recommendedActions = snippet?.audit_result?.recommendedActions || snippet?.recommended_actions || [];
-
-  // 🔥 تابع کمکی برای دریافت complexity
   const complexity = snippet?.audit_result?.complexity || snippet?.complexity || null;
-
-  // 🔥 تابع کمکی برای دریافت limitations
   const limitations = snippet?.audit_result?.limitations || snippet?.limitations || [];
-
-  // 🔥 تابع کمکی برای دریافت improvedCode
   const improvedCode = snippet?.audit_result?.improvedCode || snippet?.improved_code || null;
-
-  // 🔥 تابع کمکی برای دریافت linkedinPost
   const linkedinPost = snippet?.audit_result?.linkedinPost || snippet?.linkedin_post || null;
 
   return (
@@ -426,9 +389,7 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
           <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
             <h3 className="text-lg font-semibold text-[#a6e3a1]">✅ What Works Well</h3>
             <ul className="list-disc list-inside space-y-1 text-[#cdd6f4]">
-              {snippet.what_works_well.map((item: string, idx: number) => (
-                <li key={idx}>{item}</li>
-              ))}
+              {snippet.what_works_well.map((item: string, idx: number) => <li key={idx}>{item}</li>)}
             </ul>
           </div>
         )}
@@ -464,7 +425,6 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
           </>
         )}
 
-        {/* Findings (از audit_result یا مستقیم) */}
         {hasFindings && (
           <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
             <h3 className="text-lg font-semibold text-[#89b4fa]">🔍 Findings</h3>
@@ -519,7 +479,6 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
           </div>
         )}
 
-        {/* Execution Overview */}
         {executionOverview && (
           <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
             <h3 className="text-lg font-semibold text-[#89b4fa]">⚡ Execution Overview</h3>
@@ -558,7 +517,6 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
           </div>
         )}
 
-        {/* Architectural Observations */}
         {architecturalObservations.length > 0 && (
           <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
             <h3 className="text-lg font-semibold text-[#89b4fa]">🏗️ Architectural Observations</h3>
@@ -576,7 +534,6 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
           </div>
         )}
 
-        {/* Recommended Actions */}
         {recommendedActions.length > 0 && (
           <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
             <h3 className="text-lg font-semibold text-[#a6e3a1]">🔧 Recommended Actions</h3>
@@ -602,7 +559,6 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
           </div>
         )}
 
-        {/* Complexity */}
         {complexity && (
           <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
             <h3 className="text-lg font-semibold text-[#89b4fa]">📈 Complexity</h3>
@@ -643,7 +599,6 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
           </div>
         )}
 
-        {/* Performance Analysis (legacy fallback) */}
         {snippet.performance_analysis && !complexity && (
           <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
             <h3 className="text-lg font-semibold text-[#89b4fa]">⚡ Performance Analysis</h3>
@@ -680,7 +635,6 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
           </div>
         )}
 
-        {/* Improved Code */}
         {improvedCode && improvedCode.available && improvedCode.code && (
           <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
             <h3 className="text-lg font-semibold text-[#89b4fa]">✨ Improved Code</h3>
@@ -704,7 +658,6 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
           </div>
         )}
 
-        {/* Suggested Tests */}
         {suggestedTests.length > 0 && (
           <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
             <h3 className="text-lg font-semibold text-[#89b4fa]">🧪 Suggested Tests</h3>
@@ -739,7 +692,6 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
           </div>
         )}
 
-        {/* Scorecard */}
         {scorecardDisplay && (
           <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
             <h3 className="text-lg font-semibold text-[#89b4fa]">
@@ -769,7 +721,6 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
           </div>
         )}
 
-        {/* Verdict */}
         {verdictDisplay && (
           <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
             <h3 className="text-lg font-semibold text-[#89b4fa]">🏁 Verdict</h3>
@@ -792,19 +743,15 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
           </div>
         )}
 
-        {/* Limitations */}
         {limitations.length > 0 && (
           <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
             <h3 className="text-lg font-semibold text-[#f38ba8]">⚠️ Limitations</h3>
             <ul className="list-disc list-inside space-y-1 mt-2 text-sm text-[#a6adc8]">
-              {limitations.map((lim: string, idx: number) => (
-                <li key={idx}>{lim}</li>
-              ))}
+              {limitations.map((lim: string, idx: number) => <li key={idx}>{lim}</li>)}
             </ul>
           </div>
         )}
 
-        {/* LinkedIn Post */}
         {linkedinPost && (
           <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
             <h3 className="text-lg font-semibold text-[#89b4fa]">💼 LinkedIn Post</h3>

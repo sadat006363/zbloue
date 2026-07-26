@@ -118,9 +118,7 @@ function validateResponse(result: unknown): LegacyGenerateResponse {
  * while also preserving all canonical fields for storage and UI.
  */
 function mapCanonicalToLegacy(canonical: any): LegacyGenerateResponse {
-  // ساخت یک شیء واحد با تمام فیلدها (بدون تکرار نام)
   return {
-    // ===== فیلدهای Legacy اصلی =====
     analysis: canonical.summary || '',
     card_title: canonical.title || 'Code Analysis',
     key_concept: canonical.summary?.slice(0, 2000) || '',
@@ -155,8 +153,6 @@ function mapCanonicalToLegacy(canonical: any): LegacyGenerateResponse {
         }
       : undefined,
     error: undefined,
-
-    // ===== فیلدهای کانونیکال (برای ذخیره‌سازی و نمایش Full Analysis) =====
     findings: canonical.findings || [],
     executionOverview: canonical.executionOverview || null,
     architecturalObservations: canonical.architecturalObservations || [],
@@ -183,7 +179,6 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
   const startTime = Date.now();
   const ip = getClientIP(req);
 
-  // Rate limiting
   const rateLimitResult = await rateLimiter(ip);
   if (!rateLimitResult.allowed) {
     logger.warn(`[generate] Rate limit exceeded for IP ${ip}`);
@@ -193,7 +188,6 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
     );
   }
 
-  // Parse request
   let rawBody: unknown;
   try {
     rawBody = await req.json();
@@ -201,7 +195,6 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
     return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
   }
 
-  // Validate using canonical request schema
   const validation = GenerateRequestSchema.safeParse(rawBody);
   if (!validation.success) {
     const firstError = validation.error.issues[0];
@@ -237,12 +230,10 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
     return NextResponse.json({ error: 'Payload too large (max 100KB)' }, { status: 413 });
   }
 
-  // Check cache
   const cacheKey = getCacheKey(code, language, mode);
   const cached = getCachedResult(cacheKey);
   if (cached) {
     logger.info(`[generate] Cache hit for IP ${ip}, mode ${mode}, key ${cacheKey.slice(0, 8)}...`);
-    // بازگرداندن فقط audit_result و metadata ساده
     return NextResponse.json({
       audit_result: cached.result.audit_result,
       language,
@@ -250,7 +241,6 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
     });
   }
 
-  // Mock support
   if (process.env.USE_MOCK_RESPONSE === 'true' && mode === 'advanced') {
     logger.info(`[generate] Using mock response for advanced mode (IP ${ip})`);
     const mock = validateResponse(MOCK_RESPONSE);
@@ -262,7 +252,6 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
     });
   }
 
-  // Actual generation
   let legacyResult: LegacyGenerateResponse;
   let pipelineTrace: unknown = null;
 
@@ -314,7 +303,6 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
     legacyResult = validateResponse(legacyData);
   }
 
-  // Cache the result
   setCacheResult(cacheKey, legacyResult, pipelineTrace);
 
   const duration = Date.now() - startTime;

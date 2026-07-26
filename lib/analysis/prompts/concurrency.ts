@@ -106,7 +106,7 @@ Each finding MUST include:
 - mechanisms: Array of applicable mechanisms (e.g., ["resource-leak", "deadlock", "thread-starvation"]). Use [] if none.
 - severity: critical, high, medium, low, or info.
 - confidence: definite, likely, or conditional.
-- evidence: 🔥 MUST contain at least ONE object with startLine, endLine, code (exact excerpt), and explanation. Use the numbered source code to find exact line numbers.
+- evidence: MUST contain at least ONE object with startLine, endLine, code (exact excerpt), and explanation. Use the numbered source code to find exact line numbers.
 - executionPath: Array of method/function names leading to the issue.
 - triggerConditions: Array of conditions that trigger the issue.
 - consequence: What happens if the issue is not fixed (min 20 characters).
@@ -146,41 +146,48 @@ if (timeLimitMillis > 0) {
 - If maxConcurrentThreads > 1 → **high** (risk under load when all threads are busy with outer tasks)
 
 **Finding specifications:**
-- title: "Thread Starvation Deadlock in Same-Executor Submission" (or similar)
+- title: "Thread Starvation Self-Deadlock in Same-Executor Submission" (or similar)
 - severity: "critical" (if maxConcurrentThreads = 1) or "high"
 - confidence: "definite" (if proven by code) or "likely"
 - mechanisms: ["deadlock", "thread-starvation"]
 - category: "concurrency"
-- remediation: "Refactor to use a separate executor for timeout, or avoid submitting inner tasks to the same pool. Consider using a dedicated timeout mechanism outside the executor."
+- remediation: "Use a dedicated executor or separate thread for timeout enforcement, or restructure the design to avoid submitting inner tasks to the same pool and then waiting on them."
 
 **If you find this pattern, create a separate finding with the above specifications.**
 
-==================== DUPLICATE SUBMISSION DETECTION (HIGH PRIORITY) ====================
+==================== QUEUE CONTRACT VIOLATION DETECTION (HIGH PRIORITY) ====================
 
-🔥 **DUPLICATE SUBMISSION DETECTION - MUST BE REPORTED AS SEPARATE FINDING:**
+🔥 **QUEUE CONTRACT VIOLATION - MUST BE REPORTED AS SEPARATE FINDING:**
 
-This occurs when the same task (Runnable/FutureTask) is submitted to the executor more than once, causing queue pollution and unpredictable behavior.
+This occurs when a task is manually inserted into the executor's queue via executor.getQueue().offer(...) and then also passed to executor.execute(...), mixing two distinct submission paths.
 
 **When to report:**
 - You see a task being added to the queue via executor.getQueue().offer(...) and then also submitted via executor.execute(...).
-- Or you see a task submitted twice through any combination of methods.
+- This violates the executor's internal queuing contract and can cause inconsistent behavior.
 
 **Example pattern:**
 if (!executor.getQueue().offer(futureTask, maxWaitMillis, ...)) { ... }
-executor.execute(futureTask);  // ← SAME TASK submitted again!
+executor.execute(futureTask);  // ← same task submitted via two paths!
 
-**Severity:** high (can cause queue capacity exhaustion and rejection errors)
+**Severity:** high (can cause queue capacity exhaustion, rejection errors, and unpredictable scheduling)
 
 **Finding specifications (MUST USE THESE):**
-- **id**: Sequential (e.g., F-003)
-- **title**: "Duplicate Task Submission to Executor" (or similar)
+- **id**: Sequential (e.g., F-002)
+- **title**: "Queue Contract Violation via Manual Offer + Executor Execute" (or similar)
 - **severity**: "high"
 - **confidence**: "definite"
 - **mechanisms**: ["queue-misuse"]
 - **category**: "concurrency"
-- **remediation**: "Use only one submission method. Either use executor.execute() directly, or manage the queue manually with offer() and then submit via the executor's internal mechanism (but not both)."
+- **remediation**: "Use a single submission path: either rely entirely on executor.execute(...) and let the executor manage its queue, or manage the queue manually and submit via executor.execute on the same path, but never both. A cleaner fix is to remove the manual offer and use only executor.execute."
 
-🔥 **YOU MUST CREATE A SEPARATE FINDING FOR DUPLICATE SUBMISSION.** Do NOT merge it with other findings.
+**Focus on:**
+- Violation of executor queueing contract
+- Possible extra queued reference
+- Wasted queue capacity
+- Incorrect rejection/scheduling behavior
+- Do NOT claim duplicate execution unless proven
+
+🔥 **YOU MUST CREATE A SEPARATE FINDING FOR QUEUE CONTRACT VIOLATION.** Do NOT merge it with other findings.
 
 ==================== CODE SMELL / DUPLICATE LOGIC DETECTION (NEW) ====================
 
@@ -203,60 +210,15 @@ if (Objects.nonNull(poolMap.get(poolId)) && Objects.nonNull(semaphoreMap.get(poo
 **Severity:** medium (reduces maintainability)
 
 **Finding specifications (MUST USE THESE):**
-- **id**: Sequential (e.g., F-004)
-- **title**: "Repeated Map Lookups / Scattered Configuration Logic" (or similar)
+- **id**: Sequential (e.g., F-003)
+- **title**: "Configuration Mismatch Risk with Shared Pool Reuse" (or similar)
 - **severity**: "medium"
 - **confidence**: "definite"
-- **category**: "maintainability"
-- **remediation**: "Store the result of poolMap.get() and semaphoreMap.get() in local variables before checking conditions. Centralize pool creation/retrieval logic in a helper method."
+- **mechanisms**: ["configuration-collision"]
+- **category**: "api-design"
+- **remediation**: "When reusing a pool, update all relevant configuration fields (maxConcurrentThreads, maxQueueSize, maxWaitMillis) to match the actual values of the shared executor and semaphore. If that is not feasible, document that reusing a pool with different parameters is not supported and may lead to inconsistent behavior."
 
-🔥 **YOU MUST CREATE A SEPARATE FINDING FOR CODE SMELL.** Do NOT merge it with other findings.
-
-==================== INCONSISTENT DESIGN DETECTION (NEW) ====================
-
-🔥 **INCONSISTENT DESIGN DETECTION:**
-
-Detect when the code uses conflicting patterns that make behavior unpredictable.
-
-**When to report:**
-- Using ThreadPoolExecutor.AbortPolicy (or any rejection policy) while manually managing the queue with offer().
-- This creates inconsistency because the executor's rejection policy is bypassed by manual queue management.
-
-**Example pattern:**
-new ThreadPoolExecutor(..., new ThreadPoolExecutor.AbortPolicy());
-// Later:
-executor.getQueue().offer(futureTask, ...);  // ← manual queue management
-executor.execute(futureTask);
-
-**Severity:** medium (may cause unexpected rejection behavior and confusion)
-
-**Finding specifications:**
-- title: "Inconsistent Queue Management with AbortPolicy" (or similar)
-- severity: "medium"
-- confidence: "definite"
-- category: "configuration"
-- remediation: "Either rely entirely on the executor's internal queue management (remove manual offer()) or use a custom RejectedExecutionHandler if manual control is needed. Do not mix both approaches."
-
-**If you find this pattern, create a separate finding with the above specifications.**
-
-==================== DEADLOCK DETECTION (LOCK-BASED) ====================
-
-🔥 **LOCK-BASED DEADLOCK DETECTION:**
-
-If you detect a potential deadlock due to lock ordering (synchronized, ReentrantLock, etc.), create a finding with severity "critical" and mechanisms ["deadlock"].
-
-**When to report:**
-- Two or more threads/tasks acquiring locks in different orders.
-- A thread holding a lock while waiting for another resource that is held by a thread waiting for the first lock.
-
-**Finding specifications:**
-- severity: "critical"
-- confidence: "definite" or "likely"
-- title: "Potential Deadlock Detected" (or more specific)
-- category: "concurrency"
-- mechanisms: ["deadlock"]
-
-**If you find this pattern, create a separate finding with the above specifications.**
+🔥 **YOU MUST CREATE A SEPARATE FINDING FOR CONFIGURATION MISMATCH.** Do NOT merge it with other findings.
 
 ==================== EXECUTION OVERVIEW (MANDATORY - COMPLETE ALL FIELDS) ====================
 
@@ -324,7 +286,7 @@ Track task identity, executor identity, queue, etc.
 
 - Thread-starvation: require explicit saturation path.
 - Deadlock: require complete wait-for cycle (or strong evidence of one).
-- Duplicate submission: require two distinct successful paths.
+- Queue contract violation: require evidence of both offer and execute on the same task.
 - Interruption: do not report merely because InterruptedException is caught.
 
 ==================== COUNTERARGUMENT GATE ====================
@@ -368,22 +330,6 @@ Categories: correctness, concurrencySafety, liveness, errorHandling, resourceMan
 - If you are not confident, or the fix requires architectural changes, set "available": false and explain why in "notes".
 - NEVER provide a code snippet that you are unsure about. Invalid code is worse than no code.
 
-Valid examples:
-
-- available: true (only if you are certain):
-{
-  "available": true,
-  "code": "// Correct and compilable code",
-  "notes": "Explanation of the fix."
-}
-
-- available: false (when unsure or need architecture changes):
-{
-  "available": false,
-  "code": null,
-  "notes": "Fixing the duplicate submission pattern requires architectural changes that may break existing APIs."
-}
-
 **Do NOT invent missing APIs, types, imports, or dependencies.**
 **Prefer minimal, targeted fixes over broad rewrites.**
 **If safe fix depends on missing context, set available to false.**
@@ -420,7 +366,6 @@ Do NOT include "responseLanguage" field.
 🔥 Each finding MUST have a descriptive title, detailed technical explanation, and actionable remediation.
 🔥 Each finding MUST have at least ONE evidence item with startLine, endLine, code, and explanation.
 🔥 executionOverview MUST have ALL fields filled (entryPoints, taskSubmissionPoints, blockingWaitPoints, sharedResources, resourceLifecycle).
-🔥 If a deadlock is detected, create a separate finding with severity "critical" and mechanism ["deadlock"].
 🔥 Use "relatedFindingIds" (camelCase) for all finding references.
 🔥 Use "linkedinPost" (camelCase) for the LinkedIn post field.
 🔥 Do NOT include "responseLanguage" in the output.
