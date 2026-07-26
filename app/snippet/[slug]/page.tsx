@@ -211,14 +211,14 @@ export default async function SnippetPage({ params }: PageProps) {
   // 🔥 استفاده از normalizedAudit برای تشخیص وجود تحلیل کامل
   const fullAnalysisExists = normalizedAudit ? normalizedAudit.hasFullAnalysis : false;
 
-  // 🔥 بررسی وجود Scorecard معتبر (اعداد واقعی)
-  const hasValidScorecard = useMemo(() => {
+  // 🔥 بررسی وجود Scorecard معتبر (اعداد واقعی) - بدون useMemo
+  const hasValidScorecard = (() => {
     const sc = snippet.scorecard_new || snippet.audit_result?.scorecard;
     if (!sc || typeof sc !== 'object') return false;
     return Object.values(sc).some((item: any) => 
       item?.applicable === true && typeof item?.score === 'number' && item.score > 0
     );
-  }, [snippet.scorecard_new, snippet.audit_result]);
+  })();
 
   const debugData = {
     fullAnalysisExists,
