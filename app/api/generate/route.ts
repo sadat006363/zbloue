@@ -171,6 +171,7 @@ function mapCanonicalToLegacy(canonical: any): LegacyGenerateResponse {
     title: canonical.title || 'Code Analysis',
     summary: canonical.summary || '',
     debug_trace: canonical.debug_trace || undefined,
+    // 🔥 اضافه کردن audit_result به خروجی
     audit_result: canonical,
   };
 }
@@ -242,9 +243,17 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
   const cached = getCachedResult(cacheKey);
   if (cached) {
     logger.info(`[generate] Cache hit for IP ${ip}, mode ${mode}, key ${cacheKey.slice(0, 8)}...`);
-    // 🔥 بازگرداندن فقط audit_result و metadata ساده
+    // بازگرداندن فقط audit_result و metadata ساده
+    const auditResult = cached.result.audit_result;
+    if (!auditResult) {
+      logger.error('[generate] Cached result missing audit_result');
+      return NextResponse.json(
+        { error: 'Invalid cached data' },
+        { status: 500 }
+      );
+    }
     return NextResponse.json({
-      audit_result: cached.result.audit_result,
+      audit_result: auditResult,
       language,
       raw_code: code,
     });
@@ -255,16 +264,25 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
     logger.info(`[generate] Using mock response for advanced mode (IP ${ip})`);
     const mock = validateResponse(MOCK_RESPONSE);
     setCacheResult(cacheKey, mock);
+    const auditResult = mock.audit_result;
+    if (!auditResult) {
+      logger.error('[generate] Mock response missing audit_result');
+      return NextResponse.json(
+        { error: 'Invalid mock data' },
+        { status: 500 }
+      );
+    }
     return NextResponse.json({
-      audit_result: mock.audit_result,
+      audit_result: auditResult,
       language,
       raw_code: code,
     });
   }
 
   // Actual generation
-  let legacyResult: LegacyGenerateResponse;
+  let legacyResult: LegacyGenerateResponse | null = null;
   let pipelineTrace: unknown = null;
+  let auditResult: any = null;
 
   if (mode === 'advanced') {
     logger.info(`[generate] Running advanced pipeline for IP ${ip}`);
@@ -276,6 +294,7 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
         const validated = AdvancedAuditResultSchema.safeParse(pipelineResult.result);
         if (validated.success) {
           legacyResult = mapCanonicalToLegacy(validated.data);
+          auditResult = validated.data; // 🔥 ذخیره audit_result از داده‌های اعتبارسنجی‌شده
           if (pipelineResult.trace) {
             (legacyResult as any).debug_trace = pipelineResult.trace;
           }
@@ -284,45 +303,81 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
           logger.warn('[generate] Pipeline output failed schema validation, falling back to legacy');
           const legacyData = await generateEducationalContent(code, language, mode);
           legacyResult = validateResponse(legacyData);
+          // 🔥 در Fallback، audit_result را از legacyResult بگیریم
+          auditResult = (legacyResult as any).audit_result || null;
         }
       } else {
         logger.warn(`[generate] Advanced pipeline failed: ${pipelineResult.error}`);
         const legacyData = await generateEducationalContent(code, language, mode);
         legacyResult = validateResponse(legacyData);
+        auditResult = (legacyResult as any).audit_result || null;
       }
 
-      if (pipelineResult.trace) {
+      // ============================================================
+      // 🔥 اضافه کردن trace به legacyResult در همه حالت‌ها
+      // ============================================================
+      if (pipelineResult.trace && legacyResult) {
         (legacyResult as any).debug_trace = pipelineResult.trace;
-      } else if (pipelineResult.error) {
+      } else if (pipelineResult.error && legacyResult) {
         (legacyResult as any).debug_trace = {
           error: pipelineResult.error,
           status: pipelineResult.status,
         };
       }
+
+      // ============================================================
+      // 🔥 اگر auditResult هنوز null است، از legacyResult بگیر
+      // ============================================================
+      if (!auditResult && legacyResult) {
+        auditResult = (legacyResult as any).audit_result || null;
+      }
+
     } catch (error) {
       logger.error('[generate] Pipeline error, falling back to legacy:', error);
       const legacyData = await generateEducationalContent(code, language, mode);
       legacyResult = validateResponse(legacyData);
-      (legacyResult as any).debug_trace = {
-        error: error instanceof Error ? error.message : 'Unknown pipeline error',
-        timestamp: new Date().toISOString(),
-      };
+      auditResult = (legacyResult as any).audit_result || null;
+      if (legacyResult) {
+        (legacyResult as any).debug_trace = {
+          error: error instanceof Error ? error.message : 'Unknown pipeline error',
+          timestamp: new Date().toISOString(),
+        };
+      }
     }
   } else {
+    // Simple / Medium modes
     logger.info(`[generate] Running legacy generation for mode ${mode} (IP ${ip})`);
     const legacyData = await generateEducationalContent(code, language, mode);
     legacyResult = validateResponse(legacyData);
+    auditResult = (legacyResult as any).audit_result || null;
   }
 
-  // Cache the result
-  setCacheResult(cacheKey, legacyResult, pipelineTrace);
+  // ============================================================
+  // 🔥 اعتبارسنجی نهایی: auditResult باید وجود داشته باشد
+  // ============================================================
+  if (!auditResult) {
+    logger.error('[generate] Final audit_result is missing');
+    return NextResponse.json(
+      { error: 'Failed to generate audit result' },
+      { status: 500 }
+    );
+  }
+
+  // ============================================================
+  // 🔥 Cache the result (با نگهداری audit_result در cached.result)
+  // ============================================================
+  if (legacyResult) {
+    setCacheResult(cacheKey, legacyResult, pipelineTrace);
+  }
 
   const duration = Date.now() - startTime;
   logger.info(`[generate] Request completed in ${duration}ms for mode ${mode} (IP ${ip})`);
 
+  // ============================================================
   // 🔥 بازگرداندن فقط audit_result و metadata ساده
+  // ============================================================
   return NextResponse.json({
-    audit_result: legacyResult.audit_result,
+    audit_result: auditResult,
     language,
     raw_code: code,
   });
