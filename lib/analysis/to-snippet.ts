@@ -26,7 +26,6 @@ export function toSnippetInsert(
 ): SnippetInsert {
   const now = new Date().toISOString();
 
-  // 🔥 فقط فیلدهای ضروری در Root باقی می‌مانند
   const row = {
     // ===== Primary keys =====
     slug: context.slug,
@@ -42,7 +41,6 @@ export function toSnippetInsert(
     created_at: now,
 
     // ===== 🔥 فقط audit_result =====
-    // تمام داده‌های تحلیلی فقط در اینجا ذخیره می‌شوند
     audit_result: audit as any,
 
     // ===== 🔥 همه فیلدهای Legacy = null =====
@@ -52,7 +50,7 @@ export function toSnippetInsert(
     debug_analysis: null,
     optimization: null,
     linkedin_post: null,
-    summary: null,
+    // 🔥 summary حذف شد (در دیتابیس وجود ندارد)
 
     code_walkthrough: null,
     what_works_well: null,
@@ -89,7 +87,6 @@ export function toSnippetInsert(
 // ============================================================
 
 export function snippetRowToAudit(row: any): AdvancedAuditResult | null {
-  // اولویت اول: audit_result
   if (row.audit_result) {
     try {
       let data = row.audit_result;
@@ -105,7 +102,6 @@ export function snippetRowToAudit(row: any): AdvancedAuditResult | null {
     }
   }
 
-  // Fallback: ساخت از فیلدهای Legacy
   return legacyRowToAudit(row);
 }
 
