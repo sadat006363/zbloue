@@ -45,7 +45,6 @@ const ALL_DIMENSIONS = [
 
 type Dimension = typeof ALL_DIMENSIONS[number];
 
-// 🔥 Helper: ایجاد analysisCoverage پیش‌فرض
 function getDefaultAnalysisCoverage(): any[] {
   return ALL_DIMENSIONS.map(dim => ({
     dimension: dim as any,
@@ -55,7 +54,6 @@ function getDefaultAnalysisCoverage(): any[] {
   }));
 }
 
-// 🔥 Helper: ایجاد executionOverview پیش‌فرض
 function getDefaultExecutionOverview(): any {
   return {
     entryPoints: [],
@@ -142,20 +140,18 @@ function createMinimalAuditFromExisting(
       ? parsed.linkedinPost 
       : (typeof parsed.linkedin_post === 'string' ? parsed.linkedin_post : 'Check out this code analysis! #Zbloue');
 
-    // 🔥 اطمینان از وجود analysisCoverage
     let analysisCoverage = Array.isArray(parsed.analysisCoverage) ? parsed.analysisCoverage : [];
     if (analysisCoverage.length === 0) {
       analysisCoverage = getDefaultAnalysisCoverage();
     }
 
-    // 🔥 اطمینان از وجود executionOverview
     let executionOverview = parsed.executionOverview || {};
     if (Object.keys(executionOverview).length === 0) {
       executionOverview = getDefaultExecutionOverview();
     }
 
     const minimal: AdvancedAuditResult = {
-      schemaVersion: '1.0',
+      schemaVersion: '1.0.0', // 🔥 اصلاح شده
       auditType: 'comprehensive',
       appliedSpecializations: auditType === 'concurrency' ? ['concurrency'] : [],
       completionStatus: 'partially-complete',
@@ -255,7 +251,7 @@ IMPORTANT: Your task is to REPAIR the structure of the JSON, NOT to rewrite the 
 
     const canonicalRepaired: AdvancedAuditResult = {
       ...repaired,
-      schemaVersion: '1.0',
+      schemaVersion: '1.0.0', // 🔥 اصلاح شده
       auditType: 'comprehensive',
       completionStatus: 'complete',
       repairApplied: true,
@@ -361,7 +357,7 @@ IMPORTANT: Your task is to REPAIR the structure of the JSON, NOT to rewrite the 
 
     const canonicalRepaired: AdvancedAuditResult = {
       ...repaired,
-      schemaVersion: '1.0',
+      schemaVersion: '1.0.0', // 🔥 اصلاح شده
       auditType: 'comprehensive',
       completionStatus: 'complete',
       repairApplied: true,
