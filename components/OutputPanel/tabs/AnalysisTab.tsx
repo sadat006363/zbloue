@@ -528,7 +528,7 @@ export default function AnalysisTab({
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-2">🧪 Suggested Tests</h3>
             <div className="space-y-2">
-              {fullAnalysis.suggestedTests.map((test: any, idx: number) => {
+              {(fullAnalysis.suggestedTests ?? []).map((test: any, idx: number) => {
                 // تشخیص ساختار داده: اگر test.title و test.steps وجود داشته باشد => جدید (Canonical)
                 const isNew = test && typeof test === 'object' && test.title && test.steps && Array.isArray(test.steps);
                 return (
