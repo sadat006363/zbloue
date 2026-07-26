@@ -66,6 +66,21 @@ The previous response failed validation or needs refinement.
 Do NOT restart with a generic review.
 Correct the specified defects and return the complete corrected JSON object.
 
+🔴 CRITICAL RULES (MUST FOLLOW):
+1. schemaVersion MUST be "1.0.0" (NOT "1.0")
+2. Use "linkedinPost" (camelCase) - NOT "linkedin_post"
+3. Use "relatedFindingIds" (camelCase) - NOT "relatedFindings"
+4. Do NOT include "responseLanguage" field
+5. PRESERVE all valid content (titles, descriptions, explanations, remediations)
+6. ONLY fix structural issues (missing fields, invalid types, empty arrays)
+7. Do NOT replace valid content with placeholder text like "No ... provided"
+8. Return only valid JSON. Do not use Markdown fences.
+
+CORRECT FIELD NAMES:
+- linkedinPost (not linkedin_post)
+- relatedFindingIds (not relatedFindings)
+- schemaVersion: "1.0.0" (not "1.0")
+
 **IMPORTANT: CANONICAL SCHEMA RULES**
 - auditType must be "comprehensive"
 - completionStatus must be "complete" (or "partially-complete" if issues remain)
@@ -129,7 +144,7 @@ ${buildUntrustedDataSection('missing-coverage', serializedCoverage)}
    - After adding, removing, or changing findings, check all references:
      - architecturalObservations[].relatedFindingIds
      - recommendedActions[].relatedFindingIds
-     - scorecard.*.relatedFindings
+     - scorecard.*.relatedFindingIds
      - suggestedTests[].relatedFindingIds (if present)
    - Every relatedFindingId must point to an existing finding in the final output.
    - No dangling IDs, duplicate IDs, or invented IDs.
@@ -139,13 +154,13 @@ ${buildUntrustedDataSection('missing-coverage', serializedCoverage)}
    - completionStatus: "complete" (if all errors fixed) or "partially-complete"
    - repairApplied: true
    - appliedSpecializations: [] or ["concurrency"]
-   - schemaVersion: "1.0"
+   - schemaVersion: "1.0.0" (NOT "1.0")
 
 7. SCORECARD (0-100 OBJECT WITH APPLICABLE FLAG)
-   - Each category is an object: { applicable, score, reason, relatedFindings }
+   - Each category is an object: { applicable, score, reason, relatedFindingIds }
    - If applicable: true → score is 0-100, reason is required
    - If applicable: false → score is null, reason explains why
-   - relatedFindings must reference existing finding IDs
+   - relatedFindingIds must reference existing finding IDs (NOT relatedFindings)
 
 8. IMPROVED CODE (DISCRIMINATED UNION)
    - Must always be present:
@@ -162,6 +177,7 @@ ${buildUntrustedDataSection('missing-coverage', serializedCoverage)}
 10. LINKEDIN POST
     - Max 300 characters, min 1 character.
     - Must be a trimmed string.
+    - Use "linkedinPost" (camelCase) NOT "linkedin_post"
 
 11. INTERNAL PRE-OUTPUT VALIDATION
     Before returning the JSON, ensure:
@@ -176,7 +192,7 @@ ${buildUntrustedDataSection('missing-coverage', serializedCoverage)}
     - Verdict status is one of the 6 canonical values.
     - improvedCode is present with correct invariants.
     - complexity follows the discriminated union.
-    - linkedin_post length is between 1 and 300.
+    - linkedinPost length is between 1 and 300.
     - The output is parseable JSON.
     - No Markdown fences, comments, or extra text.
 
@@ -188,17 +204,15 @@ ${buildUntrustedDataSection('missing-coverage', serializedCoverage)}
 ==================== CANONICAL OUTPUT CONTRACT ====================
 
 {
-  "schemaVersion": "1.0",
+  "schemaVersion": "1.0.0",
   "auditType": "comprehensive",
   "appliedSpecializations": [],
   "completionStatus": "complete",
   "repairApplied": true,
   "title": "Concise audit title",
   "language": "javascript",
-  "responseLanguage": "English",
   "analysisCoverage": [
-    { "dimension": "correctness", "status": "analyzed", "summary": "Analysis of correctness dimension.", "limitation": null },
-    // ... all 15 dimensions
+    { "dimension": "correctness", "status": "analyzed", "summary": "Analysis of correctness dimension.", "limitation": null }
   ],
   "summary": "Concise summary of findings.",
   "executionOverview": {
@@ -220,13 +234,13 @@ ${buildUntrustedDataSection('missing-coverage', serializedCoverage)}
     "assumptions": ["Input size is bounded."]
   },
   "scorecard": {
-    "correctness": { "applicable": true, "score": 80, "reason": "Good", "relatedFindings": [] },
-    "concurrencySafety": { "applicable": false, "score": null, "reason": "No concurrency", "relatedFindings": [] },
-    "liveness": { "applicable": false, "score": null, "reason": "No liveness issues", "relatedFindings": [] },
-    "errorHandling": { "applicable": true, "score": 70, "reason": "Basic error handling", "relatedFindings": [] },
-    "resourceManagement": { "applicable": true, "score": 80, "reason": "Resources managed", "relatedFindings": [] },
-    "maintainability": { "applicable": true, "score": 85, "reason": "Simple and readable", "relatedFindings": [] },
-    "productionReadiness": { "applicable": true, "score": 75, "reason": "Ready for production", "relatedFindings": [] }
+    "correctness": { "applicable": true, "score": 80, "reason": "Good", "relatedFindingIds": [] },
+    "concurrencySafety": { "applicable": false, "score": null, "reason": "No concurrency", "relatedFindingIds": [] },
+    "liveness": { "applicable": false, "score": null, "reason": "No liveness issues", "relatedFindingIds": [] },
+    "errorHandling": { "applicable": true, "score": 70, "reason": "Basic error handling", "relatedFindingIds": [] },
+    "resourceManagement": { "applicable": true, "score": 80, "reason": "Resources managed", "relatedFindingIds": [] },
+    "maintainability": { "applicable": true, "score": 85, "reason": "Simple and readable", "relatedFindingIds": [] },
+    "productionReadiness": { "applicable": true, "score": 75, "reason": "Ready for production", "relatedFindingIds": [] }
   },
   "verdict": {
     "status": "requires-changes",
@@ -238,7 +252,7 @@ ${buildUntrustedDataSection('missing-coverage', serializedCoverage)}
     "code": null,
     "notes": "No safe focused patch can be produced from the supplied context."
   },
-  "linkedin_post": "Professional summary, max 300 chars."
+  "linkedinPost": "Professional summary, max 300 chars."
 }
 
 ==================== ENUM REFERENCE ====================

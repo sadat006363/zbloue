@@ -304,8 +304,8 @@ export const AdvancedAuditResultSchema = z
     linkedinPost: z.string().trim().min(1, 'LinkedIn post must not be empty').max(300, 'LinkedIn post must be at most 300 characters'),
   })
   .strict()
-  // 🔥 حذف فیلدهای ناشناخته (responseLanguage, linkedin_post, relatedFindings)
-  .catchall(z.unknown()); // ← این اجازه می‌دهد فیلدهای اضافی نادیده گرفته شوند
+  // 🔥 اجازه می‌دهد فیلدهای اضافی نادیده گرفته شوند
+  .catchall(z.unknown());
 
 // ============================================================
 // 5. Type inference

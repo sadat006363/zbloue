@@ -64,6 +64,85 @@ function getDefaultExecutionOverview(): any {
   };
 }
 
+// ============================================================
+// 🔥 تابع کمکی برای تبدیل relatedFindings → relatedFindingIds
+// ============================================================
+function convertRelatedFindings(obj: any): any {
+  if (!obj || typeof obj !== 'object') return obj;
+  const result = { ...obj };
+  if (Array.isArray(obj.relatedFindings)) {
+    result.relatedFindingIds = obj.relatedFindings;
+    delete result.relatedFindings;
+  }
+  if (Array.isArray(obj.relatedFindingIds)) {
+    result.relatedFindingIds = obj.relatedFindingIds;
+  }
+  return result;
+}
+
+// ============================================================
+// 🔥 تابع کمکی برای پاکسازی فیلدهای اضافی
+// ============================================================
+function sanitizeRepairedData(data: any): any {
+  if (!data || typeof data !== 'object') return data;
+
+  const cleaned = { ...data };
+
+  // 1. اطمینان از schemaVersion
+  cleaned.schemaVersion = '1.0.0';
+
+  // 2. تبدیل linkedin_post → linkedinPost
+  if (cleaned.linkedin_post && !cleaned.linkedinPost) {
+    cleaned.linkedinPost = cleaned.linkedin_post;
+  }
+  delete cleaned.linkedin_post;
+
+  // 3. حذف responseLanguage
+  delete cleaned.responseLanguage;
+
+  // 4. تبدیل relatedFindings → relatedFindingIds در scorecard
+  if (cleaned.scorecard && typeof cleaned.scorecard === 'object') {
+    const scorecard = cleaned.scorecard;
+    const categories = [
+      'correctness',
+      'concurrencySafety',
+      'liveness',
+      'errorHandling',
+      'resourceManagement',
+      'maintainability',
+      'productionReadiness',
+    ];
+    for (const cat of categories) {
+      if (scorecard[cat] && typeof scorecard[cat] === 'object') {
+        scorecard[cat] = convertRelatedFindings(scorecard[cat]);
+      }
+    }
+  }
+
+  // 5. تبدیل relatedFindings → relatedFindingIds در architecturalObservations
+  if (Array.isArray(cleaned.architecturalObservations)) {
+    cleaned.architecturalObservations = cleaned.architecturalObservations.map((obs: any) =>
+      convertRelatedFindings(obs)
+    );
+  }
+
+  // 6. تبدیل relatedFindings → relatedFindingIds در recommendedActions
+  if (Array.isArray(cleaned.recommendedActions)) {
+    cleaned.recommendedActions = cleaned.recommendedActions.map((action: any) =>
+      convertRelatedFindings(action)
+    );
+  }
+
+  // 7. تبدیل relatedFindings → relatedFindingIds در suggestedTests
+  if (Array.isArray(cleaned.suggestedTests)) {
+    cleaned.suggestedTests = cleaned.suggestedTests.map((test: any) =>
+      convertRelatedFindings(test)
+    );
+  }
+
+  return cleaned;
+}
+
 function createMinimalAuditFromExisting(
   previousAudit: string,
   language: string,
@@ -136,7 +215,6 @@ function createMinimalAuditFromExisting(
           assumptions: [],
         };
 
-    // 🔥 اصلاح: استفاده از camelCase
     const linkedinPost = typeof parsed.linkedinPost === 'string' 
       ? parsed.linkedinPost 
       : (typeof parsed.linkedin_post === 'string' ? parsed.linkedin_post : 'Check out this code analysis! #Zbloue');
@@ -152,7 +230,6 @@ function createMinimalAuditFromExisting(
     }
 
     const minimal: AdvancedAuditResult = {
-      // 🔥 اصلاح: schemaVersion به صورت string معمولی
       schemaVersion: '1.0.0',
       auditType: 'comprehensive',
       appliedSpecializations: auditType === 'concurrency' ? ['concurrency'] : [],
@@ -220,17 +297,38 @@ export async function repairAudit(
       missingCoverage
     );
 
+    // 🔥 SYSTEM PROMPT اصلاح‌شده با دستورات واضح
     const systemPrompt = `You are an expert code auditor. 
 IMPORTANT: Your task is to REPAIR the structure of the JSON, NOT to rewrite the content.
-- PRESERVE all valid content (titles, descriptions, explanations, remediations).
-- ONLY fix structural issues (missing fields, invalid types, empty arrays).
-- Do NOT replace valid content with placeholder text like "No ... provided".
-- If a field is missing, keep it as null or empty array.
-- Use "schemaVersion": "1.0.0" in your output.
-- Use "linkedinPost" (camelCase) NOT "linkedin_post".
-- Use "relatedFindingIds" NOT "relatedFindings".
-- Do NOT include "responseLanguage" in the output.
-- Return only valid JSON. Do not use Markdown fences.`;
+
+🔴 CRITICAL RULES (MUST FOLLOW):
+1. schemaVersion MUST be "1.0.0" (NOT "1.0")
+2. Use "linkedinPost" (camelCase) - NOT "linkedin_post"
+3. Use "relatedFindingIds" (camelCase) - NOT "relatedFindings"
+4. Do NOT include "responseLanguage" field
+5. PRESERVE all valid content (titles, descriptions, explanations, remediations)
+6. ONLY fix structural issues (missing fields, invalid types, empty arrays)
+7. Do NOT replace valid content with placeholder text like "No ... provided"
+8. Return only valid JSON. Do not use Markdown fences.
+
+CORRECT FIELD NAMES:
+- linkedinPost (not linkedin_post)
+- relatedFindingIds (not relatedFindings)
+- schemaVersion: "1.0.0" (not "1.0")
+
+EXAMPLE OF CORRECT OUTPUT:
+{
+  "schemaVersion": "1.0.0",
+  "linkedinPost": "Professional summary...",
+  "scorecard": {
+    "correctness": {
+      "applicable": true,
+      "score": 70,
+      "reason": "...",
+      "relatedFindingIds": ["F-001"]
+    }
+  }
+}`;
 
     const rawContent = await callOpenAI(systemPrompt, prompt, {
       mode: 'advanced',
@@ -249,7 +347,10 @@ IMPORTANT: Your task is to REPAIR the structure of the JSON, NOT to rewrite the 
 
     const repaired = parseResult.data;
 
-    const semanticResult = validateSemanticIntegrity(repaired);
+    // 🔥 🔥 🔥 FORCE CORRECT FIELD NAMES 🔥 🔥 🔥
+    const sanitized = sanitizeRepairedData(repaired);
+
+    const semanticResult = validateSemanticIntegrity(sanitized);
     if (!semanticResult.isValid) {
       logger.warn('[Repair] Semantic validation failed:', semanticResult.errors);
       return createMinimalAuditFromExisting(previousAudit, language, auditType);
@@ -257,13 +358,13 @@ IMPORTANT: Your task is to REPAIR the structure of the JSON, NOT to rewrite the 
 
     // 🔥 اصلاح: اطمینان از schemaVersion صحیح و حذف فیلدهای اضافی
     const canonicalRepaired: AdvancedAuditResult = {
-      ...repaired,
-      schemaVersion: '1.0.0', // ← مقدار صحیح
+      ...sanitized,
+      schemaVersion: '1.0.0',
       auditType: 'comprehensive',
       completionStatus: 'complete',
       repairApplied: true,
-      appliedSpecializations: repaired.appliedSpecializations && repaired.appliedSpecializations.length > 0
-        ? repaired.appliedSpecializations
+      appliedSpecializations: sanitized.appliedSpecializations && sanitized.appliedSpecializations.length > 0
+        ? sanitized.appliedSpecializations
         : (auditType === 'concurrency' ? ['concurrency'] : []),
       language: language,
     };
@@ -339,15 +440,21 @@ export async function repairStructureOnly(
 
     const systemPrompt = `You are an expert code auditor. 
 IMPORTANT: Your task is to REPAIR the structure of the JSON, NOT to rewrite the content.
-- PRESERVE all valid content (titles, descriptions, explanations, remediations).
-- ONLY fix structural issues (missing fields, invalid types, empty arrays).
-- Do NOT replace valid content with placeholder text like "No ... provided".
-- If a field is missing, keep it as null or empty array.
-- Use "schemaVersion": "1.0.0" in your output.
-- Use "linkedinPost" (camelCase) NOT "linkedin_post".
-- Use "relatedFindingIds" NOT "relatedFindings".
-- Do NOT include "responseLanguage" in the output.
-- Return only valid JSON. Do not use Markdown fences.`;
+
+🔴 CRITICAL RULES (MUST FOLLOW):
+1. schemaVersion MUST be "1.0.0" (NOT "1.0")
+2. Use "linkedinPost" (camelCase) - NOT "linkedin_post"
+3. Use "relatedFindingIds" (camelCase) - NOT "relatedFindings"
+4. Do NOT include "responseLanguage" field
+5. PRESERVE all valid content (titles, descriptions, explanations, remediations)
+6. ONLY fix structural issues (missing fields, invalid types, empty arrays)
+7. Do NOT replace valid content with placeholder text like "No ... provided"
+8. Return only valid JSON. Do not use Markdown fences.
+
+CORRECT FIELD NAMES:
+- linkedinPost (not linkedin_post)
+- relatedFindingIds (not relatedFindings)
+- schemaVersion: "1.0.0" (not "1.0")`;
 
     const rawContent = await callOpenAI(systemPrompt, prompt, {
       mode: 'advanced',
@@ -365,15 +472,16 @@ IMPORTANT: Your task is to REPAIR the structure of the JSON, NOT to rewrite the 
     }
 
     const repaired = parseResult.data;
+    const sanitized = sanitizeRepairedData(repaired);
 
     const canonicalRepaired: AdvancedAuditResult = {
-      ...repaired,
+      ...sanitized,
       schemaVersion: '1.0.0',
       auditType: 'comprehensive',
       completionStatus: 'complete',
       repairApplied: true,
-      appliedSpecializations: repaired.appliedSpecializations && repaired.appliedSpecializations.length > 0
-        ? repaired.appliedSpecializations
+      appliedSpecializations: sanitized.appliedSpecializations && sanitized.appliedSpecializations.length > 0
+        ? sanitized.appliedSpecializations
         : (auditType === 'concurrency' ? ['concurrency'] : []),
       language: language,
     };
