@@ -35,7 +35,7 @@ type PipelineStatus = 'complete' | 'repaired' | 'failed_validation';
 // CONSTANTS
 // ============================================================
 
-const MAX_REPAIR_ATTEMPTS = ANALYSIS_CONFIG.maxRepairPasses; // 🔥 حالا 1 است
+const MAX_REPAIR_ATTEMPTS = ANALYSIS_CONFIG.maxRepairPasses;
 const PIPELINE_DEADLINE_MS = parseInt(process.env.PIPELINE_DEADLINE_MS || '180000', 10);
 
 // ============================================================
@@ -92,11 +92,28 @@ function finalizeAuditCandidate(
   }
 
   const payload: any = { ...candidate };
-  // 🔥 اطمینان از schemaVersion صحیح
   payload.schemaVersion = '1.0.0';
   payload.auditType = 'comprehensive';
-  payload.completionStatus = metadata.completionStatus;
-  payload.repairApplied = metadata.repairApplied;
+  
+  // 🔥 اگر candidate خودش completionStatus دارد، از آن استفاده کن
+  if (candidate && typeof candidate === 'object' && 'completionStatus' in candidate) {
+    const status = (candidate as any).completionStatus;
+    if (status === 'complete' || status === 'partially-complete') {
+      payload.completionStatus = status;
+    } else {
+      payload.completionStatus = metadata.completionStatus;
+    }
+  } else {
+    payload.completionStatus = metadata.completionStatus;
+  }
+  
+  // 🔥 اگر candidate خودش repairApplied دارد، از آن استفاده کن
+  if (candidate && typeof candidate === 'object' && 'repairApplied' in candidate) {
+    payload.repairApplied = (candidate as any).repairApplied;
+  } else {
+    payload.repairApplied = metadata.repairApplied;
+  }
+  
   payload.appliedSpecializations = metadata.appliedSpecializations;
   payload.language = metadata.language;
 
@@ -140,7 +157,6 @@ async function attemptRepairWithBudget(
   const previousJson = previousCandidate ? JSON.stringify(previousCandidate, null, 2) : '{}';
 
   try {
-    // 🔥 استفاده از مدل ارزان‌تر برای Repair
     const repaired = await repairAudit(
       numberedCode,
       previousJson,
@@ -475,7 +491,11 @@ export async function runAdvancedPipeline(
               finalCandidate = repaired;
               finalValidation = revalidation;
               wasRepaired = true;
-              repairApplied = true;
+              // 🔥 repairApplied را بر اساس improvedCode موجود تنظیم کن
+              const hasImprovedCode = repaired && typeof repaired === 'object' && 
+                (repaired as any).improvedCode && 
+                (repaired as any).improvedCode.available === true;
+              repairApplied = hasImprovedCode && wasRepaired;
               completionStatus = 'complete';
               stages.push({ name: 'repair_success', durationMs: Date.now() - stageStartRepair, data: { attempt: repairAttempts + 1 } });
               break;
@@ -483,7 +503,11 @@ export async function runAdvancedPipeline(
               finalCandidate = repaired;
               finalValidation = revalidation;
               wasRepaired = true;
-              repairApplied = true;
+              // 🔥 اگر improvedCode موجود است، repairApplied = true
+              const hasImprovedCode = repaired && typeof repaired === 'object' && 
+                (repaired as any).improvedCode && 
+                (repaired as any).improvedCode.available === true;
+              repairApplied = hasImprovedCode;
               stages.push({ name: 'repair_partial', durationMs: Date.now() - stageStartRepair, data: { attempt: repairAttempts + 1, issuesCount: revalidation.issues.length } });
             } else {
               logger.warn('[Pipeline] Repair produced structurally invalid data despite Zod pass');
@@ -500,7 +524,8 @@ export async function runAdvancedPipeline(
 
         if (finalValidation.structurallyValid) {
           const finalCompletionStatus: CompletionStatus = finalValidation.repairRequired ? 'partially-complete' : 'complete';
-          const finalRepairApplied = wasRepaired || repairApplied;
+          // 🔥 repairApplied فقط در صورتی true است که improvedCode موجود باشد
+          const finalRepairApplied = wasRepaired && repairApplied;
 
           const finalizeResult = finalizeAuditCandidate(finalCandidate, {
             completionStatus: finalCompletionStatus,

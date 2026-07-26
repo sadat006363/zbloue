@@ -18,47 +18,9 @@ const CreateSnippetRequestSchema = z
   .object({
     code: z.string().min(1).max(100000),
     language: z.string().min(1).max(50),
-    card_title: z.string().min(1).max(200).optional(),
-    key_concept: z.string().max(2000).optional(),
-    what_this_code_does: z.string().max(10000).optional(),
-    debug_analysis: z.string().max(5000).optional(),
-    optimization: z.string().max(5000).optional(),
-    linkedin_post: z.string().max(300).optional(),
     username: z.string().min(1).max(100).nullable().optional(),
     github_username: z.string().min(1).max(100).nullable().optional(),
     avatar_url: z.string().url().nullable().optional(),
-
-    // ===== فیلدهای Legacy =====
-    code_walkthrough: z.any().optional().nullable(),
-    what_works_well: z.any().optional().nullable(),
-    bugs_and_risky_cases: z.any().optional().nullable(),
-    edge_cases: z.any().optional().nullable(),
-    performance_analysis: z.any().optional().nullable(),
-    security_analysis: z.any().optional().nullable(),
-    production_readiness: z.any().optional().nullable(),
-    recommended_improvements: z.any().optional().nullable(),
-    improved_code: z.string().optional().nullable(),
-    suggested_tests: z.any().optional().nullable(),
-    scorecard: z.any().optional().nullable(),
-    final_verdict_summary: z.string().optional().nullable(),
-    final_verdict_approved: z.boolean().optional().nullable(),
-    final_verdict_next_steps: z.string().optional().nullable(),
-
-    // ===== فیلدهای Advanced (JSONB) =====
-    findings: z.any().optional().nullable(),
-    execution_overview: z.any().optional().nullable(),
-    architectural_observations: z.any().optional().nullable(),
-    recommended_actions: z.any().optional().nullable(),
-    suggested_tests_new: z.any().optional().nullable(),
-    complexity: z.any().optional().nullable(),
-    scorecard_new: z.any().optional().nullable(),
-    verdict: z.any().optional().nullable(),
-    limitations: z.array(z.string().max(300)).max(20).optional().nullable(),
-
-    // ===== فیلدهای Debug =====
-    debug_trace: z.any().optional().nullable(),
-
-    // ===== فیلد جدید: audit_result (خروجی کامل Pipeline) =====
     audit_result: z.any().optional().nullable(),
   })
   .catchall(z.any());
@@ -98,7 +60,56 @@ async function generateUniqueSlug(retries = MAX_SLUG_RETRIES): Promise<string> {
 }
 
 // ============================================================
-// 3. POST Handler (با استفاده از Mapper جدید)
+// 🔥 تابع Fallback (برای داده‌های قدیمی بدون audit_result)
+// ============================================================
+
+function buildFallbackRow(body: any, context: any): any {
+  const now = new Date().toISOString();
+  return {
+    slug: context.slug,
+    raw_code: context.rawCode,
+    language: context.sourceLanguage,
+    username: context.username ?? null,
+    github_username: context.githubUsername ?? null,
+    avatar_url: context.avatarUrl ?? null,
+    is_public: true,
+    created_at: now,
+    audit_result: null,
+    card_title: null,
+    key_concept: null,
+    what_this_code_does: null,
+    debug_analysis: null,
+    optimization: null,
+    linkedin_post: null,
+    code_walkthrough: null,
+    what_works_well: null,
+    bugs_and_risky_cases: null,
+    edge_cases: null,
+    performance_analysis: null,
+    security_analysis: null,
+    production_readiness: null,
+    recommended_improvements: null,
+    improved_code: null,
+    suggested_tests: null,
+    scorecard: null,
+    final_verdict_summary: null,
+    final_verdict_approved: null,
+    final_verdict_next_steps: null,
+    findings: null,
+    execution_overview: null,
+    architectural_observations: null,
+    recommended_actions: null,
+    suggested_tests_new: null,
+    complexity: null,
+    scorecard_new: null,
+    verdict: null,
+    limitations: null,
+    debug_trace: null,
+  };
+}
+
+// ============================================================
+// 3. POST Handler
 // ============================================================
 
 export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
@@ -137,22 +148,6 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
 
   const body = validation.data;
 
-  // ============================================================
-  // 🔥 لاگ‌های سمت سرور - مرحله ۱: بررسی داده‌های دریافتی
-  // ============================================================
-  logger.info('[Server] ===== START DEBUG =====');
-  logger.info('[Server] body.audit_result exists?', !!body.audit_result);
-  logger.info('[Server] body.audit_result type:', typeof body.audit_result);
-  if (body.audit_result) {
-    logger.info('[Server] body.audit_result keys:', Object.keys(body.audit_result));
-    logger.info('[Server] body.audit_result.findings?', !!body.audit_result.findings);
-    logger.info('[Server] body.audit_result.findings length:', body.audit_result.findings?.length || 0);
-  }
-  logger.info('[Server] body.findings exists?', !!body.findings);
-  logger.info('[Server] body.scorecard_new exists?', !!body.scorecard_new);
-  logger.info('[Server] body.verdict exists?', !!body.verdict);
-  logger.info('[Server] ===== END DEBUG =====');
-
   // ===== Generate Slug =====
   let slug: string;
   try {
@@ -163,10 +158,7 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
     return NextResponse.json({ error: 'Failed to generate unique identifier' }, { status: 500 });
   }
 
-  // ============================================================
-  // 🔥 ساخت Context برای Mapper
-  // ============================================================
-
+  // ===== ساخت Context =====
   const context = {
     rawCode: body.code,
     sourceLanguage: body.language,
@@ -190,211 +182,28 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
   }
 
   // ============================================================
-  // 🔥 ساخت Audit Result از داده‌های ورودی (با اولویت audit_result)
-  // ============================================================
-
-  let auditResult: any = null;
-
-  // 1️⃣ اولویت اول: استفاده از audit_result (اگر موجود باشد)
-  if (body.audit_result) {
-    logger.info('[Server] Attempting to use body.audit_result');
-    try {
-      const validated = AdvancedAuditResultSchema.safeParse(body.audit_result);
-      if (validated.success) {
-        auditResult = validated.data;
-        logger.info('[Server] ✅ audit_result validation passed');
-        logger.info('[Server] auditResult.findings length:', auditResult.findings?.length || 0);
-      } else {
-        logger.warn('[Server] ❌ audit_result validation failed:', validated.error.issues);
-      }
-    } catch (error) {
-      logger.warn('[Server] ❌ Failed to parse audit_result:', error);
-    }
-  }
-
-  // 2️⃣ اگر audit_result موجود نبود یا نامعتبر بود، از فیلدهای جداگانه بساز
-  if (!auditResult && (body.findings || body.scorecard_new || body.verdict)) {
-    logger.info('[Server] Building auditResult from separate fields');
-    try {
-      auditResult = {
-        schemaVersion: '1.0',
-        auditType: 'comprehensive',
-        appliedSpecializations: body.execution_overview ? ['concurrency'] : [],
-        completionStatus: 'complete',
-        repairApplied: false,
-        language: body.language,
-        responseLanguage: 'English',
-        summary: body.key_concept || '',
-        executionOverview: body.execution_overview || { entryPoints: [], taskSubmissionPoints: [], blockingWaitPoints: [], sharedResources: [], resourceLifecycle: [] },
-        findings: body.findings || [],
-        architecturalObservations: body.architectural_observations || [],
-        recommendedActions: body.recommended_actions || [],
-        suggestedTests: body.suggested_tests_new || [],
-        complexity: body.complexity || { applicable: false, expression: null, explanation: null, variables: [], assumptions: [] },
-        scorecard: body.scorecard_new || {
-          correctness: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
-          concurrencySafety: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
-          liveness: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
-          errorHandling: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
-          resourceManagement: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
-          maintainability: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
-          productionReadiness: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
-        },
-        verdict: body.verdict || { status: 'requires-changes', explanation: '' },
-        limitations: body.limitations || [],
-        improvedCode: {
-          available: !!body.improved_code,
-          code: body.improved_code || null,
-          notes: body.improved_code ? 'Migrated from improved_code' : 'No improved code provided',
-        },
-        linkedin_post: body.linkedin_post || 'Check out this code analysis! #Zbloue',
-        title: body.card_title || 'Code Analysis',
-        analysisCoverage: [
-          'correctness', 'security', 'concurrency', 'liveness', 'performance',
-          'resource-management', 'error-handling', 'input-validation', 'data-integrity',
-          'api-design', 'architecture', 'maintainability', 'testability', 'observability',
-          'compatibility'
-        ].map(dim => ({
-          dimension: dim as any,
-          status: 'analyzed',
-          summary: `Analysis of ${dim} dimension.`,
-          limitation: null,
-        })),
-      };
-
-      const validated = AdvancedAuditResultSchema.safeParse(auditResult);
-      if (!validated.success) {
-        logger.warn('[Server] ❌ Built audit result validation failed:', validated.error.issues);
-        auditResult = null;
-      } else {
-        auditResult = validated.data;
-        logger.info('[Server] ✅ Built auditResult from separate fields');
-      }
-    } catch (error) {
-      logger.warn('[Server] ❌ Failed to build audit result from fields:', error);
-      auditResult = null;
-    }
-  }
-
-  logger.info('[Server] Final auditResult exists?', !!auditResult);
-  if (auditResult) {
-    logger.info('[Server] auditResult.findings length:', auditResult.findings?.length || 0);
-  }
-
-  // ============================================================
-  // 4. استفاده از Mapper
+  // 🔥 ساخت Row با استفاده از Mapper
   // ============================================================
 
   let row: any;
   try {
-    if (auditResult) {
-      logger.info('[Server] Using toSnippetInsert with auditResult');
-      row = toSnippetInsert(auditResult, context);
-      logger.info('[Server] ✅ Mapper used with auditResult');
+    if (body.audit_result) {
+      // 🔥 اعتبارسنجی audit_result
+      const validated = AdvancedAuditResultSchema.safeParse(body.audit_result);
+      if (!validated.success) {
+        logger.error('[create-snippet] Invalid audit_result:', validated.error.issues);
+        return NextResponse.json(
+          { error: 'Invalid audit result structure' },
+          { status: 400 }
+        );
+      }
+      // 🔥 استفاده از toSnippetInsert
+      row = toSnippetInsert(validated.data, context);
+      logger.info('[Server] ✅ Mapper used with audit_result');
     } else {
-      // ===== Fallback: استفاده از داده‌های Legacy =====
-      logger.info('[Server] Using Fallback (no auditResult)');
-      const now = new Date().toISOString();
-
-      // ساخت audit_result برای Fallback
-      const fallbackAuditResult = body.audit_result ?? (() => {
-        if (body.findings || body.scorecard_new || body.verdict) {
-          return {
-            schemaVersion: '1.0',
-            auditType: 'comprehensive',
-            appliedSpecializations: body.execution_overview ? ['concurrency'] : [],
-            completionStatus: 'complete',
-            repairApplied: false,
-            language: body.language,
-            responseLanguage: 'English',
-            summary: body.key_concept || '',
-            executionOverview: body.execution_overview || { entryPoints: [], taskSubmissionPoints: [], blockingWaitPoints: [], sharedResources: [], resourceLifecycle: [] },
-            findings: body.findings || [],
-            architecturalObservations: body.architectural_observations || [],
-            recommendedActions: body.recommended_actions || [],
-            suggestedTests: body.suggested_tests_new || [],
-            complexity: body.complexity || { applicable: false, expression: null, explanation: null, variables: [], assumptions: [] },
-            scorecard: body.scorecard_new || {
-              correctness: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
-              concurrencySafety: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
-              liveness: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
-              errorHandling: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
-              resourceManagement: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
-              maintainability: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
-              productionReadiness: { applicable: false, score: null, reason: 'No data', relatedFindings: [] },
-            },
-            verdict: body.verdict || { status: 'requires-changes', explanation: '' },
-            limitations: body.limitations || [],
-            improvedCode: {
-              available: !!body.improved_code,
-              code: body.improved_code || null,
-              notes: body.improved_code ? 'Migrated from improved_code' : 'No improved code provided',
-            },
-            linkedin_post: body.linkedin_post || 'Check out this code analysis! #Zbloue',
-            title: body.card_title || 'Code Analysis',
-            analysisCoverage: [
-              'correctness', 'security', 'concurrency', 'liveness', 'performance',
-              'resource-management', 'error-handling', 'input-validation', 'data-integrity',
-              'api-design', 'architecture', 'maintainability', 'testability', 'observability',
-              'compatibility'
-            ].map(dim => ({
-              dimension: dim as any,
-              status: 'analyzed',
-              summary: `Analysis of ${dim} dimension.`,
-              limitation: null,
-            })),
-          };
-        }
-        return null;
-      })();
-
-      row = {
-        slug,
-        raw_code: body.code,
-        language: body.language,
-        card_title: body.card_title ?? 'Code Analysis',
-        key_concept: body.key_concept ?? '',
-        what_this_code_does: body.what_this_code_does ?? '',
-        debug_analysis: body.debug_analysis ?? '-',
-        optimization: body.optimization ?? '-',
-        linkedin_post: body.linkedin_post ?? '',
-        username: body.username ?? null,
-        github_username: body.github_username ?? null,
-        avatar_url: body.avatar_url ?? null,
-        is_public: true,
-        created_at: now,
-
-        // Legacy fields
-        code_walkthrough: body.code_walkthrough ?? null,
-        what_works_well: body.what_works_well ?? null,
-        bugs_and_risky_cases: body.bugs_and_risky_cases ?? null,
-        edge_cases: body.edge_cases ?? null,
-        performance_analysis: body.performance_analysis ?? null,
-        security_analysis: body.security_analysis ?? null,
-        production_readiness: body.production_readiness ?? null,
-        recommended_improvements: body.recommended_improvements ?? null,
-        improved_code: body.improved_code ?? null,
-        suggested_tests: body.suggested_tests ?? null,
-        scorecard: body.scorecard ?? null,
-        final_verdict_summary: body.final_verdict_summary ?? null,
-        final_verdict_approved: body.final_verdict_approved ?? null,
-        final_verdict_next_steps: body.final_verdict_next_steps ?? null,
-
-        // Advanced fields
-        findings: body.findings ?? null,
-        execution_overview: body.execution_overview ?? null,
-        architectural_observations: body.architectural_observations ?? null,
-        recommended_actions: body.recommended_actions ?? null,
-        suggested_tests_new: body.suggested_tests_new ?? null,
-        complexity: body.complexity ?? null,
-        scorecard_new: body.scorecard_new ?? null,
-        verdict: body.verdict ?? null,
-        limitations: body.limitations ?? null,
-        debug_trace: body.debug_trace ?? null,
-
-        // 🔥 مهم: audit_result را با fallbackAuditResult پر کنید
-        audit_result: fallbackAuditResult,
-      };
+      // Fallback: اگر audit_result وجود نداشت
+      logger.warn('[create-snippet] No audit_result provided, using fallback');
+      row = buildFallbackRow(body, context);
       logger.info('[Server] ✅ Fallback row created');
     }
   } catch (error) {
@@ -406,21 +215,6 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
   }
 
   // ============================================================
-  // 🔥 لاگ‌های سمت سرور - مرحله ۳: قبل از insert
-  // ============================================================
-  logger.info('[Server] ===== BEFORE INSERT =====');
-  logger.info('[Server] row.audit_result exists?', !!row.audit_result);
-  if (row.audit_result) {
-    logger.info('[Server] row.audit_result type:', typeof row.audit_result);
-    logger.info('[Server] row.audit_result.findings?', !!row.audit_result.findings);
-    logger.info('[Server] row.audit_result.findings length:', row.audit_result.findings?.length || 0);
-  }
-  logger.info('[Server] row.findings exists?', !!row.findings);
-  logger.info('[Server] row.scorecard_new exists?', !!row.scorecard_new);
-  logger.info('[Server] row.verdict exists?', !!row.verdict);
-  logger.info('[Server] ===== END BEFORE INSERT =====');
-
-  // ============================================================
   // 5. Insert into Supabase
   // ============================================================
 
@@ -428,7 +222,7 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
   const { data, error } = await supabase
     .from('snippets')
     .insert(row as any)
-    .select('id, slug, card_title, username, github_username, avatar_url')
+    .select('id, slug, username, github_username, avatar_url')
     .single();
 
   if (error) {
@@ -449,11 +243,6 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
   // ===== Response =====
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || '';
   logger.info(`[create-snippet] ✅ Snippet created: ${data.slug} (IP ${ip})`);
-
-  // لاگ نهایی برای تأیید ذخیره‌سازی
-  logger.info('[Server] ===== FINAL VERIFICATION =====');
-  logger.info('[Server] Created snippet slug:', data.slug);
-  logger.info('[Server] audit_result should be stored in database');
 
   return NextResponse.json(
     {

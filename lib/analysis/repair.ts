@@ -67,6 +67,7 @@ function getDefaultExecutionOverview(): any {
 // ============================================================
 // 🔥 تابع کمکی برای تبدیل relatedFindings → relatedFindingIds
 // ============================================================
+
 function convertRelatedFindings(obj: any): any {
   if (!obj || typeof obj !== 'object') return obj;
   const result = { ...obj };
@@ -81,8 +82,9 @@ function convertRelatedFindings(obj: any): any {
 }
 
 // ============================================================
-// 🔥 تابع کمکی برای پاکسازی فیلدهای اضافی
+// 🔥 تابع کمکی برای پاکسازی فیلدهای اضافی و تنظیم پرچم‌ها
 // ============================================================
+
 function sanitizeRepairedData(data: any): any {
   if (!data || typeof data !== 'object') return data;
 
@@ -138,6 +140,30 @@ function sanitizeRepairedData(data: any): any {
     cleaned.suggestedTests = cleaned.suggestedTests.map((test: any) =>
       convertRelatedFindings(test)
     );
+  }
+
+  // 🔥 8. تنظیم repairApplied بر اساس وجود بهبود واقعی
+  if (cleaned.improvedCode && cleaned.improvedCode.available === true) {
+    cleaned.repairApplied = true;
+  } else {
+    cleaned.repairApplied = false;
+  }
+
+  // 🔥 9. تنظیم completionStatus بر اساس کامل بودن داده‌ها
+  const hasFindings = Array.isArray(cleaned.findings) && cleaned.findings.length > 0;
+  const hasScorecard = cleaned.scorecard && typeof cleaned.scorecard === 'object';
+  const hasVerdict = cleaned.verdict && typeof cleaned.verdict === 'object';
+  const hasSeriousLimitation = Array.isArray(cleaned.limitations) && 
+    cleaned.limitations.some((l: string) => 
+      l.includes('incomplete') || 
+      l.includes('repair failure') ||
+      l.includes('partial')
+    );
+
+  if (hasFindings && hasScorecard && hasVerdict && !hasSeriousLimitation) {
+    cleaned.completionStatus = 'complete';
+  } else {
+    cleaned.completionStatus = 'partially-complete';
   }
 
   return cleaned;
@@ -234,7 +260,7 @@ function createMinimalAuditFromExisting(
       auditType: 'comprehensive',
       appliedSpecializations: auditType === 'concurrency' ? ['concurrency'] : [],
       completionStatus: 'partially-complete',
-      repairApplied: true,
+      repairApplied: false,
       title: title,
       language: language || 'unknown',
       summary: summary,
@@ -297,7 +323,6 @@ export async function repairAudit(
       missingCoverage
     );
 
-    // 🔥 SYSTEM PROMPT اصلاح‌شده با دستورات واضح
     const systemPrompt = `You are an expert code auditor. 
 IMPORTANT: Your task is to REPAIR the structure of the JSON, NOT to rewrite the content.
 
@@ -361,8 +386,8 @@ EXAMPLE OF CORRECT OUTPUT:
       ...sanitized,
       schemaVersion: '1.0.0',
       auditType: 'comprehensive',
-      completionStatus: 'complete',
-      repairApplied: true,
+      completionStatus: sanitized.completionStatus || 'complete',
+      repairApplied: sanitized.repairApplied || false,
       appliedSpecializations: sanitized.appliedSpecializations && sanitized.appliedSpecializations.length > 0
         ? sanitized.appliedSpecializations
         : (auditType === 'concurrency' ? ['concurrency'] : []),
@@ -478,8 +503,8 @@ CORRECT FIELD NAMES:
       ...sanitized,
       schemaVersion: '1.0.0',
       auditType: 'comprehensive',
-      completionStatus: 'complete',
-      repairApplied: true,
+      completionStatus: sanitized.completionStatus || 'complete',
+      repairApplied: sanitized.repairApplied || false,
       appliedSpecializations: sanitized.appliedSpecializations && sanitized.appliedSpecializations.length > 0
         ? sanitized.appliedSpecializations
         : (auditType === 'concurrency' ? ['concurrency'] : []),

@@ -122,10 +122,18 @@ const ALL_DIMENSIONS = [
 
 type Dimension = typeof ALL_DIMENSIONS[number];
 
-function normalizeAnalysisCoverage(source: unknown): AnalysisCoverageItem[] {
+// ============================================================
+// 🔥 اصلاح: تابع normalizeAnalysisCoverage با بررسی Findings
+// ============================================================
+
+function normalizeAnalysisCoverage(
+  source: unknown,
+  findings?: any[]
+): AnalysisCoverageItem[] {
   const input = getSafeObject(source);
   const coverageMap: Record<string, { status: string; summary: string; limitation: string | null }> = {};
 
+  // استخراج از source
   if (Array.isArray(source)) {
     for (const item of source) {
       if (isObject(item)) {
@@ -152,16 +160,87 @@ function normalizeAnalysisCoverage(source: unknown): AnalysisCoverageItem[] {
     }
   }
 
+  // 🔥 تحلیل Findings برای تشخیص ابعاد واقعاً پوشش‌داده‌شده
+  const analyzedDimensions = new Set<string>();
+  if (findings && Array.isArray(findings)) {
+    for (const finding of findings) {
+      const category = finding?.category;
+      if (category === 'concurrency' || category === 'liveness' || category === 'deadlock' || category === 'thread-starvation') {
+        analyzedDimensions.add('concurrency');
+        analyzedDimensions.add('liveness');
+      }
+      if (category === 'correctness' || category === 'data-integrity') {
+        analyzedDimensions.add('correctness');
+        analyzedDimensions.add('data-integrity');
+      }
+      if (category === 'resource-management' || category === 'resource-leak' || category === 'resource-lifecycle') {
+        analyzedDimensions.add('resource-management');
+      }
+      if (category === 'error-handling' || category === 'timeout' || category === 'interruption') {
+        analyzedDimensions.add('error-handling');
+      }
+      if (category === 'api-design' || category === 'configuration') {
+        analyzedDimensions.add('api-design');
+        analyzedDimensions.add('configuration');
+      }
+      if (category === 'performance') {
+        analyzedDimensions.add('performance');
+      }
+      if (category === 'maintainability') {
+        analyzedDimensions.add('maintainability');
+      }
+      if (category === 'architecture' || category === 'architectural-duplication') {
+        analyzedDimensions.add('architecture');
+      }
+      if (category === 'testability') {
+        analyzedDimensions.add('testability');
+      }
+      if (category === 'observability') {
+        analyzedDimensions.add('observability');
+      }
+      if (category === 'compatibility') {
+        analyzedDimensions.add('compatibility');
+      }
+      // 🔥 امنیت و ورودی فقط در صورت وجود شواهد خاص
+      if (category === 'security') {
+        analyzedDimensions.add('security');
+      }
+      if (category === 'input-validation') {
+        analyzedDimensions.add('input-validation');
+      }
+    }
+  }
+
   const result: AnalysisCoverageItem[] = [];
   for (const dim of ALL_DIMENSIONS) {
     const existing = coverageMap[dim];
+    const isAnalyzed = analyzedDimensions.has(dim);
+
+    let status: 'analyzed' | 'not-applicable' | 'limited' = 'limited';
+    let limitation: string | null = null;
+
+    if (isAnalyzed) {
+      status = 'analyzed';
+    } else if (dim === 'concurrency' && !isAnalyzed) {
+      // اگر هم‌روندی وجود نداشته باشد
+      status = 'not-applicable';
+      limitation = 'No concurrency primitives detected in the code.';
+    } else if (dim === 'input-validation' && !isAnalyzed) {
+      status = 'limited';
+      limitation = 'No explicit input validation analysis was performed.';
+    } else if (dim === 'security' && !isAnalyzed) {
+      status = 'limited';
+      limitation = 'No explicit security analysis was performed.';
+    } else {
+      status = 'limited';
+      limitation = `Limited evidence available for ${dim} dimension.`;
+    }
+
     result.push({
       dimension: dim as any,
-      status: existing?.status === 'not-applicable' || existing?.status === 'limited'
-        ? (existing.status as any)
-        : 'analyzed',
+      status: status,
       summary: existing?.summary || `Analysis of ${dim} dimension.`,
-      limitation: existing?.limitation ?? null,
+      limitation: limitation,
     });
   }
 
@@ -611,7 +690,6 @@ function normalizeLanguage(source: unknown): string {
   return getSafeString(source, 'unknown');
 }
 
-// 🔥 تابع createMinimalAuditFromPartial
 function createMinimalAuditFromPartial(
   raw: unknown,
   error: unknown
@@ -622,7 +700,10 @@ function createMinimalAuditFromPartial(
     const title = normalizeTitle(input.title, summary);
     const language = normalizeLanguage(input.language);
 
-    let analysisCoverage = normalizeAnalysisCoverage(input.analysisCoverage ?? input.coverage ?? {});
+    let analysisCoverage = normalizeAnalysisCoverage(
+      input.analysisCoverage ?? input.coverage ?? {},
+      getSafeArray(input.findings, [])
+    );
     if (analysisCoverage.length === 0) {
       analysisCoverage = ALL_DIMENSIONS.map(dim => ({
         dimension: dim as any,
@@ -685,7 +766,6 @@ function createMinimalAuditFromPartial(
   }
 }
 
-// 🔥 تابع اصلی normalizeAnalysisOutput
 export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
   const startTime = Date.now();
   logger.debug('[Normalizer] Starting normalization');
@@ -787,8 +867,10 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
     linkedinPost = DEFAULT_LINKEDIN_POST;
   }
 
+  // 🔥 analysisCoverage را با findings واقعی بساز
   let analysisCoverage = normalizeAnalysisCoverage(
-    input.analysisCoverage ?? input.coverage ?? {}
+    input.analysisCoverage ?? input.coverage ?? {},
+    normalizedFindings  // ← ارسال findings واقعی
   );
   if (analysisCoverage.length === 0) {
     analysisCoverage = ALL_DIMENSIONS.map(dim => ({

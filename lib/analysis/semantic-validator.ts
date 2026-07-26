@@ -121,7 +121,7 @@ function validateReferences(
     ];
 
     for (const [category, item] of categories) {
-      if (item && (item as any).relatedFindingIds) { // 🔥 اصلاح: استفاده از relatedFindingIds
+      if (item && (item as any).relatedFindingIds) {
         const path = `scorecard.${category}.relatedFindingIds`;
         checkReferences((item as any).relatedFindingIds, path, `scorecard.${category}`);
       }
@@ -241,7 +241,6 @@ function validateScorecardConsistency(result: AdvancedAuditResult): SemanticVali
   const hasCritical = findings.some((f) => f.severity === 'critical');
   const hasHigh = findings.some((f) => f.severity === 'high');
 
-  // 🔥 اصلاح: دسترسی به score از productionReadiness
   const prodScore = scorecard.productionReadiness?.score;
   if (hasCritical && prodScore !== null && typeof prodScore === 'number' && prodScore > 50) {
     issues.push({
@@ -305,31 +304,114 @@ function validateDuplicateReferences(result: AdvancedAuditResult): SemanticValid
   return issues;
 }
 
+// ============================================================
+// 🔥 اضافه کردن اعتبارسنجی Confidence
+// ============================================================
+
 /**
- * تابع اصلی اعتبارسنجی معنایی
+ * اعتبارسنجی Confidence یافته‌ها
  */
+function validateFindingConfidence(findings: AuditFinding[]): SemanticValidationIssue[] {
+  const issues: SemanticValidationIssue[] = [];
+
+  for (const finding of findings) {
+    // 🔥 اگر عنوان حاوی "Queue Contract" باشد و confidence = definite باشد
+    if (finding.title && 
+        (finding.title.includes('Queue Contract') || 
+         finding.title.includes('queue') || 
+         finding.title.includes('Queue')) && 
+        finding.confidence === 'definite') {
+      
+      // بررسی شواهد - آیا واقعاً قطعی است؟
+      const hasStrongEvidence = finding.evidence && finding.evidence.length > 0 &&
+        finding.evidence.some(e => 
+          e.code && (e.code.includes('offer') || e.code.includes('getQueue'))
+        );
+
+      // اگر شواهد قوی نبود، warning بده
+      if (!hasStrongEvidence) {
+        issues.push({
+          code: 'CONFIDENCE_OVERSTATED',
+          path: `findings[${findings.indexOf(finding)}].confidence`,
+          message: `Finding "${finding.id}" has confidence "definite" but evidence may be circumstantial. Consider "likely" for queue-related findings unless the execution path is fully proven.`,
+          relatedIds: [finding.id],
+        });
+      }
+    }
+
+    // 🔥 همچنین اگر finding مربوط به deadlock باشد و confidence = definite باشد
+    if (finding.title && 
+        (finding.title.includes('Deadlock') || 
+         finding.title.includes('deadlock') ||
+         finding.title.includes('Starvation') ||
+         finding.title.includes('starvation')) && 
+        finding.confidence === 'definite') {
+      
+      // بررسی اینکه آیا همه شرایط deadlock اثبات شده است
+      const hasFullPath = finding.executionPath && finding.executionPath.length >= 2;
+      const hasTriggerConditions = finding.triggerConditions && finding.triggerConditions.length >= 2;
+      const hasEvidence = finding.evidence && finding.evidence.length >= 1;
+
+      if (!hasFullPath || !hasTriggerConditions || !hasEvidence) {
+        issues.push({
+          code: 'CONFIDENCE_OVERSTATED_DEADLOCK',
+          path: `findings[${findings.indexOf(finding)}].confidence`,
+          message: `Finding "${finding.id}" reports deadlock/starvation with "definite" confidence but missing complete execution path, trigger conditions, or evidence. Consider "likely" unless all conditions are proven.`,
+          relatedIds: [finding.id],
+        });
+      }
+    }
+
+    // 🔥 اگر confidence = definite باشد ولی evidence فقط یک خط دارد
+    if (finding.confidence === 'definite' && finding.evidence && finding.evidence.length === 1) {
+      const evidence = finding.evidence[0];
+      if (evidence && evidence.code && evidence.code.length < 50) {
+        issues.push({
+          code: 'CONFIDENCE_OVERSTATED_SINGLE_EVIDENCE',
+          path: `findings[${findings.indexOf(finding)}].confidence`,
+          message: `Finding "${finding.id}" has confidence "definite" but only a single short evidence snippet. Consider "likely" unless the issue is trivially reproducible.`,
+          relatedIds: [finding.id],
+        });
+      }
+    }
+  }
+
+  return issues;
+}
+
+// ============================================================
+// 🔥 تابع اصلی اعتبارسنجی معنایی
+// ============================================================
+
 export function validateSemanticIntegrity(result: AdvancedAuditResult): SemanticValidationResult {
   const errors: SemanticValidationIssue[] = [];
   const warnings: SemanticValidationIssue[] = [];
 
+  // ===== اعتبارسنجی Finding IDs =====
   const idIssues = validateFindingIds(result.findings || []);
   errors.push(...idIssues);
 
+  // ===== اعتبارسنجی References =====
   const refIssues = validateReferences(result.findings || [], result);
   errors.push(...refIssues);
 
+  // ===== اعتبارسنجی Improved Code =====
   const codeIssues = validateImprovedCode(result);
   errors.push(...codeIssues);
 
+  // ===== اعتبارسنجی Verdict Consistency =====
   const verdictIssues = validateVerdictConsistency(result);
   warnings.push(...verdictIssues);
 
+  // ===== اعتبارسنجی Scorecard Consistency =====
   const scorecardIssues = validateScorecardConsistency(result);
   warnings.push(...scorecardIssues);
 
+  // ===== اعتبارسنجی Duplicate References =====
   const duplicateIssues = validateDuplicateReferences(result);
   warnings.push(...duplicateIssues);
 
+  // ===== اعتبارسنجی Summary vs Findings =====
   if (result.summary && result.summary.includes('no issues') && (result.findings || []).length > 0) {
     warnings.push({
       code: 'SUMMARY_FINDINGS_MISMATCH',
@@ -338,6 +420,11 @@ export function validateSemanticIntegrity(result: AdvancedAuditResult): Semantic
     });
   }
 
+  // 🔥 🔥 🔥 اضافه کردن اعتبارسنجی confidence
+  const confidenceIssues = validateFindingConfidence(result.findings || []);
+  warnings.push(...confidenceIssues);
+
+  // ===== نتیجه نهایی =====
   return {
     isValid: errors.length === 0,
     errors,

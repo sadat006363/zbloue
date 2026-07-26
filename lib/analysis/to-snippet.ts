@@ -4,7 +4,6 @@ import { AdvancedAuditResult, AdvancedAuditResultSchema } from './schema';
 import type { Database } from '@/types/supabase';
 
 type SnippetInsert = Database['public']['Tables']['snippets']['Insert'];
-type SnippetRow = Database['public']['Tables']['snippets']['Row'];
 
 export interface SnippetCreationContext {
   rawCode: string;
@@ -18,7 +17,7 @@ export interface SnippetCreationContext {
 }
 
 // ============================================================
-// 🔥 تبدیل AdvancedAuditResult به SnippetInsert (فقط audit_result)
+// 🔥 اصلاح: تبدیل AdvancedAuditResult به SnippetInsert
 // ============================================================
 
 export function toSnippetInsert(
@@ -27,30 +26,35 @@ export function toSnippetInsert(
 ): SnippetInsert {
   const now = new Date().toISOString();
 
+  // 🔥 فقط فیلدهای ضروری در root باقی می‌مانند
   const row: SnippetInsert = {
+    // ===== Primary keys =====
     slug: context.slug,
     raw_code: context.rawCode,
     language: context.sourceLanguage,
 
-    // 🔥 فیلدهای Legacy را با مقادیر پیش‌فرض یا از audit_result پر می‌کنیم
-    card_title: audit.title || 'Code Analysis',
-    key_concept: audit.summary?.slice(0, 2000) || '',
-    what_this_code_does: audit.executionOverview?.entryPoints?.join(', ') || '',
-    debug_analysis: audit.findings?.length ? `${audit.findings.length} findings` : '-',
-    optimization: audit.recommendedActions?.length
-      ? audit.recommendedActions.map((a) => a.title).join('; ')
-      : '-',
-    linkedin_post: audit.linkedinPost || 'Check out this code analysis! #Zbloue',
-
+    // ===== User metadata =====
     username: context.username ?? null,
     github_username: context.githubUsername ?? null,
     avatar_url: context.avatarUrl ?? null,
     user_id: context.userId ?? null,
     is_public: context.isPublic ?? true,
-
     created_at: now,
-    schema_version: '1.0',
 
+    // ===== 🔥 فقط audit_result =====
+    // تمام داده‌های تحلیلی فقط در اینجا ذخیره می‌شوند
+    audit_result: audit as any,
+
+    // ===== فیلدهای Legacy (برای سازگاری با نسخه‌های قدیمی) =====
+    // 🔥 همه را null می‌گذاریم چون داده‌ها در audit_result هستند
+    card_title: null,
+    key_concept: null,
+    what_this_code_does: null,
+    debug_analysis: null,
+    optimization: null,
+    linkedin_post: null,
+
+    // Legacy fields - all null
     code_walkthrough: null,
     what_works_well: null,
     bugs_and_risky_cases: null,
@@ -66,6 +70,7 @@ export function toSnippetInsert(
     final_verdict_approved: null,
     final_verdict_next_steps: null,
 
+    // Advanced fields - all null (data in audit_result)
     findings: null,
     execution_overview: null,
     architectural_observations: null,
@@ -75,8 +80,7 @@ export function toSnippetInsert(
     scorecard_new: null,
     verdict: null,
     limitations: null,
-
-    audit_result: audit as any,
+    debug_trace: null,
   };
 
   return row;
@@ -86,7 +90,8 @@ export function toSnippetInsert(
 // 🔥 تبدیل Snippet از دیتابیس به AdvancedAuditResult
 // ============================================================
 
-export function snippetRowToAudit(row: SnippetRow): AdvancedAuditResult | null {
+export function snippetRowToAudit(row: any): AdvancedAuditResult | null {
+  // اولویت اول: audit_result
   if (row.audit_result) {
     try {
       let data = row.audit_result;
@@ -96,14 +101,13 @@ export function snippetRowToAudit(row: SnippetRow): AdvancedAuditResult | null {
       const validation = AdvancedAuditResultSchema.safeParse(data);
       if (validation.success) {
         return validation.data;
-      } else {
-        console.warn('[toSnippet] audit_result validation failed:', validation.error.format());
       }
     } catch (error) {
       console.warn('[toSnippet] Failed to parse audit_result:', error);
     }
   }
 
+  // Fallback: ساخت از فیلدهای Legacy
   return legacyRowToAudit(row);
 }
 
@@ -111,7 +115,7 @@ export function snippetRowToAudit(row: SnippetRow): AdvancedAuditResult | null {
 // 🔥 تبدیل Legacy به Canonical (برای داده‌های قدیمی)
 // ============================================================
 
-export function legacyRowToAudit(row: SnippetRow | any): AdvancedAuditResult | null {
+export function legacyRowToAudit(row: any): AdvancedAuditResult | null {
   try {
     const hasConcurrency = row.execution_overview && 
       (row.execution_overview.entryPoints?.length > 0 ||
