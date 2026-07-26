@@ -118,8 +118,9 @@ function validateResponse(result: unknown): LegacyGenerateResponse {
  * while also preserving all canonical fields for storage and UI.
  */
 function mapCanonicalToLegacy(canonical: any): LegacyGenerateResponse {
-  // فیلدهای Legacy اصلی
-  const legacy: LegacyGenerateResponse = {
+  // ساخت یک شیء واحد با تمام فیلدها (بدون تکرار نام)
+  return {
+    // ===== فیلدهای Legacy اصلی =====
     analysis: canonical.summary || '',
     card_title: canonical.title || 'Code Analysis',
     key_concept: canonical.summary?.slice(0, 2000) || '',
@@ -144,8 +145,9 @@ function mapCanonicalToLegacy(canonical: any): LegacyGenerateResponse {
           notes: canonical.improvedCode.notes || '',
         }
       : undefined,
-    suggestedTests: [],
-    scorecard: undefined,
+    // ===== فیلدهایی که هم Legacy و هم Canonical دارند =====
+    suggestedTests: canonical.suggestedTests || [], // فقط یک بار
+    scorecard: canonical.scorecard || null, // فقط یک بار
     finalVerdict: canonical.verdict
       ? {
           summary: canonical.verdict.explanation,
@@ -154,14 +156,13 @@ function mapCanonicalToLegacy(canonical: any): LegacyGenerateResponse {
         }
       : undefined,
     error: undefined,
-    // فیلدهای کانونیکال برای ذخیره‌سازی در دیتابیس و نمایش Full Analysis
+
+    // ===== فیلدهای کانونیکال (برای ذخیره‌سازی و نمایش Full Analysis) =====
     findings: canonical.findings || [],
     executionOverview: canonical.executionOverview || null,
     architecturalObservations: canonical.architecturalObservations || [],
     recommendedActions: canonical.recommendedActions || [],
-    suggestedTests: canonical.suggestedTests || [],
     complexity: canonical.complexity || null,
-    scorecard: canonical.scorecard || null,
     verdict: canonical.verdict || null,
     limitations: canonical.limitations || [],
     analysisCoverage: canonical.analysisCoverage || [],
@@ -171,11 +172,8 @@ function mapCanonicalToLegacy(canonical: any): LegacyGenerateResponse {
     title: canonical.title || 'Code Analysis',
     summary: canonical.summary || '',
     debug_trace: canonical.debug_trace || undefined,
-    // 🔥 اضافه کردن audit_result برای ذخیره‌سازی کامل
     audit_result: canonical,
   };
-
-  return legacy;
 }
 
 // ============================================================
