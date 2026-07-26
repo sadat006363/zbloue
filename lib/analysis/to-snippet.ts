@@ -202,7 +202,7 @@ export function legacyRowToAudit(row: SnippetRow | any): AdvancedAuditResult | n
     }));
 
     const audit: Partial<AdvancedAuditResult> = {
-      schemaVersion: '1.0',
+      schemaVersion: '1.0.0',
       auditType: 'comprehensive',
       appliedSpecializations: hasConcurrency ? ['concurrency'] : [],
       completionStatus: 'complete',
