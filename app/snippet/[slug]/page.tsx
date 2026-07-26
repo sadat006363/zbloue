@@ -186,10 +186,8 @@ export default async function SnippetPage({ params }: PageProps) {
             complexity: auditData.complexity ?? snippet.complexity,
             limitations: auditData.limitations ?? snippet.limitations,
             improved_code: auditData.improvedCode?.code ?? snippet.improved_code,
-            // 🔥 اصلاح: linkedin_post از linkedinPost کانونیکال گرفته می‌شود
             linkedin_post: auditData.linkedinPost ?? snippet.linkedin_post,
             summary: auditData.summary ?? snippet.key_concept,
-            // فیلدهای متفرقه برای نمایش بهتر
             card_title: auditData.title ?? snippet.card_title,
             key_concept: auditData.summary ?? snippet.key_concept,
             what_this_code_does: auditData.executionOverview?.entryPoints?.join(', ') ?? snippet.what_this_code_does,
@@ -213,8 +211,18 @@ export default async function SnippetPage({ params }: PageProps) {
   // 🔥 استفاده از normalizedAudit برای تشخیص وجود تحلیل کامل
   const fullAnalysisExists = normalizedAudit ? normalizedAudit.hasFullAnalysis : false;
 
+  // 🔥 بررسی وجود Scorecard معتبر (اعداد واقعی)
+  const hasValidScorecard = useMemo(() => {
+    const sc = snippet.scorecard_new || snippet.audit_result?.scorecard;
+    if (!sc || typeof sc !== 'object') return false;
+    return Object.values(sc).some((item: any) => 
+      item?.applicable === true && typeof item?.score === 'number' && item.score > 0
+    );
+  }, [snippet.scorecard_new, snippet.audit_result]);
+
   const debugData = {
     fullAnalysisExists,
+    hasValidScorecard,
     findings: snippet.findings,
     scorecard_new: snippet.scorecard_new,
     verdict: snippet.verdict,
@@ -222,7 +230,7 @@ export default async function SnippetPage({ params }: PageProps) {
     normalizedAudit,
   };
 
-  // 🔥 نرمالایز کردن line_explanations: اگر وجود دارد و آرایه است، به‌عنوان LineExplanation[] استفاده می‌شود
+  // 🔥 نرمالایز کردن line_explanations
   const lineExplanations = snippet.line_explanations && Array.isArray(snippet.line_explanations)
     ? (snippet.line_explanations as LineExplanation[])
     : [];
@@ -270,6 +278,9 @@ export default async function SnippetPage({ params }: PageProps) {
             />
           </div>
 
+          {/* ============================================================
+              🔥 SnippetFullAnalysis - فقط در صورت وجود تحلیل کامل نمایش داده شود
+              ============================================================ */}
           <div id="snippet-full-analysis">
             {fullAnalysisExists ? (
               <SnippetFullAnalysis snippet={snippet} />
@@ -277,11 +288,10 @@ export default async function SnippetPage({ params }: PageProps) {
               <div className="mt-8 pt-6 border-t border-[#313244]">
                 <div className="bg-[#11111b] p-6 rounded-lg border border-[#313244] text-center">
                   <p className="text-[#a6adc8] text-sm">
-                    📊 Full report has not been generated for this snippet yet.
+                    📊 Full analysis is only available in <strong>Advanced</strong> mode.
                   </p>
                   <p className="text-[#6c7086] text-xs mt-2">
-                    Generate a full analysis to see detailed insights including code walkthrough,
-                    performance analysis, security review, and more.
+                    Switch to Advanced mode to see detailed findings, scorecard, and recommendations.
                   </p>
                 </div>
               </div>

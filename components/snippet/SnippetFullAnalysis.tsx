@@ -265,6 +265,15 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
     return { scorecardDisplay: display, scorecardIsNew: isNew, scorecardMax: max };
   }, [snippet]);
 
+  // 🔥 بررسی اعتبار Scorecard (حداقل یک دسته با applicable=true و score>0)
+  const hasValidScorecard = useMemo(() => {
+    const sc = scorecardDisplay;
+    if (!sc || typeof sc !== 'object') return false;
+    return Object.values(sc).some((item: any) => 
+      item?.applicable === true && typeof item?.score === 'number' && item.score > 0
+    );
+  }, [scorecardDisplay]);
+
   const suggestedTests = useMemo(
     () => normalizeTests(
       snippet?.audit_result?.suggestedTests || snippet?.suggested_tests_new,
@@ -692,7 +701,10 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
           </div>
         )}
 
-        {scorecardDisplay && (
+        {/* ============================================================
+            🔥 Scorecard - فقط در صورت اعتبار نمایش داده شود
+            ============================================================ */}
+        {hasValidScorecard && scorecardDisplay && (
           <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244]">
             <h3 className="text-lg font-semibold text-[#89b4fa]">
               📊 Scorecard {scorecardIsNew && scorecardMax === 100 ? '(New)' : ''}
@@ -706,18 +718,34 @@ export default function SnippetFullAnalysis({ snippet }: SnippetFullAnalysisProp
                   num = (value as any).score;
                 }
 
+                const isApplicable = value?.applicable !== false;
+
                 return (
                   <div key={key} className="bg-[#1e1e2e] p-2 rounded-md text-center border border-[#313244]">
                     <p className="text-xs text-[#6c7086] capitalize">
                       {key.replace(/([A-Z])/g, ' $1')}
                     </p>
                     <p className="text-lg font-bold text-white">
-                      {num}/{scorecardMax}
+                      {isApplicable && num > 0 ? `${num}/${scorecardMax}` : 'N/A'}
                     </p>
                   </div>
                 );
               })}
             </div>
+          </div>
+        )}
+
+        {/* ============================================================
+            🔥 اگر Scorecard معتبر نباشد، پیام نمایش داده شود
+            ============================================================ */}
+        {!hasValidScorecard && (
+          <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244] text-center">
+            <p className="text-[#a6adc8] text-sm">
+              📊 Scorecard is not available for this analysis mode.
+            </p>
+            <p className="text-[#6c7086] text-xs mt-1">
+              Use <strong>Advanced</strong> mode for detailed scoring.
+            </p>
           </div>
         )}
 

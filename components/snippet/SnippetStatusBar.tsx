@@ -21,6 +21,27 @@ export default function SnippetStatusBar({ snippet }: SnippetStatusBarProps) {
     return Array.isArray(snippet.line_explanations) && snippet.line_explanations.length > 0;
   }, [snippet.line_explanations]);
 
+  // 🔥 بررسی وجود تحلیل کامل (Advanced)
+  const hasFullAnalysis = useMemo(() => {
+    return !!(
+      snippet.findings?.length > 0 ||
+      snippet.scorecard_new ||
+      snippet.verdict ||
+      snippet.execution_overview ||
+      snippet.architectural_observations?.length > 0 ||
+      snippet.recommended_actions?.length > 0
+    );
+  }, [snippet]);
+
+  // 🔥 بررسی وجود Scorecard معتبر
+  const hasValidScorecard = useMemo(() => {
+    const sc = snippet.scorecard_new || snippet.audit_result?.scorecard;
+    if (!sc || typeof sc !== 'object') return false;
+    return Object.values(sc).some((item: any) => 
+      item?.applicable === true && typeof item?.score === 'number' && item.score > 0
+    );
+  }, [snippet.scorecard_new, snippet.audit_result]);
+
   const statusItems: StatusItem[] = useMemo(() => {
     return [
       {
@@ -44,12 +65,13 @@ export default function SnippetStatusBar({ snippet }: SnippetStatusBarProps) {
       {
         label: 'Full Analysis',
         icon: '📊',
-        available: !!(
-          snippet.findings ||
-          snippet.scorecard_new ||
-          snippet.verdict ||
-          snippet.execution_overview
-        ),
+        available: hasFullAnalysis,
+        sectionId: 'snippet-full-analysis',
+      },
+      {
+        label: 'Scorecard',
+        icon: '📊',
+        available: hasValidScorecard,
         sectionId: 'snippet-full-analysis',
       },
       {
@@ -76,10 +98,8 @@ export default function SnippetStatusBar({ snippet }: SnippetStatusBarProps) {
     snippet.key_concept,
     snippet.what_this_code_does,
     snippet.debug_analysis,
-    snippet.findings,
-    snippet.scorecard_new,
-    snippet.verdict,
-    snippet.execution_overview,
+    hasFullAnalysis,
+    hasValidScorecard,
     hasLineExplanations,
     snippet.generated_prompt,
     snippet.linkedin_post,
