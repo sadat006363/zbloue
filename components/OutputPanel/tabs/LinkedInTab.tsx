@@ -1,6 +1,9 @@
+// components/OutputPanel/tabs/LinkedInTab.tsx
 'use client';
+
 import { useState, useRef, useEffect } from 'react';
 import { safeString } from '@/lib/utils';
+import Tooltip from '@/components/common/Tooltip';
 
 interface LinkedInTabProps {
   linkedinPost: string;
@@ -12,7 +15,6 @@ export default function LinkedInTab({ linkedinPost, shareUrl, showToast }: Linke
   const [showShareDropdown, setShowShareDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // ===== کلیک خارج از منو =====
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -26,12 +28,10 @@ export default function LinkedInTab({ linkedinPost, shareUrl, showToast }: Linke
     };
   }, []);
 
-  // ===== کلیک روی دکمه Share (Toggle) =====
   const toggleDropdown = () => {
     setShowShareDropdown(!showShareDropdown);
   };
 
-  // ===== اشتراک‌گذاری و بستن منو =====
   const handleShare = (platform: string) => {
     setShowShareDropdown(false);
 
@@ -53,9 +53,6 @@ export default function LinkedInTab({ linkedinPost, shareUrl, showToast }: Linke
     }
   };
 
-  // ============================================================
-  // 🔥 دکمه کپی اختصاصی (مستقل از CopyButton)
-  // ============================================================
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(linkedinPost ?? '');
@@ -78,40 +75,40 @@ export default function LinkedInTab({ linkedinPost, shareUrl, showToast }: Linke
         </div>
         
         <div className="flex items-center gap-2">
-          {/* ============================================================
-              🔥 دکمه کپی اختصاصی که محتوای پست لینکدین را کپی می‌کند
-              ============================================================ */}
-          <button
-            onClick={handleCopy}
-            className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md transition border border-[#d0d0d8] text-[#4a4a6a] hover:text-[#4a86f7] hover:bg-[#f1f3f5]"
-            title="Copy LinkedIn post to clipboard"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
-            </svg>
-            <span>Copy</span>
-          </button>
+          {/* ===== Copy Button with Tooltip ===== */}
+          <Tooltip text="Copy LinkedIn post to clipboard" position="top">
+            <button
+              onClick={handleCopy}
+              className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md transition border border-[#d0d0d8] text-[#4a4a6a] hover:text-[#4a86f7] hover:bg-[#f1f3f5]"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+              </svg>
+              <span>Copy</span>
+            </button>
+          </Tooltip>
           
           {/* ===== Share Dropdown Button ===== */}
           <div className="relative" ref={dropdownRef}>
-            <button
-              onClick={toggleDropdown}
-              className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md transition border ${
-                showShareDropdown
-                  ? 'bg-[#f1f3f5] text-[#4a86f7] border-[#4a86f7]'
-                  : 'border-[#d0d0d8] text-[#4a4a6a] hover:text-[#4a86f7] hover:bg-[#f1f3f5]'
-              }`}
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
-              </svg>
-              <span>Share</span>
-              <svg className={`w-3 h-3 transition-transform ${showShareDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/>
-              </svg>
-            </button>
+            <Tooltip text="Share on social media" position="top">
+              <button
+                onClick={toggleDropdown}
+                className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md transition border ${
+                  showShareDropdown
+                    ? 'bg-[#f1f3f5] text-[#4a86f7] border-[#4a86f7]'
+                    : 'border-[#d0d0d8] text-[#4a4a6a] hover:text-[#4a86f7] hover:bg-[#f1f3f5]'
+                }`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
+                </svg>
+                <span>Share</span>
+                <svg className={`w-3 h-3 transition-transform ${showShareDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+              </button>
+            </Tooltip>
 
-            {/* ===== Dropdown Menu ===== */}
             {showShareDropdown && (
               <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-[#d0d0d8] py-1 z-50">
                 <div className="px-3 py-2 text-xs font-medium text-[#6c7086] border-b border-[#e8e8f0]">

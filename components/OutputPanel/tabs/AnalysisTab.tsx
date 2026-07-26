@@ -1,5 +1,6 @@
 // components/OutputPanel/tabs/AnalysisTab.tsx
 'use client';
+
 import {
   LegacyGenerateResponse,
   LegacyCodeWalkthroughItem,
@@ -14,6 +15,7 @@ import {
 } from '@/types';
 import { safeString } from '@/lib/utils';
 import { useState } from 'react';
+import Tooltip from '@/components/common/Tooltip';
 
 interface AnalysisTabProps {
   fullAnalysis: LegacyGenerateResponse | null | undefined;
@@ -283,30 +285,38 @@ export default function AnalysisTab({
     URL.revokeObjectURL(url);
   };
 
+  // ===== Advanced Mode =====
   if (isAdvanced && fullAnalysis) {
     return (
       <div className="space-y-6">
+        {/* ===== Header with Copy & Download Buttons ===== */}
         <div className="flex justify-end items-center gap-3 pb-2 border-b-2 border-[#e8e8f0]">
-          <button
-            onClick={handleCopy}
-            className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md transition border border-[#d0d0d8] text-[#4a4a6a] hover:text-[#4a86f7] hover:bg-[#f1f3f5]"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
-            </svg>
-            <span>{copySuccess ? '✅ Copied!' : 'Copy'}</span>
-          </button>
-          <button
-            onClick={handleDownload}
-            className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md transition border border-[#d0d0d8] text-[#4a4a6a] hover:text-[#4a86f7] hover:bg-[#f1f3f5]"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            <span>Download</span>
-          </button>
+          <Tooltip text="Copy full analysis to clipboard" position="top">
+            <button
+              onClick={handleCopy}
+              className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md transition border border-[#d0d0d8] text-[#4a4a6a] hover:text-[#4a86f7] hover:bg-[#f1f3f5]"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+              </svg>
+              <span>{copySuccess ? '✅ Copied!' : 'Copy'}</span>
+            </button>
+          </Tooltip>
+          
+          <Tooltip text="Download analysis as text file" position="top">
+            <button
+              onClick={handleDownload}
+              className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md transition border border-[#d0d0d8] text-[#4a4a6a] hover:text-[#4a86f7] hover:bg-[#f1f3f5]"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              <span>Download</span>
+            </button>
+          </Tooltip>
         </div>
 
+        {/* ===== Content ===== */}
         <div>
           <h2 className="text-2xl font-bold text-[#1a1a2e]">{safeString(fullAnalysis.card_title || fullAnalysis.title || 'Advanced Analysis')}</h2>
           {fullAnalysis.key_concept && (
@@ -321,6 +331,7 @@ export default function AnalysisTab({
           )}
         </div>
 
+        {/* ===== Findings ===== */}
         {hasFindings && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-3">🔍 Findings</h3>
@@ -372,6 +383,7 @@ export default function AnalysisTab({
           </div>
         )}
 
+        {/* ===== Execution Overview ===== */}
         {hasExecutionOverview && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-2">⚡ Execution Overview</h3>
@@ -410,6 +422,7 @@ export default function AnalysisTab({
           </div>
         )}
 
+        {/* ===== Architectural Observations ===== */}
         {hasArchitecturalObservations && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-2">🏗️ Architectural Observations</h3>
@@ -427,6 +440,7 @@ export default function AnalysisTab({
           </div>
         )}
 
+        {/* ===== Recommended Actions ===== */}
         {hasRecommendedActions && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-2">🔧 Recommended Actions</h3>
@@ -452,6 +466,7 @@ export default function AnalysisTab({
           </div>
         )}
 
+        {/* ===== Complexity ===== */}
         {hasComplexity && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-2">📈 Complexity</h3>
@@ -490,6 +505,7 @@ export default function AnalysisTab({
           </div>
         )}
 
+        {/* ===== Suggested Tests ===== */}
         {hasSuggestedTests && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-2">🧪 Suggested Tests</h3>
@@ -548,6 +564,7 @@ export default function AnalysisTab({
           </div>
         )}
 
+        {/* ===== Code Walkthrough ===== */}
         {safeArray(fullAnalysis.codeWalkthrough).length > 0 && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-2">🧩 Code Walkthrough</h3>
@@ -560,6 +577,7 @@ export default function AnalysisTab({
           </div>
         )}
 
+        {/* ===== What Works Well ===== */}
         {safeArray(fullAnalysis.whatWorksWell).length > 0 && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#43a047] mb-2">✅ What Works Well</h3>
@@ -569,6 +587,7 @@ export default function AnalysisTab({
           </div>
         )}
 
+        {/* ===== Bugs and Risky Cases ===== */}
         {safeArray(fullAnalysis.bugsAndRiskyCases).length > 0 && (
           <div className="bg-red-50 p-4 rounded-lg border border-red-200">
             <h3 className="font-semibold text-[#e53935]">🐛 Bugs and Risky Cases</h3>
@@ -582,6 +601,7 @@ export default function AnalysisTab({
           </div>
         )}
 
+        {/* ===== Edge Cases ===== */}
         {safeArray(fullAnalysis.edgeCases).length > 0 && (
           <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
             <h3 className="font-semibold text-[#f57c00]">🧪 Edge Cases</h3>
@@ -598,6 +618,7 @@ export default function AnalysisTab({
           </div>
         )}
 
+        {/* ===== Performance Analysis ===== */}
         {fullAnalysis.performanceAnalysis && !hasComplexity && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-2">⚡ Performance Analysis</h3>
@@ -627,6 +648,7 @@ export default function AnalysisTab({
           </div>
         )}
 
+        {/* ===== Security Analysis ===== */}
         {fullAnalysis.securityAnalysis && (
           <div className={`p-4 rounded-lg border ${fullAnalysis.securityAnalysis.severity === 'Critical' ? 'bg-red-50 border-red-300' : fullAnalysis.securityAnalysis.severity === 'High' ? 'bg-orange-50 border-orange-300' : fullAnalysis.securityAnalysis.severity === 'Medium' ? 'bg-yellow-50 border-yellow-300' : 'bg-blue-50 border-blue-300'}`}>
             <h3 className="font-semibold text-[#1a1a2e]">🔒 Security Analysis</h3>
@@ -646,6 +668,7 @@ export default function AnalysisTab({
           </div>
         )}
 
+        {/* ===== Production Readiness ===== */}
         {fullAnalysis.productionReadiness && (
           <div className={`p-4 rounded-lg border ${fullAnalysis.productionReadiness.isProductionReady ? 'bg-green-50 border-green-200' : 'bg-orange-50 border-orange-200'}`}>
             <h3 className="font-semibold text-[#1a1a2e]">🛡️ Production Readiness</h3>
@@ -665,6 +688,7 @@ export default function AnalysisTab({
           </div>
         )}
 
+        {/* ===== Recommended Improvements ===== */}
         {safeArray(fullAnalysis.recommendedImprovements).length > 0 && !hasRecommendedActions && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-2">🔧 Recommended Improvements</h3>
@@ -682,6 +706,7 @@ export default function AnalysisTab({
           </div>
         )}
 
+        {/* ===== Improved Code ===== */}
         {fullAnalysis.improvedCode && fullAnalysis.improvedCode.available && (
           <div className="bg-[#e8f5e9] p-4 rounded-lg border border-green-200">
             <h3 className="font-semibold text-[#43a047] mb-2">✨ Improved Code</h3>
@@ -692,6 +717,7 @@ export default function AnalysisTab({
           </div>
         )}
 
+        {/* ===== Scorecard ===== */}
         {hasScorecardNew && scorecardDisplay && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-2">📊 Scorecard</h3>
@@ -713,6 +739,7 @@ export default function AnalysisTab({
           </div>
         )}
 
+        {/* ===== Verdict ===== */}
         {fullAnalysis.verdict && (
           <div className={`p-4 rounded-lg border ${fullAnalysis.verdict.status === 'approved' || fullAnalysis.verdict.status === 'approved-with-suggestions' ? 'bg-green-50 border-green-200' : 'bg-orange-50 border-orange-200'}`}>
             <h3 className="font-semibold text-[#1a1a2e]">🏁 Verdict</h3>
@@ -723,6 +750,7 @@ export default function AnalysisTab({
           </div>
         )}
 
+        {/* ===== Limitations ===== */}
         {hasLimitations && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#e53935] mb-2">⚠️ Limitations</h3>
@@ -732,6 +760,7 @@ export default function AnalysisTab({
           </div>
         )}
 
+        {/* ===== LinkedIn Post ===== */}
         {hasLinkedInPost && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-2">💼 LinkedIn Post</h3>
@@ -739,6 +768,7 @@ export default function AnalysisTab({
           </div>
         )}
 
+        {/* ===== Debug Trace (Development Only) ===== */}
         {(fullAnalysis as any).debug_trace && process.env.NODE_ENV === 'development' && (
           <details className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <summary className="cursor-pointer text-sm font-medium text-[#1a1a2e]">🔍 Debug Trace</summary>
@@ -751,6 +781,7 @@ export default function AnalysisTab({
     );
   }
 
+  // ===== Simple/Medium Mode =====
   if (!quickAnalysisText) {
     return <div className="text-[#4a4a6a]">No quick analysis available.</div>;
   }
@@ -780,26 +811,34 @@ export default function AnalysisTab({
 
   return (
     <div className="space-y-4">
+      {/* ===== Header with Copy & Download Buttons ===== */}
       <div className="flex justify-end items-center gap-3 pb-2 border-b-2 border-[#e8e8f0]">
-        <button
-          onClick={handleCopySimple}
-          className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md transition border border-[#d0d0d8] text-[#4a4a6a] hover:text-[#4a86f7] hover:bg-[#f1f3f5]"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
-          </svg>
-          <span>{copySuccess ? '✅ Copied!' : 'Copy'}</span>
-        </button>
-        <button
-          onClick={handleDownloadSimple}
-          className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md transition border border-[#d0d0d8] text-[#4a4a6a] hover:text-[#4a86f7] hover:bg-[#f1f3f5]"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-          </svg>
-          <span>Download</span>
-        </button>
+        <Tooltip text="Copy analysis to clipboard" position="top">
+          <button
+            onClick={handleCopySimple}
+            className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md transition border border-[#d0d0d8] text-[#4a4a6a] hover:text-[#4a86f7] hover:bg-[#f1f3f5]"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+            </svg>
+            <span>{copySuccess ? '✅ Copied!' : 'Copy'}</span>
+          </button>
+        </Tooltip>
+        
+        <Tooltip text="Download analysis as text file" position="top">
+          <button
+            onClick={handleDownloadSimple}
+            className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md transition border border-[#d0d0d8] text-[#4a4a6a] hover:text-[#4a86f7] hover:bg-[#f1f3f5]"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            <span>Download</span>
+          </button>
+        </Tooltip>
       </div>
+      
+      {/* ===== Content ===== */}
       <div className="space-y-3">
         <h2 className="text-xl font-bold text-[#1a1a2e]">📊 Quick Analysis</h2>
         <div

@@ -17,6 +17,7 @@ import { EditorView } from '@codemirror/view';
 import { RangeSetBuilder } from '@codemirror/state';
 import { Decoration } from '@codemirror/view';
 import { useAppContext } from '@/context';
+import Tooltip from './common/Tooltip';
 
 // ============================================================
 // 🔥 زبان‌های پشتیبانی‌شده
@@ -80,15 +81,13 @@ const EXTENSION_TO_LANGUAGE: Record<string, string> = {
 };
 
 // ============================================================
-// 🔥 تشخیص زبان از محتوای کد (بدون پسوند فایل)
+// 🔥 تشخیص زبان از محتوای کد
 // ============================================================
 
 function detectLanguageFromContent(code: string): string | null {
   if (!code || code.trim().length === 0) return null;
-
   const trimmed = code.trim();
 
-  // ===== Java =====
   if (/public\s+class\s+\w+/.test(trimmed) ||
       /System\.out\.println/.test(trimmed) ||
       /public\s+static\s+void\s+main/.test(trimmed) ||
@@ -96,7 +95,6 @@ function detectLanguageFromContent(code: string): string | null {
     return 'java';
   }
 
-  // ===== Python =====
   if (/^import\s+\w+/.test(trimmed) ||
       /^from\s+\w+\s+import/.test(trimmed) ||
       /def\s+\w+\s*\(/.test(trimmed) ||
@@ -105,7 +103,6 @@ function detectLanguageFromContent(code: string): string | null {
     return 'python';
   }
 
-  // ===== JavaScript / TypeScript =====
   if (/function\s+\w+\s*\(/.test(trimmed) ||
       /const\s+\w+\s*=\s*\(/.test(trimmed) ||
       /let\s+\w+\s*=\s*\(/.test(trimmed) ||
@@ -115,7 +112,6 @@ function detectLanguageFromContent(code: string): string | null {
       /console\.log/.test(trimmed) ||
       /module\.exports/.test(trimmed) ||
       /export\s+(default|const|function)/.test(trimmed)) {
-    // تشخیص TypeScript با وجود type annotation
     if (/:\s*(string|number|boolean|void|any|Array<|\[\])/.test(trimmed) ||
         /interface\s+\w+/.test(trimmed) ||
         /type\s+\w+\s*=/.test(trimmed)) {
@@ -124,7 +120,6 @@ function detectLanguageFromContent(code: string): string | null {
     return 'javascript';
   }
 
-  // ===== Go =====
   if (/package\s+main/.test(trimmed) ||
       /func\s+main\s*\(/.test(trimmed) ||
       /fmt\.Println/.test(trimmed) ||
@@ -132,7 +127,6 @@ function detectLanguageFromContent(code: string): string | null {
     return 'go';
   }
 
-  // ===== Rust =====
   if (/fn\s+main\s*\(/.test(trimmed) ||
       /println!/.test(trimmed) ||
       /let\s+mut\s+\w+/.test(trimmed) ||
@@ -140,21 +134,18 @@ function detectLanguageFromContent(code: string): string | null {
     return 'rust';
   }
 
-  // ===== PHP =====
   if (/<\?php/.test(trimmed) ||
       /\$[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*/.test(trimmed) &&
       /echo\s+/.test(trimmed)) {
     return 'php';
   }
 
-  // ===== C / C++ =====
   if (/#include\s*<[^>]+>/.test(trimmed) ||
       /int\s+main\s*\(/.test(trimmed) &&
       /printf/.test(trimmed)) {
     return 'cpp';
   }
 
-  // ===== HTML =====
   if (/<!DOCTYPE\s+html/.test(trimmed) ||
       /<html[^>]*>/.test(trimmed) ||
       /<body[^>]*>/.test(trimmed) ||
@@ -162,14 +153,12 @@ function detectLanguageFromContent(code: string): string | null {
     return 'html';
   }
 
-  // ===== CSS =====
   if (/^[.#][a-zA-Z_-]+\s*{/.test(trimmed) ||
       /@media/.test(trimmed) ||
       /@keyframes/.test(trimmed)) {
     return 'css';
   }
 
-  // ===== JSON =====
   if (trimmed.startsWith('{') && trimmed.endsWith('}') ||
       trimmed.startsWith('[') && trimmed.endsWith(']')) {
     try {
@@ -180,7 +169,6 @@ function detectLanguageFromContent(code: string): string | null {
     }
   }
 
-  // ===== Bash =====
   if (/^#!\/bin\/bash/.test(trimmed) ||
       /^#!\/usr\/bin\/env\s+bash/.test(trimmed) ||
       /^export\s+/.test(trimmed) ||
@@ -290,7 +278,7 @@ export default function Editor({
   }, [dispatch]);
 
   // ============================================================
-  // 🔥 تشخیص خودکار زبان هنگام تغییر کد (همیشه فعال)
+  // 🔥 تشخیص خودکار زبان هنگام تغییر کد
   // ============================================================
 
   useEffect(() => {
@@ -305,7 +293,7 @@ export default function Editor({
   }, [code, language, dispatch]);
 
   // ============================================================
-  // 🔥 تشخیص زبان از پسوند فایل (برای آپلود)
+  // 🔥 تشخیص زبان از پسوند فایل
   // ============================================================
 
   const detectLanguageFromExtension = useCallback((filename: string): string | null => {
@@ -480,10 +468,10 @@ export default function Editor({
   // 🔥 Mode Selector
   // ============================================================
 
-  const modes: { value: 'simple' | 'medium' | 'advanced'; label: string; icon: string; color: string }[] = [
-    { value: 'simple', label: 'Simple', icon: '📘', color: 'bg-green-500' },
-    { value: 'medium', label: 'Medium', icon: '📗', color: 'bg-yellow-500' },
-    { value: 'advanced', label: 'Advanced', icon: '📕', color: 'bg-red-500' },
+  const modes: { value: 'simple' | 'medium' | 'advanced'; label: string; icon: string; color: string; tooltip: string }[] = [
+    { value: 'simple', label: 'Simple', icon: '📘', color: 'bg-green-500', tooltip: 'Quick overview and basic analysis' },
+    { value: 'medium', label: 'Medium', icon: '📗', color: 'bg-yellow-500', tooltip: 'Detailed analysis with code review' },
+    { value: 'advanced', label: 'Advanced', icon: '📕', color: 'bg-red-500', tooltip: 'Deep production-grade audit with concurrency checks' },
   ];
 
   // ============================================================
@@ -520,23 +508,24 @@ export default function Editor({
 
       {/* ===== Toolbar Top: Mode & Source Language ===== */}
       <div className="flex flex-col gap-2 p-3 bg-[#f1f3f5] border-b border-[#d0d0d8]">
-        {/* ===== Row 1: Mode Selector (با flex-nowrap برای جلوگیری از شکستن خط) ===== */}
+        {/* ===== Row 1: Mode Selector ===== */}
         <div className="flex flex-nowrap items-center gap-2">
           <span className="text-xs font-medium text-[#4a4a6a] whitespace-nowrap">🎯 Mode:</span>
           <div className="flex gap-1">
             {modes.map((m) => (
-              <button
-                key={m.value}
-                onClick={() => dispatch({ type: 'SET_MODE', payload: m.value })}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-all whitespace-nowrap ${
-                  mode === m.value
-                    ? 'bg-[#4a86f7] text-white shadow-sm'
-                    : 'bg-white text-[#4a4a6a] hover:bg-[#e8e8f0] border border-[#d0d0d8]'
-                }`}
-              >
-                <span className="mr-1">{m.icon}</span>
-                {m.label}
-              </button>
+              <Tooltip key={m.value} text={m.tooltip} position="top">
+                <button
+                  onClick={() => dispatch({ type: 'SET_MODE', payload: m.value })}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-all whitespace-nowrap ${
+                    mode === m.value
+                      ? 'bg-[#4a86f7] text-white shadow-sm'
+                      : 'bg-white text-[#4a4a6a] hover:bg-[#e8e8f0] border border-[#d0d0d8]'
+                  }`}
+                >
+                  <span className="mr-1">{m.icon}</span>
+                  {m.label}
+                </button>
+              </Tooltip>
             ))}
           </div>
           <span className="text-xs text-[#6c7086] ml-1 whitespace-nowrap flex-shrink-0">
@@ -582,21 +571,22 @@ export default function Editor({
               ))}
           </select>
 
-          <button
-            onClick={handleConvertClick}
-            disabled={!convertLanguage || !canConvert || isConverting}
-            className={`flex items-center gap-1.5 text-sm px-3 py-1 rounded-md transition ${
-              !convertLanguage || !canConvert || isConverting
-                ? 'bg-[#e8e8f0] text-[#a0a0b0] cursor-not-allowed border border-[#d0d0d8]'
-                : 'bg-[#4a86f7] hover:bg-[#3b6fd4] text-white border border-[#4a86f7]'
-            }`}
-            title="Click to convert code to selected language"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            <span>{isConverting ? 'Converting...' : 'Convert'}</span>
-          </button>
+          <Tooltip text="Convert code to selected programming language" position="top">
+            <button
+              onClick={handleConvertClick}
+              disabled={!convertLanguage || !canConvert || isConverting}
+              className={`flex items-center gap-1.5 text-sm px-3 py-1 rounded-md transition ${
+                !convertLanguage || !canConvert || isConverting
+                  ? 'bg-[#e8e8f0] text-[#a0a0b0] cursor-not-allowed border border-[#d0d0d8]'
+                  : 'bg-[#4a86f7] hover:bg-[#3b6fd4] text-white border border-[#4a86f7]'
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              <span>{isConverting ? 'Converting...' : 'Convert'}</span>
+            </button>
+          </Tooltip>
 
           {isConverting && (
             <span className="text-sm text-[#4a86f7] animate-pulse">⏳ Converting...</span>
@@ -624,64 +614,75 @@ export default function Editor({
       {/* ===== Action Buttons ===== */}
       <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2 bg-[#f8f9fa] border-b border-[#d0d0d8]">
         <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={onGenerate}
-            disabled={loading || !code.trim()}
-            className="flex items-center gap-1.5 bg-[#4a86f7] hover:bg-[#3b6fd4] text-white font-medium px-4 py-1.5 rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-            {loading ? 'Generating...' : '✨ Generate'}
-          </button>
-
-          <button
-            onClick={handleExplainClick}
-            disabled={!code.trim() || isExplaining}
-            className={`flex items-center text-sm px-3 py-1.5 rounded-md border transition ${
-              !code.trim() || isExplaining
-                ? 'bg-[#f1f3f5] text-[#a0a0b0] border-[#d0d0d8] cursor-not-allowed'
-                : 'bg-[#e8e8f0] hover:bg-[#d0d0d8] text-[#1a1a2e] border-[#d0d0d8] hover:border-[#4a86f7]'
-            }`}
-            title="Explain code line by line"
-          >
-            <span>{isExplaining ? 'Explaining...' : 'Explain'}</span>
-          </button>
-
-          <button
-            onClick={handleGeneratePromptClick}
-            disabled={!code.trim() || isGeneratingPrompt}
-            className={`flex items-center text-sm px-3 py-1.5 rounded-md border transition ${
-              !code.trim() || isGeneratingPrompt
-                ? 'bg-[#f1f3f5] text-[#a0a0b0] border-[#d0d0d8] cursor-not-allowed'
-                : 'bg-[#e8e8f0] hover:bg-[#d0d0d8] text-[#1a1a2e] border-[#d0d0d8] hover:border-[#4a86f7]'
-            }`}
-            title="Generate prompt from code"
-          >
-            <span>{isGeneratingPrompt ? 'Generating...' : 'Prompt'}</span>
-          </button>
-
-          {loading && onStop && (
+          {/* ===== Generate Button ===== */}
+          <Tooltip text="Generate AI-powered code analysis (Ctrl+Enter)" position="top">
             <button
-              onClick={onStop}
-              className="flex items-center text-orange-500 hover:text-orange-700 transition-colors hover:bg-orange-50 px-2 py-1 rounded-md border border-orange-200 hover:border-orange-300 text-sm"
-              title="Stop generation process"
-            >
-              <span>Stop</span>
-            </button>
-          )}
-
-          {code.trim() && (
-            <button
-              onClick={handleClearCode}
-              className="flex items-center gap-1 text-red-500 hover:text-red-700 transition-colors hover:bg-red-50 px-2 py-1 rounded-md border border-red-200 hover:border-red-300 text-sm"
-              title="Clear all code and results"
+              onClick={onGenerate}
+              disabled={loading || !code.trim()}
+              className="flex items-center gap-1.5 bg-[#4a86f7] hover:bg-[#3b6fd4] text-white font-medium px-4 py-1.5 rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed text-sm"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
-              <span className="hidden sm:inline">Clear</span>
+              {loading ? 'Generating...' : '✨ Generate'}
             </button>
+          </Tooltip>
+
+          {/* ===== Explain Button ===== */}
+          <Tooltip text="Generate line-by-line code explanation" position="top">
+            <button
+              onClick={handleExplainClick}
+              disabled={!code.trim() || isExplaining}
+              className={`flex items-center text-sm px-3 py-1.5 rounded-md border transition ${
+                !code.trim() || isExplaining
+                  ? 'bg-[#f1f3f5] text-[#a0a0b0] border-[#d0d0d8] cursor-not-allowed'
+                  : 'bg-[#e8e8f0] hover:bg-[#d0d0d8] text-[#1a1a2e] border-[#d0d0d8] hover:border-[#4a86f7]'
+              }`}
+            >
+              <span>{isExplaining ? 'Explaining...' : 'Explain'}</span>
+            </button>
+          </Tooltip>
+
+          {/* ===== Prompt Button ===== */}
+          <Tooltip text="Generate a learning prompt from your code" position="top">
+            <button
+              onClick={handleGeneratePromptClick}
+              disabled={!code.trim() || isGeneratingPrompt}
+              className={`flex items-center text-sm px-3 py-1.5 rounded-md border transition ${
+                !code.trim() || isGeneratingPrompt
+                  ? 'bg-[#f1f3f5] text-[#a0a0b0] border-[#d0d0d8] cursor-not-allowed'
+                  : 'bg-[#e8e8f0] hover:bg-[#d0d0d8] text-[#1a1a2e] border-[#d0d0d8] hover:border-[#4a86f7]'
+              }`}
+            >
+              <span>{isGeneratingPrompt ? 'Generating...' : 'Prompt'}</span>
+            </button>
+          </Tooltip>
+
+          {/* ===== Stop Button ===== */}
+          {loading && onStop && (
+            <Tooltip text="Stop the current generation process" position="top">
+              <button
+                onClick={onStop}
+                className="flex items-center text-orange-500 hover:text-orange-700 transition-colors hover:bg-orange-50 px-2 py-1 rounded-md border border-orange-200 hover:border-orange-300 text-sm"
+              >
+                <span>Stop</span>
+              </button>
+            </Tooltip>
+          )}
+
+          {/* ===== Clear Button ===== */}
+          {code.trim() && (
+            <Tooltip text="Clear all code and results" position="top">
+              <button
+                onClick={handleClearCode}
+                className="flex items-center gap-1 text-red-500 hover:text-red-700 transition-colors hover:bg-red-50 px-2 py-1 rounded-md border border-red-200 hover:border-red-300 text-sm"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                <span className="hidden sm:inline">Clear</span>
+              </button>
+            </Tooltip>
           )}
         </div>
 
@@ -749,11 +750,13 @@ export default function Editor({
               onClick={handleUploadClick}
               className="pointer-events-auto cursor-pointer w-64 h-64 rounded-2xl border-4 border-dashed border-[#d0d0d8] hover:border-[#4a86f7] bg-white/50 hover:bg-white/80 flex flex-col items-center justify-center gap-4 transition-all duration-300 group"
             >
-              <div className="w-16 h-16 rounded-full bg-[#f1f3f5] group-hover:bg-[#e8e8f0] flex items-center justify-center transition-all">
-                <svg className="w-8 h-8 text-[#6c7086] group-hover:text-[#4a86f7] transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                </svg>
-              </div>
+              <Tooltip text="Click to upload a code file (drag & drop supported)" position="top">
+                <div className="w-16 h-16 rounded-full bg-[#f1f3f5] group-hover:bg-[#e8e8f0] flex items-center justify-center transition-all">
+                  <svg className="w-8 h-8 text-[#6c7086] group-hover:text-[#4a86f7] transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  </svg>
+                </div>
+              </Tooltip>
               <div className="text-center">
                 <p className="text-[#1a1a2e] font-medium text-lg group-hover:text-[#4a86f7] transition-all">
                   📤 Upload Code
