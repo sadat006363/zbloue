@@ -35,7 +35,7 @@ type PipelineStatus = 'complete' | 'repaired' | 'failed_validation';
 // CONSTANTS
 // ============================================================
 
-const MAX_REPAIR_ATTEMPTS = ANALYSIS_CONFIG.maxRepairPasses;
+const MAX_REPAIR_ATTEMPTS = ANALYSIS_CONFIG.maxRepairPasses; // 🔥 حالا 1 است
 const PIPELINE_DEADLINE_MS = parseInt(process.env.PIPELINE_DEADLINE_MS || '180000', 10);
 
 // ============================================================
@@ -92,7 +92,8 @@ function finalizeAuditCandidate(
   }
 
   const payload: any = { ...candidate };
-  payload.schemaVersion = '1.0';
+  // 🔥 اطمینان از schemaVersion صحیح
+  payload.schemaVersion = '1.0.0';
   payload.auditType = 'comprehensive';
   payload.completionStatus = metadata.completionStatus;
   payload.repairApplied = metadata.repairApplied;
@@ -139,6 +140,7 @@ async function attemptRepairWithBudget(
   const previousJson = previousCandidate ? JSON.stringify(previousCandidate, null, 2) : '{}';
 
   try {
+    // 🔥 استفاده از مدل ارزان‌تر برای Repair
     const repaired = await repairAudit(
       numberedCode,
       previousJson,
@@ -428,6 +430,25 @@ export async function runAdvancedPipeline(
         let completionStatus: CompletionStatus = 'complete';
         let repairApplied = false;
 
+        // 🔥 اگر خروجی معتبر است، از Repair صرف‌نظر کن
+        if (!lastValidation.repairRequired) {
+          logger.info('[Pipeline] No repair needed, returning directly');
+          const finalizeResult = finalizeAuditCandidate(lastCandidate, {
+            completionStatus: 'complete',
+            repairApplied: false,
+            appliedSpecializations,
+            language,
+          });
+          if (finalizeResult.success) {
+            return {
+              result: finalizeResult.data,
+              status: 'complete',
+              trace: { stages, rawAIResponse: rawContent, extractedJSON: jsonString || '' },
+            };
+          }
+        }
+
+        // 🔥 فقط در صورت نیاز به Repair اجرا کن
         while (lastValidation.repairRequired && repairAttempts < MAX_REPAIR_ATTEMPTS) {
           if (Date.now() > deadline) {
             logger.warn('[Pipeline] Deadline reached during repair loop');

@@ -195,7 +195,7 @@ function normalizeScoreItem(
   if (isObject(value)) {
     const score = normalizeScore(value.score, fallback);
     const reason = typeof value.reason === 'string' ? value.reason.trim() : defaultReason;
-    // 🔥 اصلاح: پشتیبانی از هر دو نام فیلد (relatedFindingIds و relatedFindings)
+    // 🔥 پشتیبانی از هر دو نام فیلد (relatedFindingIds و relatedFindings)
     let relatedFindingIds: string[] = [];
     if (Array.isArray(value.relatedFindingIds)) {
       relatedFindingIds = value.relatedFindingIds.filter((id): id is string => typeof id === 'string');
@@ -544,7 +544,7 @@ function normalizeArchitecturalObservations(
       const o = getSafeObject(obs);
       const title = getSafeString(o.title, '');
       const explanation = getSafeString(o.explanation, '');
-      // 🔥 اصلاح: پشتیبانی از هر دو نام فیلد
+      // 🔥 پشتیبانی از هر دو نام فیلد
       let relatedFindingIds: string[] = [];
       if (Array.isArray(o.relatedFindingIds)) {
         relatedFindingIds = o.relatedFindingIds.filter((id) => findingIds.has(id));
@@ -568,7 +568,7 @@ function normalizeRecommendedActions(
       const severity = sanitizeEnum(a.severity, SeveritySchema.options, 'medium');
       const title = getSafeString(a.title, '');
       const action = getSafeString(a.action, '');
-      // 🔥 اصلاح: پشتیبانی از هر دو نام فیلد
+      // 🔥 پشتیبانی از هر دو نام فیلد
       let relatedFindingIds: string[] = [];
       if (Array.isArray(a.relatedFindingIds)) {
         relatedFindingIds = a.relatedFindingIds.filter((id) => findingIds.has(id));
@@ -595,7 +595,7 @@ function normalizeSuggestedTests(
       const setup = getStringArray(t.setup) || [];
       const steps = getStringArray(t.steps) || [];
       const expectedResult = getSafeString(t.expectedResult, getSafeString(t.expectedOutput, ''));
-      // 🔥 اصلاح: پشتیبانی از هر دو نام فیلد
+      // 🔥 پشتیبانی از هر دو نام فیلد
       let relatedFindingIds: string[] = [];
       if (Array.isArray(t.relatedFindingIds)) {
         relatedFindingIds = t.relatedFindingIds.filter((id) => findingIds.has(id));
@@ -611,7 +611,7 @@ function normalizeLanguage(source: unknown): string {
   return getSafeString(source, 'unknown');
 }
 
-// 🔥 اصلاح: تابع createMinimalAuditFromPartial
+// 🔥 تابع createMinimalAuditFromPartial
 function createMinimalAuditFromPartial(
   raw: unknown,
   error: unknown
@@ -644,7 +644,6 @@ function createMinimalAuditFromPartial(
     }
 
     const minimal: AdvancedAuditResult = {
-      // 🔥 اصلاح: schemaVersion به صورت string معمولی
       schemaVersion: '1.0.0',
       auditType: 'comprehensive',
       appliedSpecializations: normalizeAppliedSpecializations(input.appliedSpecializations ?? input.specializations),
@@ -686,7 +685,7 @@ function createMinimalAuditFromPartial(
   }
 }
 
-// 🔥 اصلاح: تابع اصلی normalizeAnalysisOutput
+// 🔥 تابع اصلی normalizeAnalysisOutput
 export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
   const startTime = Date.now();
   logger.debug('[Normalizer] Starting normalization');
@@ -776,7 +775,7 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
 
   const limitations = getStringArray(input.limitations);
 
-  // 🔥 اصلاح: پشتیبانی از هر دو نام فیلد (camelCase و snake_case)
+  // 🔥 پشتیبانی از هر دو نام فیلد (camelCase و snake_case)
   let linkedinPost =
     typeof input.linkedinPost === 'string'
       ? input.linkedinPost.trim()
@@ -800,9 +799,8 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
     }));
   }
 
-  // 🔥 اصلاح: ساخت نتیجه نهایی با schemaVersion صحیح
+  // 🔥 ساخت نتیجه نهایی با schemaVersion صحیح
   const result: AdvancedAuditResult = {
-    // 🔥 اصلاح: schemaVersion به صورت string معمولی (پشتیبانی از هر دو نسخه)
     schemaVersion: '1.0.0',
     auditType: 'comprehensive',
     appliedSpecializations,

@@ -9,9 +9,9 @@ export interface AnalysisConfig {
 }
 
 export const ANALYSIS_CONFIG: AnalysisConfig = {
-  concurrencyThreshold: 3, // 🔥 کاهش از 5 به 3 تا حساس‌تر شود
+  concurrencyThreshold: 5, // 🔥 افزایش از 3 به 5 (کمتر وارد حالت Concurrency شود)
   maxLinesForAnalysis: 500,
-  maxRepairPasses: 2,
+  maxRepairPasses: 1, // 🔥 کاهش از 2 به 1 (کاهش هزینه و زمان)
   schemaVersion: '1.0',
   scoreRange: { min: 0, max: 10 },
 };
