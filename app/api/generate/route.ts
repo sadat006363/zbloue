@@ -118,9 +118,7 @@ function validateResponse(result: unknown): LegacyGenerateResponse {
  * while also preserving all canonical fields for storage and UI.
  */
 function mapCanonicalToLegacy(canonical: any): LegacyGenerateResponse {
-  // ساخت یک شیء واحد با تمام فیلدها (بدون تکرار نام)
   return {
-    // ===== فیلدهای Legacy اصلی =====
     analysis: canonical.summary || '',
     card_title: canonical.title || 'Code Analysis',
     key_concept: canonical.summary?.slice(0, 2000) || '',
@@ -145,7 +143,7 @@ function mapCanonicalToLegacy(canonical: any): LegacyGenerateResponse {
           notes: canonical.improvedCode.notes || '',
         }
       : undefined,
-    suggestedTests: canonical.suggestedTests || [],
+    suggestedTests: [],
     scorecard: canonical.scorecard || null,
     finalVerdict: canonical.verdict
       ? {
@@ -155,8 +153,6 @@ function mapCanonicalToLegacy(canonical: any): LegacyGenerateResponse {
         }
       : undefined,
     error: undefined,
-
-    // ===== فیلدهای کانونیکال (برای ذخیره‌سازی و نمایش Full Analysis) =====
     findings: canonical.findings || [],
     executionOverview: canonical.executionOverview || null,
     architecturalObservations: canonical.architecturalObservations || [],
@@ -171,214 +167,237 @@ function mapCanonicalToLegacy(canonical: any): LegacyGenerateResponse {
     title: canonical.title || 'Code Analysis',
     summary: canonical.summary || '',
     debug_trace: canonical.debug_trace || undefined,
-    // 🔥 اضافه کردن audit_result به خروجی
     audit_result: canonical,
   };
 }
 
 // ============================================================
-// 3. Main POST handler
+// 3. Main POST handler (با try-catch برای لاگ‌گیری دقیق)
 // ============================================================
 
 export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
+  console.log('🔍 [generate] ===== REQUEST STARTED =====');
   const startTime = Date.now();
   const ip = getClientIP(req);
 
-  // Rate limiting
-  const rateLimitResult = await rateLimiter(ip);
-  if (!rateLimitResult.allowed) {
-    logger.warn(`[generate] Rate limit exceeded for IP ${ip}`);
-    return NextResponse.json(
-      { error: rateLimitResult.message },
-      { status: 429 }
-    );
-  }
-
-  // Parse request
-  let rawBody: unknown;
   try {
-    rawBody = await req.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
-  }
-
-  // Validate using canonical request schema
-  const validation = GenerateRequestSchema.safeParse(rawBody);
-  if (!validation.success) {
-    const firstError = validation.error.issues[0];
-    logger.warn(`[generate] Validation failed for IP ${ip}: ${firstError.path.join('.')} - ${firstError.message}`);
-    return NextResponse.json(
-      { error: `Validation error: ${firstError.path.join('.')} - ${firstError.message}` },
-      { status: 400 }
-    );
-  }
-
-  const { code, language: rawLanguage, mode } = validation.data;
-  const language = normalizeLanguage(rawLanguage);
-
-  if (!isSupportedLanguage(language)) {
-    return NextResponse.json(
-      {
-        error: `Unsupported language: "${rawLanguage}" (normalized: "${language}"). Supported: ${SUPPORTED_LANGUAGES.join(', ')}`,
-      },
-      { status: 400 }
-    );
-  }
-
-  const lines = code.split(/\r?\n/).length;
-  if (lines > MAX_LINES_GENERATE) {
-    return NextResponse.json(
-      { error: `Code exceeds ${MAX_LINES_GENERATE} lines (${lines} lines).` },
-      { status: 400 }
-    );
-  }
-
-  const byteLength = Buffer.byteLength(JSON.stringify(rawBody), 'utf8');
-  if (byteLength > 100000) {
-    return NextResponse.json({ error: 'Payload too large (max 100KB)' }, { status: 413 });
-  }
-
-  // Check cache
-  const cacheKey = getCacheKey(code, language, mode);
-  const cached = getCachedResult(cacheKey);
-  if (cached) {
-    logger.info(`[generate] Cache hit for IP ${ip}, mode ${mode}, key ${cacheKey.slice(0, 8)}...`);
-    // بازگرداندن فقط audit_result و metadata ساده
-    const auditResult = cached.result.audit_result;
-    if (!auditResult) {
-      logger.error('[generate] Cached result missing audit_result');
+    // Rate limiting
+    console.log('🔍 [generate] Checking rate limit for IP:', ip);
+    const rateLimitResult = await rateLimiter(ip);
+    if (!rateLimitResult.allowed) {
+      logger.warn(`[generate] Rate limit exceeded for IP ${ip}`);
       return NextResponse.json(
-        { error: 'Invalid cached data' },
-        { status: 500 }
+        { error: rateLimitResult.message },
+        { status: 429 }
       );
     }
-    return NextResponse.json({
-      audit_result: auditResult,
-      language,
-      raw_code: code,
-    });
-  }
 
-  // Mock support
-  if (process.env.USE_MOCK_RESPONSE === 'true' && mode === 'advanced') {
-    logger.info(`[generate] Using mock response for advanced mode (IP ${ip})`);
-    const mock = validateResponse(MOCK_RESPONSE);
-    setCacheResult(cacheKey, mock);
-    const auditResult = mock.audit_result;
-    if (!auditResult) {
-      logger.error('[generate] Mock response missing audit_result');
-      return NextResponse.json(
-        { error: 'Invalid mock data' },
-        { status: 500 }
-      );
-    }
-    return NextResponse.json({
-      audit_result: auditResult,
-      language,
-      raw_code: code,
-    });
-  }
-
-  // Actual generation
-  let legacyResult: LegacyGenerateResponse | null = null;
-  let pipelineTrace: unknown = null;
-  let auditResult: any = null;
-
-  if (mode === 'advanced') {
-    logger.info(`[generate] Running advanced pipeline for IP ${ip}`);
+    // Parse request
+    let rawBody: unknown;
     try {
-      const pipelineResult = await runAdvancedPipeline(code, language);
-      pipelineTrace = pipelineResult.trace || null;
+      rawBody = await req.json();
+      console.log('🔍 [generate] Request body received, mode:', (rawBody as any)?.mode);
+    } catch (parseError) {
+      console.error('❌ [generate] JSON parse error:', parseError);
+      return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
+    }
 
-      if (pipelineResult.result) {
-        const validated = AdvancedAuditResultSchema.safeParse(pipelineResult.result);
-        if (validated.success) {
-          legacyResult = mapCanonicalToLegacy(validated.data);
-          auditResult = validated.data; // 🔥 ذخیره audit_result از داده‌های اعتبارسنجی‌شده
-          if (pipelineResult.trace) {
-            (legacyResult as any).debug_trace = pipelineResult.trace;
+    // Validate using canonical request schema
+    const validation = GenerateRequestSchema.safeParse(rawBody);
+    if (!validation.success) {
+      const firstError = validation.error.issues[0];
+      logger.warn(`[generate] Validation failed for IP ${ip}: ${firstError.path.join('.')} - ${firstError.message}`);
+      return NextResponse.json(
+        { error: `Validation error: ${firstError.path.join('.')} - ${firstError.message}` },
+        { status: 400 }
+      );
+    }
+
+    const { code, language: rawLanguage, mode } = validation.data;
+    const language = normalizeLanguage(rawLanguage);
+    console.log(`🔍 [generate] Normalized language: ${language}, mode: ${mode}`);
+
+    if (!isSupportedLanguage(language)) {
+      return NextResponse.json(
+        {
+          error: `Unsupported language: "${rawLanguage}" (normalized: "${language}"). Supported: ${SUPPORTED_LANGUAGES.join(', ')}`,
+        },
+        { status: 400 }
+      );
+    }
+
+    const lines = code.split(/\r?\n/).length;
+    if (lines > MAX_LINES_GENERATE) {
+      return NextResponse.json(
+        { error: `Code exceeds ${MAX_LINES_GENERATE} lines (${lines} lines).` },
+        { status: 400 }
+      );
+    }
+
+    const byteLength = Buffer.byteLength(JSON.stringify(rawBody), 'utf8');
+    if (byteLength > 100000) {
+      return NextResponse.json({ error: 'Payload too large (max 100KB)' }, { status: 413 });
+    }
+
+    // Check cache (only for advanced mode to avoid caching simple/medium)
+    if (mode === 'advanced') {
+      const cacheKey = getCacheKey(code, language, mode);
+      const cached = getCachedResult(cacheKey);
+      if (cached) {
+        logger.info(`[generate] Cache hit for IP ${ip}, mode ${mode}, key ${cacheKey.slice(0, 8)}...`);
+        const auditResult = cached.result.audit_result;
+        if (!auditResult) {
+          logger.error('[generate] Cached result missing audit_result');
+          return NextResponse.json(
+            { error: 'Invalid cached data' },
+            { status: 500 }
+          );
+        }
+        return NextResponse.json({
+          audit_result: auditResult,
+          language,
+          raw_code: code,
+        });
+      }
+    }
+
+    // Mock support (only for advanced)
+    if (process.env.USE_MOCK_RESPONSE === 'true' && mode === 'advanced') {
+      logger.info(`[generate] Using mock response for advanced mode (IP ${ip})`);
+      const mock = validateResponse(MOCK_RESPONSE);
+      if (mode === 'advanced') {
+        setCacheResult(getCacheKey(code, language, mode), mock);
+      }
+      const auditResult = mock.audit_result;
+      if (!auditResult) {
+        logger.error('[generate] Mock response missing audit_result');
+        return NextResponse.json(
+          { error: 'Invalid mock data' },
+          { status: 500 }
+        );
+      }
+      return NextResponse.json({
+        audit_result: auditResult,
+        language,
+        raw_code: code,
+      });
+    }
+
+    // ============================================================
+    // 🔥 Actual generation
+    // ============================================================
+    let legacyResult: LegacyGenerateResponse | null = null;
+    let pipelineTrace: unknown = null;
+    let auditResult: any = null;
+
+    console.log(`🔍 [generate] Starting generation for mode: ${mode}`);
+
+    if (mode === 'advanced') {
+      logger.info(`[generate] Running advanced pipeline for IP ${ip}`);
+      try {
+        const pipelineResult = await runAdvancedPipeline(code, language);
+        pipelineTrace = pipelineResult.trace || null;
+
+        if (pipelineResult.result) {
+          const validated = AdvancedAuditResultSchema.safeParse(pipelineResult.result);
+          if (validated.success) {
+            legacyResult = mapCanonicalToLegacy(validated.data);
+            auditResult = validated.data;
+            if (pipelineResult.trace) {
+              (legacyResult as any).debug_trace = pipelineResult.trace;
+            }
+            logger.info(`[generate] Advanced pipeline succeeded with status: ${pipelineResult.status}`);
+          } else {
+            logger.warn('[generate] Pipeline output failed schema validation, falling back to legacy');
+            const legacyData = await generateEducationalContent(code, language, mode);
+            legacyResult = validateResponse(legacyData);
+            auditResult = (legacyResult as any).audit_result || null;
           }
-          logger.info(`[generate] Advanced pipeline succeeded with status: ${pipelineResult.status}`);
         } else {
-          logger.warn('[generate] Pipeline output failed schema validation, falling back to legacy');
+          logger.warn(`[generate] Advanced pipeline failed: ${pipelineResult.error}`);
           const legacyData = await generateEducationalContent(code, language, mode);
           legacyResult = validateResponse(legacyData);
-          // 🔥 در Fallback، audit_result را از legacyResult بگیریم
           auditResult = (legacyResult as any).audit_result || null;
         }
-      } else {
-        logger.warn(`[generate] Advanced pipeline failed: ${pipelineResult.error}`);
+
+        // Add trace
+        if (pipelineResult.trace && legacyResult) {
+          (legacyResult as any).debug_trace = pipelineResult.trace;
+        } else if (pipelineResult.error && legacyResult) {
+          (legacyResult as any).debug_trace = {
+            error: pipelineResult.error,
+            status: pipelineResult.status,
+          };
+        }
+
+        if (!auditResult && legacyResult) {
+          auditResult = (legacyResult as any).audit_result || null;
+        }
+      } catch (error) {
+        logger.error('[generate] Pipeline error, falling back to legacy:', error);
         const legacyData = await generateEducationalContent(code, language, mode);
         legacyResult = validateResponse(legacyData);
         auditResult = (legacyResult as any).audit_result || null;
+        if (legacyResult) {
+          (legacyResult as any).debug_trace = {
+            error: error instanceof Error ? error.message : 'Unknown pipeline error',
+            timestamp: new Date().toISOString(),
+          };
+        }
       }
-
-      // ============================================================
-      // 🔥 اضافه کردن trace به legacyResult در همه حالت‌ها
-      // ============================================================
-      if (pipelineResult.trace && legacyResult) {
-        (legacyResult as any).debug_trace = pipelineResult.trace;
-      } else if (pipelineResult.error && legacyResult) {
-        (legacyResult as any).debug_trace = {
-          error: pipelineResult.error,
-          status: pipelineResult.status,
-        };
-      }
-
-      // ============================================================
-      // 🔥 اگر auditResult هنوز null است، از legacyResult بگیر
-      // ============================================================
-      if (!auditResult && legacyResult) {
+    } else {
+      // Simple / Medium
+      console.log(`🔍 [generate] Running legacy generation for mode ${mode} (IP ${ip})`);
+      try {
+        const legacyData = await generateEducationalContent(code, language, mode);
+        legacyResult = validateResponse(legacyData);
         auditResult = (legacyResult as any).audit_result || null;
-      }
-
-    } catch (error) {
-      logger.error('[generate] Pipeline error, falling back to legacy:', error);
-      const legacyData = await generateEducationalContent(code, language, mode);
-      legacyResult = validateResponse(legacyData);
-      auditResult = (legacyResult as any).audit_result || null;
-      if (legacyResult) {
-        (legacyResult as any).debug_trace = {
-          error: error instanceof Error ? error.message : 'Unknown pipeline error',
-          timestamp: new Date().toISOString(),
-        };
+        console.log(`🔍 [generate] Legacy generation completed for mode ${mode}`);
+      } catch (legacyError) {
+        console.error(`❌ [generate] Legacy generation failed for mode ${mode}:`, legacyError);
+        throw legacyError; // re-throw to be caught by outer try-catch
       }
     }
-  } else {
-    // Simple / Medium modes
-    logger.info(`[generate] Running legacy generation for mode ${mode} (IP ${ip})`);
-    const legacyData = await generateEducationalContent(code, language, mode);
-    legacyResult = validateResponse(legacyData);
-    auditResult = (legacyResult as any).audit_result || null;
-  }
 
-  // ============================================================
-  // 🔥 اعتبارسنجی نهایی: auditResult باید وجود داشته باشد
-  // ============================================================
-  if (!auditResult) {
-    logger.error('[generate] Final audit_result is missing');
+    // Final validation
+    if (!auditResult && mode === 'advanced') {
+      logger.error('[generate] Final audit_result is missing');
+      return NextResponse.json(
+        { error: 'Failed to generate audit result' },
+        { status: 500 }
+      );
+    }
+
+    // Cache only advanced results
+    if (mode === 'advanced' && legacyResult) {
+      setCacheResult(getCacheKey(code, language, mode), legacyResult, pipelineTrace);
+    }
+
+    const duration = Date.now() - startTime;
+    logger.info(`[generate] Request completed in ${duration}ms for mode ${mode} (IP ${ip})`);
+
+    // ============================================================
+    // 🔥 Return response
+    // ============================================================
+    if (mode === 'advanced') {
+      return NextResponse.json({
+        audit_result: auditResult,
+        language,
+        raw_code: code,
+      });
+    } else {
+      // Simple / Medium: return legacy response (with analysis text)
+      return NextResponse.json(legacyResult);
+    }
+  } catch (error) {
+    console.error('❌ [generate] UNHANDLED ERROR:', error);
+    logger.error('[generate] Unhandled error:', error);
     return NextResponse.json(
-      { error: 'Failed to generate audit result' },
+      {
+        error: error instanceof Error ? error.message : 'Internal server error',
+        stack: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.stack : undefined) : undefined,
+      },
       { status: 500 }
     );
   }
-
-  // ============================================================
-  // 🔥 Cache the result (با نگهداری audit_result در cached.result)
-  // ============================================================
-  if (legacyResult) {
-    setCacheResult(cacheKey, legacyResult, pipelineTrace);
-  }
-
-  const duration = Date.now() - startTime;
-  logger.info(`[generate] Request completed in ${duration}ms for mode ${mode} (IP ${ip})`);
-
-  // ============================================================
-  // 🔥 بازگرداندن فقط audit_result و metadata ساده
-  // ============================================================
-  return NextResponse.json({
-    audit_result: auditResult,
-    language,
-    raw_code: code,
-  });
 });
