@@ -17,7 +17,7 @@ export interface SnippetCreationContext {
 }
 
 // ============================================================
-// 🔥 اصلاح: تبدیل AdvancedAuditResult به SnippetInsert
+// 🔥 تبدیل AdvancedAuditResult به SnippetInsert
 // ============================================================
 
 export function toSnippetInsert(
@@ -26,7 +26,6 @@ export function toSnippetInsert(
 ): SnippetInsert {
   const now = new Date().toISOString();
 
-  // 🔥 فقط فیلدهای ضروری در root باقی می‌مانند
   const row: SnippetInsert = {
     // ===== Primary keys =====
     slug: context.slug,
@@ -42,11 +41,9 @@ export function toSnippetInsert(
     created_at: now,
 
     // ===== 🔥 فقط audit_result =====
-    // تمام داده‌های تحلیلی فقط در اینجا ذخیره می‌شوند
     audit_result: audit as any,
 
-    // ===== فیلدهای Legacy (برای سازگاری با نسخه‌های قدیمی) =====
-    // 🔥 همه را null می‌گذاریم چون داده‌ها در audit_result هستند
+    // ===== فیلدهای Legacy - همه nullable هستند =====
     card_title: null,
     key_concept: null,
     what_this_code_does: null,
@@ -54,7 +51,6 @@ export function toSnippetInsert(
     optimization: null,
     linkedin_post: null,
 
-    // Legacy fields - all null
     code_walkthrough: null,
     what_works_well: null,
     bugs_and_risky_cases: null,
@@ -70,7 +66,6 @@ export function toSnippetInsert(
     final_verdict_approved: null,
     final_verdict_next_steps: null,
 
-    // Advanced fields - all null (data in audit_result)
     findings: null,
     execution_overview: null,
     architectural_observations: null,
@@ -91,7 +86,6 @@ export function toSnippetInsert(
 // ============================================================
 
 export function snippetRowToAudit(row: any): AdvancedAuditResult | null {
-  // اولویت اول: audit_result
   if (row.audit_result) {
     try {
       let data = row.audit_result;
@@ -107,7 +101,6 @@ export function snippetRowToAudit(row: any): AdvancedAuditResult | null {
     }
   }
 
-  // Fallback: ساخت از فیلدهای Legacy
   return legacyRowToAudit(row);
 }
 
