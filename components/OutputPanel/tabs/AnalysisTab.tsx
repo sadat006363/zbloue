@@ -121,7 +121,8 @@ export default function AnalysisTab({
   const hasLimitations = fullAnalysis?.limitations && Array.isArray(fullAnalysis.limitations) && fullAnalysis.limitations.length > 0;
   const hasScorecardNew = fullAnalysis?.scorecard && typeof fullAnalysis.scorecard === 'object';
   const hasSuggestedTests = fullAnalysis?.suggestedTests && Array.isArray(fullAnalysis.suggestedTests) && fullAnalysis.suggestedTests.length > 0;
-  const hasLinkedInPost = fullAnalysis?.linkedinPost && typeof fullAnalysis.linkedinPost === 'string' && fullAnalysis.linkedinPost.length > 0;
+  // 🔥 اصلاح: استفاده از linkedin_post (Legacy) به‌جای linkedinPost
+  const hasLinkedInPost = fullAnalysis?.linkedin_post && typeof fullAnalysis.linkedin_post === 'string' && fullAnalysis.linkedin_post.length > 0;
 
   // 🔥 استخراج امتیازات از scorecard
   const getScoreValue = (scoreItem: any): number | null => {
@@ -762,11 +763,11 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* LinkedIn Post (جدید) */}
+        {/* LinkedIn Post (با استفاده از linkedin_post) */}
         {hasLinkedInPost && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-2">💼 LinkedIn Post</h3>
-            <p className="text-sm text-[#4a4a6a] whitespace-pre-wrap">{safeString(fullAnalysis.linkedinPost)}</p>
+            <p className="text-sm text-[#4a4a6a] whitespace-pre-wrap">{safeString(fullAnalysis.linkedin_post)}</p>
           </div>
         )}
 
