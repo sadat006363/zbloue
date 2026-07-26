@@ -100,7 +100,23 @@ Zbloue is currently in the MVP stage and actively collecting feedback.
 
 ## 🚀 Local Setup
 ```bash
+
 git clone https://github.com/sadat006363/zbloue.git
 cd zbloue
 npm install
 npm run dev
+## Feedback Wanted
+
+Zbloue is currently being refined toward MVP.
+
+If you're a developer, student, or beginner learning from code, your feedback would be very valuable.
+
+I'm especially looking for feedback on:
+- whether the core idea is clear
+- how useful this feels for beginners
+- confusing parts in the current flow
+- features you'd expect before using it regularly
+
+If you'd like to help, feel free to open an issue or start a discussion.
+
+
