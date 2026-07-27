@@ -141,22 +141,13 @@ export const LLM_MODELS = {
     defaultMaxTokens: 4000,
   },
 
-  // ===== Groq (Llama, Mistral, Gemma) - مدل‌های پشتیبانی‌شده فعلی =====
-  'llama-3.1-70b': {
-    model: 'llama3-70b-8192', // جایگزین llama-3.1-70b-versatile
-    api: 'chat-completions',
-    purpose: 'advanced-analysis',
-    supportsReasoning: false,
-    supportsTemperature: true,
-    supportsTopP: true,
-    supportsFrequencyPenalty: false,
-    supportsPresencePenalty: false,
-    tokenParam: 'max_tokens',
-    defaultMaxTokens: 8000,
-  },
+  // ============================================================
+  // 🔥 Groq - بر اساس مستندات رسمی (Production Models)
+  // ============================================================
 
+  // Llama 3.1 8B (سریع و ارزان)
   'llama-3.1-8b': {
-    model: 'llama3-8b-8192', // جایگزین llama-3.1-8b-instant (که کار می‌کرد)
+    model: 'llama-3.1-8b-instant',  // ← ID صحیح از مستندات
     api: 'chat-completions',
     purpose: 'code-analysis',
     supportsReasoning: false,
@@ -168,10 +159,37 @@ export const LLM_MODELS = {
     defaultMaxTokens: 8000,
   },
 
-  // mixtral-8x7b حذف شد چون decommissioned است
-  // به جای آن از gemma2-9b استفاده می‌کنیم
-  'gemma2-9b': {
-    model: 'gemma2-9b-it',
+  // Llama 3.3 70B (دقت بالا)
+  'llama-3.3-70b': {
+    model: 'llama-3.3-70b-versatile',  // ← ID صحیح از مستندات
+    api: 'chat-completions',
+    purpose: 'advanced-analysis',
+    supportsReasoning: false,
+    supportsTemperature: true,
+    supportsTopP: true,
+    supportsFrequencyPenalty: false,
+    supportsPresencePenalty: false,
+    tokenParam: 'max_tokens',
+    defaultMaxTokens: 8000,
+  },
+
+  // GPT-OSS 120B (OpenAI مدل Open Source)
+  'gpt-oss-120b': {
+    model: 'openai/gpt-oss-120b',  // ← ID صحیح از مستندات
+    api: 'chat-completions',
+    purpose: 'advanced-analysis',
+    supportsReasoning: false,
+    supportsTemperature: true,
+    supportsTopP: true,
+    supportsFrequencyPenalty: false,
+    supportsPresencePenalty: false,
+    tokenParam: 'max_tokens',
+    defaultMaxTokens: 8000,
+  },
+
+  // GPT-OSS 20B (سریع‌ترین)
+  'gpt-oss-20b': {
+    model: 'openai/gpt-oss-20b',  // ← ID صحیح از مستندات
     api: 'chat-completions',
     purpose: 'code-analysis',
     supportsReasoning: false,

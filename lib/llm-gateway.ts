@@ -50,7 +50,7 @@ const anthropic = new Anthropic({
 });
 
 // ============================================================
-// 🔥 Groq Client (برای Llama, Mistral و ...)
+// 🔥 Groq Client (برای Llama, GPT-OSS و ...)
 // ============================================================
 
 const groqApiKey = process.env.GROQ_API_KEY || '';
@@ -380,7 +380,7 @@ async function executeAnthropicCall(
 }
 
 // ============================================================
-// 🔥 Execute Groq Call (برای Llama, Mistral و ...)
+// 🔥 Execute Groq Call (مدل‌های فعال بر اساس مستندات Groq)
 // ============================================================
 
 async function executeGroqCall(
@@ -397,12 +397,12 @@ async function executeGroqCall(
 ): Promise<{ content: string; model: string; api: string; provider: 'groq' }> {
   console.log(`  🟢 [Groq] Executing with model: ${modelKey}`);
 
-  // 🔥 مدل‌های پشتیبانی‌شده توسط Groq (بر اساس مستندات فعلی)
+  // 🔥 مدل‌های پشتیبانی‌شده توسط Groq (بر اساس مستندات رسمی ۲۰۲۶)
   const modelMap: Record<string, string> = {
-    'llama-3.1-70b': 'llama3-70b-8192',
-    'llama-3.1-8b': 'llama3-8b-8192',
-    'gemma2-9b': 'gemma2-9b-it',
-    // در صورت نیاز به مدل‌های دیگر اضافه کنید
+    'llama-3.1-8b': 'llama-3.1-8b-instant',
+    'llama-3.3-70b': 'llama-3.3-70b-versatile',
+    'gpt-oss-20b': 'openai/gpt-oss-20b',
+    'gpt-oss-120b': 'openai/gpt-oss-120b',
   };
 
   const model = modelMap[modelKey] || modelKey;
@@ -412,8 +412,7 @@ async function executeGroqCall(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-  // 🔥 توجه: Groq فعلاً از response_format پشتیبانی نمی‌کند،
-  // بنابراین اگر responseFormat=json_object باشد، در پرامپت تأکید می‌کنیم.
+  // 🔥 Groq از response_format پشتیبانی نمی‌کند، بنابراین در پرامپت تأکید می‌کنیم
   let finalUserPrompt = userPrompt;
   if (options.responseFormat === 'json_object') {
     finalUserPrompt =
@@ -501,7 +500,8 @@ function getProviderModels(
 
   if (request.provider === 'groq') {
     console.log(`🔍 [LLM Gateway] Provider manually set to: GROQ`);
-    const keys = ['llama-3.1-70b', 'llama-3.1-8b', 'gemma2-9b'];
+    // 🔥 مدل‌های فعال Groq بر اساس مستندات
+    const keys = ['llama-3.3-70b', 'llama-3.1-8b', 'gpt-oss-120b', 'gpt-oss-20b'];
     models.push(
       ...keys.map((key) => ({
         provider: 'groq' as const,
@@ -545,18 +545,19 @@ function getProviderModels(
     openaiKeys = roleMap[role as AdvancedModelRole] || ['gpt-4o', 'gpt-4o-mini'];
   }
 
-  // ===== اگر costFallback است، Groq را اول اضافه کن =====
+  // ===== اگر costFallback است، Groq را اول اضافه کن (مدل‌های فعال) =====
   if (isCostFallback && groqApiKey) {
     console.log(`🔍 [LLM Gateway] → Adding Groq models (HIGHEST priority for cost optimization)`);
-    // از مدل‌های پشتیبانی‌شده استفاده کن
     models.push(
-      { provider: 'groq', modelKey: 'llama-3.1-70b', model: null },
+      { provider: 'groq', modelKey: 'llama-3.3-70b', model: null },
       { provider: 'groq', modelKey: 'llama-3.1-8b', model: null },
-      { provider: 'groq', modelKey: 'gemma2-9b', model: null }
+      { provider: 'groq', modelKey: 'gpt-oss-20b', model: null },
+      { provider: 'groq', modelKey: 'gpt-oss-120b', model: null }
     );
-    console.log(`  ✅ Added Groq: llama-3.1-70b (primary)`);
-    console.log(`  ✅ Added Groq: llama-3.1-8b (fallback)`);
-    console.log(`  ✅ Added Groq: gemma2-9b (lightweight)`);
+    console.log(`  ✅ Added Groq: llama-3.3-70b (high quality)`);
+    console.log(`  ✅ Added Groq: llama-3.1-8b (fast & cheap)`);
+    console.log(`  ✅ Added Groq: gpt-oss-20b (ultra-fast)`);
+    console.log(`  ✅ Added Groq: gpt-oss-120b (high power)`);
   }
 
   // ===== اضافه کردن OpenAI =====
@@ -586,11 +587,10 @@ function getProviderModels(
   if (!isCostFallback && groqApiKey) {
     console.log(`🔍 [LLM Gateway] → Adding Groq models (LOWEST priority - last resort)`);
     models.push(
-      { provider: 'groq', modelKey: 'llama-3.1-70b', model: null },
-      { provider: 'groq', modelKey: 'llama-3.1-8b', model: null },
-      { provider: 'groq', modelKey: 'gemma2-9b', model: null }
+      { provider: 'groq', modelKey: 'llama-3.3-70b', model: null },
+      { provider: 'groq', modelKey: 'llama-3.1-8b', model: null }
     );
-    console.log(`  ✅ Added Groq: llama-3.1-70b (last resort)`);
+    console.log(`  ✅ Added Groq: llama-3.3-70b (last resort)`);
   }
 
   console.log(`📊 [LLM Gateway] Total models in list: ${models.length}`);
