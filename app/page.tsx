@@ -143,7 +143,7 @@ function buildPromptInfo(
 }
 
 // ============================================================
-// 🔥 تابع ساخت audit_result برای Simple/Medium
+// 🔥 تابع ساخت audit_result برای Simple/Medium (اصلاح‌شده)
 // ============================================================
 
 function buildMinimalAuditResult(
@@ -156,6 +156,7 @@ function buildMinimalAuditResult(
   const linkedinPost = genData.linkedin_post || 'Check out this code analysis! #Zbloue';
   const cardTitle = genData.card_title || 'Code Analysis';
 
+  // 🔥 اصلاح 1: analysisCoverage محافظه‌کارانه
   const allDimensions = [
     'correctness', 'security', 'concurrency', 'liveness', 'performance',
     'resource-management', 'error-handling', 'input-validation', 'data-integrity',
@@ -163,11 +164,14 @@ function buildMinimalAuditResult(
     'compatibility'
   ] as const;
 
+  // فقط ابعادی که واقعاً در Simple/Medium تا حدی تحلیل می‌شوند
+  const analyzedDims = ['correctness', 'api-design', 'maintainability'];
+
   const analysisCoverage = allDimensions.map((dim) => ({
     dimension: dim,
-    status: 'analyzed',
+    status: analyzedDims.includes(dim) ? 'analyzed' : 'limited',
     summary: `Analysis of ${dim} dimension.`,
-    limitation: null,
+    limitation: analyzedDims.includes(dim) ? null : `Limited evidence available for ${dim} dimension.`,
   }));
 
   // تشخیص هم‌روندی از متن
@@ -205,8 +209,9 @@ function buildMinimalAuditResult(
       variables: [],
       assumptions: [],
     },
+    // 🔥 اصلاح 2: scorecard - همه applicable: false, score: null
     scorecard: {
-      correctness: { applicable: true, score: 0, reason: 'No detailed score available in this mode.', relatedFindingIds: [] },
+      correctness: { applicable: false, score: null, reason: 'No detailed score available in this mode.', relatedFindingIds: [] },
       concurrencySafety: { applicable: false, score: null, reason: 'No concurrency analysis performed.', relatedFindingIds: [] },
       liveness: { applicable: false, score: null, reason: 'No liveness analysis performed.', relatedFindingIds: [] },
       errorHandling: { applicable: false, score: null, reason: 'No detailed error handling analysis performed.', relatedFindingIds: [] },
@@ -263,7 +268,7 @@ export default function HomePage() {
   }, [dispatch]);
 
   // ============================================================
-  // 🔥 handleGenerate (اصلاح‌شده برای ذخیره هر سه حالت)
+  // 🔥 handleGenerate (اصلاح‌شده)
   // ============================================================
 
   const handleGenerate = useCallback(async () => {
@@ -329,6 +334,12 @@ export default function HomePage() {
       // ============================================================
       // 🔥 ساخت SnippetData برای نمایش
       // ============================================================
+      // 🔥 اصلاح: what_this_code_does را از genData پر کنید
+      const whatThisCodeDoes = auditResult.executionOverview?.entryPoints?.join(', ') || 
+                               genData.what_this_code_does || 
+                               genData.analysis || 
+                               '';
+
       const snippetData: Snippet = {
         id: saveResult.id,
         slug: saveResult.slug,
@@ -336,9 +347,7 @@ export default function HomePage() {
         language,
         card_title: auditResult.title || 'Code Analysis',
         key_concept: auditResult.summary || '',
-        what_this_code_does: auditResult.executionOverview?.entryPoints?.join(', ') || 
-                           genData.what_this_code_does || 
-                           genData.analysis || '',
+        what_this_code_does: whatThisCodeDoes,
         debug_analysis: auditResult.findings?.length ? `${auditResult.findings.length} findings` : 
                        (genData.debug_analysis || '-'),
         optimization: auditResult.recommendedActions?.length
