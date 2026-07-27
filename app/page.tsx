@@ -143,7 +143,61 @@ function buildPromptInfo(
 }
 
 // ============================================================
-// 🔥 تابع ساخت audit_result برای Simple/Medium (اصلاح‌شده با analysis)
+// 🔥 تابع تولید متن تحلیل برای حالت Advanced
+// ============================================================
+
+function generateAdvancedAnalysisText(audit: any): string {
+  const lines: string[] = [];
+
+  if (audit.title) {
+    lines.push(`📌 Title: ${audit.title}`);
+  }
+
+  if (audit.summary) {
+    lines.push(`📝 Summary: ${audit.summary}`);
+    lines.push('');
+  }
+
+  if (audit.findings && audit.findings.length > 0) {
+    lines.push(`🔍 Findings (${audit.findings.length}):`);
+    audit.findings.slice(0, 5).forEach((f: any) => {
+      const confidence = f.confidence || 'unknown';
+      lines.push(`  - [${f.severity}] ${f.title} (${confidence})`);
+    });
+    if (audit.findings.length > 5) {
+      lines.push(`  - ... and ${audit.findings.length - 5} more findings.`);
+    }
+    lines.push('');
+  }
+
+  if (audit.scorecard) {
+    const scoreItems = Object.entries(audit.scorecard)
+      .filter(([_, v]: [string, any]) => v?.applicable === true && typeof v?.score === 'number')
+      .map(([k, v]: [string, any]) => `${k}: ${v.score}`);
+    if (scoreItems.length > 0) {
+      lines.push(`📊 Scorecard: ${scoreItems.join(', ')}`);
+    } else {
+      lines.push(`📊 Scorecard: Not available in this mode.`);
+    }
+    lines.push('');
+  }
+
+  if (audit.verdict) {
+    lines.push(`🏁 Verdict: ${audit.verdict.status} - ${audit.verdict.explanation}`);
+  }
+
+  if (audit.limitations && audit.limitations.length > 0) {
+    lines.push(`⚠️ Limitations:`);
+    audit.limitations.slice(0, 3).forEach((lim: string) => {
+      lines.push(`  - ${lim}`);
+    });
+  }
+
+  return lines.join('\n');
+}
+
+// ============================================================
+// 🔥 تابع ساخت audit_result برای Simple/Medium (با analysis)
 // ============================================================
 
 function buildMinimalAuditResult(
@@ -156,7 +210,6 @@ function buildMinimalAuditResult(
   const linkedinPost = genData.linkedin_post || 'Check out this code analysis! #Zbloue';
   const cardTitle = genData.card_title || 'Code Analysis';
 
-  // 🔥 اصلاح 1: analysisCoverage محافظه‌کارانه
   const allDimensions = [
     'correctness', 'security', 'concurrency', 'liveness', 'performance',
     'resource-management', 'error-handling', 'input-validation', 'data-integrity',
@@ -188,7 +241,6 @@ function buildMinimalAuditResult(
     title: cardTitle,
     language: language,
     summary: summary,
-    // 🔥 🔥 🔥 اضافه کردن فیلد analysis با متن کامل تحلیل
     analysis: genData.analysis || '',
     analysisCoverage,
     executionOverview: {
@@ -267,7 +319,7 @@ export default function HomePage() {
   }, [dispatch]);
 
   // ============================================================
-  // 🔥 handleGenerate (اصلاح‌شده نهایی)
+  // 🔥 handleGenerate (اصلاح‌شده نهایی با پشتیبانی از Advanced)
   // ============================================================
 
   const handleGenerate = useCallback(async () => {
@@ -310,6 +362,17 @@ export default function HomePage() {
 
       if (!auditResult) {
         auditResult = buildMinimalAuditResult(genData, language, mode);
+      }
+
+      // ============================================================
+      // 🔥 🔥 🔥 برای حالت Advanced، متن تحلیل را از داده‌های ساختاریافته تولید کن
+      // ============================================================
+      if (mode === 'advanced' && auditResult) {
+        // اگر analysis موجود نیست یا خیلی کوتاه است، آن را تولید کن
+        const hasAnalysis = auditResult.analysis && auditResult.analysis.length > 50;
+        if (!hasAnalysis) {
+          auditResult.analysis = generateAdvancedAnalysisText(auditResult);
+        }
       }
 
       // ============================================================
