@@ -5,8 +5,9 @@ import type { LegacyGenerateResponse } from '@/types';
 
 /**
  * تبدیل audit_result به شکل Legacy برای سازگاری موقت
+ * 🔥 پارامتر audit به‌صورت any پذیرفته می‌شود تا با Json از دیتابیس سازگار باشد.
  */
-export function adaptCanonicalToLegacy(audit: AdvancedAuditResult | null | undefined): {
+export function adaptCanonicalToLegacy(audit: any): {
   card_title: string;
   key_concept: string;
   what_this_code_does: string;
@@ -18,7 +19,17 @@ export function adaptCanonicalToLegacy(audit: AdvancedAuditResult | null | undef
   scorecard_new: any;
   verdict: any;
 } {
-  if (!audit) {
+  // اگر audit از نوع string بود، parse کن
+  let normalizedAudit = audit;
+  if (typeof audit === 'string') {
+    try {
+      normalizedAudit = JSON.parse(audit);
+    } catch {
+      normalizedAudit = null;
+    }
+  }
+
+  if (!normalizedAudit || typeof normalizedAudit !== 'object') {
     return {
       card_title: 'Code Analysis',
       key_concept: '',
@@ -34,23 +45,24 @@ export function adaptCanonicalToLegacy(audit: AdvancedAuditResult | null | undef
   }
 
   return {
-    card_title: audit.title || 'Code Analysis',
-    key_concept: audit.summary || '',
-    what_this_code_does: audit.executionOverview?.entryPoints?.join(', ') || audit.summary || '',
-    debug_analysis: audit.findings?.length ? `${audit.findings.length} findings` : '-',
-    optimization: audit.recommendedActions?.length
-      ? audit.recommendedActions.map(a => a.title).join('; ')
+    card_title: normalizedAudit.title || 'Code Analysis',
+    key_concept: normalizedAudit.summary || '',
+    what_this_code_does: normalizedAudit.executionOverview?.entryPoints?.join(', ') || normalizedAudit.summary || '',
+    debug_analysis: normalizedAudit.findings?.length ? `${normalizedAudit.findings.length} findings` : '-',
+    optimization: normalizedAudit.recommendedActions?.length
+      ? normalizedAudit.recommendedActions.map((a: any) => a.title).join('; ')
       : '-',
-    linkedin_post: audit.linkedinPost || 'Check out this code analysis! #Zbloue',
-    summary: audit.summary || '',
-    findings: audit.findings || [],
-    scorecard_new: audit.scorecard || null,
-    verdict: audit.verdict || null,
+    linkedin_post: normalizedAudit.linkedinPost || 'Check out this code analysis! #Zbloue',
+    summary: normalizedAudit.summary || '',
+    findings: normalizedAudit.findings || [],
+    scorecard_new: normalizedAudit.scorecard || null,
+    verdict: normalizedAudit.verdict || null,
   };
 }
 
 /**
  * بررسی اینکه آیا audit_result کامل وجود دارد یا خیر
+ * 🔥 پارامتر snippet به‌صورت any پذیرفته می‌شود.
  */
 export function hasCanonicalAudit(snippet: any): boolean {
   if (!snippet) return false;
@@ -71,8 +83,8 @@ export function hasCanonicalAudit(snippet: any): boolean {
  * تبدیل AdvancedAuditResult به LegacyGenerateResponse کامل
  * برای استفاده در کلاینت (مخصوص حالت Advanced)
  */
-export function canonicalToLegacyResponse(audit: AdvancedAuditResult | null | undefined): LegacyGenerateResponse {
-  if (!audit) {
+export function canonicalToLegacyResponse(audit: any): LegacyGenerateResponse {
+  if (!audit || typeof audit !== 'object') {
     return {
       analysis: '',
       card_title: 'Code Analysis',
@@ -103,7 +115,7 @@ export function canonicalToLegacyResponse(audit: AdvancedAuditResult | null | un
     what_this_code_does: audit.executionOverview?.entryPoints?.join(', ') || audit.summary || '',
     debug_analysis: audit.findings?.length ? `${audit.findings.length} findings` : '-',
     optimization: audit.recommendedActions?.length
-      ? audit.recommendedActions.map(a => a.title).join('; ')
+      ? audit.recommendedActions.map((a: any) => a.title).join('; ')
       : '-',
     linkedin_post: audit.linkedinPost || 'Check out this code analysis! #Zbloue',
     findings: audit.findings || [],
