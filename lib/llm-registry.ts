@@ -45,6 +45,8 @@ export interface ModelCapability {
 // 🔥 Model Registry (OpenAI + Anthropic + Groq)
 // ============================================================
 
+console.log('📋 [LLM Registry] Loading model registry...');
+
 export const LLM_MODELS = {
   // ===== OpenAI =====
   'gpt-4o': {
@@ -139,9 +141,9 @@ export const LLM_MODELS = {
     defaultMaxTokens: 4000,
   },
 
-  // ===== Groq (Llama, Mistral, Gemma) =====
+  // ===== Groq (Llama, Mistral, Gemma) - مدل‌های پشتیبانی‌شده فعلی =====
   'llama-3.1-70b': {
-    model: 'llama-3.1-70b-versatile',
+    model: 'llama3-70b-8192', // جایگزین llama-3.1-70b-versatile
     api: 'chat-completions',
     purpose: 'advanced-analysis',
     supportsReasoning: false,
@@ -154,7 +156,7 @@ export const LLM_MODELS = {
   },
 
   'llama-3.1-8b': {
-    model: 'llama-3.1-8b-instant',
+    model: 'llama3-8b-8192', // جایگزین llama-3.1-8b-instant (که کار می‌کرد)
     api: 'chat-completions',
     purpose: 'code-analysis',
     supportsReasoning: false,
@@ -166,19 +168,8 @@ export const LLM_MODELS = {
     defaultMaxTokens: 8000,
   },
 
-  'mixtral-8x7b': {
-    model: 'mixtral-8x7b-32768',
-    api: 'chat-completions',
-    purpose: 'code-analysis',
-    supportsReasoning: false,
-    supportsTemperature: true,
-    supportsTopP: true,
-    supportsFrequencyPenalty: false,
-    supportsPresencePenalty: false,
-    tokenParam: 'max_tokens',
-    defaultMaxTokens: 8000,
-  },
-
+  // mixtral-8x7b حذف شد چون decommissioned است
+  // به جای آن از gemma2-9b استفاده می‌کنیم
   'gemma2-9b': {
     model: 'gemma2-9b-it',
     api: 'chat-completions',
@@ -201,10 +192,13 @@ export const ADVANCED_MODEL_ROLES = {
   primary: 'gpt-4o',
   codeFallback: 'gpt-4o-mini',
   stableFallback: 'gpt-4o-mini-fallback',
-  costFallback: 'groq', // 🔥 جدید: برای حالت‌های کم‌هزینه
+  costFallback: 'groq',
 } as const;
 
 export type AdvancedModelRole = keyof typeof ADVANCED_MODEL_ROLES;
+
+console.log(`✅ [LLM Registry] Loaded ${Object.keys(LLM_MODELS).length} models`);
+console.log(`✅ [LLM Registry] Roles: ${Object.keys(ADVANCED_MODEL_ROLES).join(', ')}`);
 
 // ============================================================
 // 🔥 Helpers
@@ -214,6 +208,7 @@ export function getModelByKey(key: string): ModelCapability | undefined {
   if (key in LLM_MODELS) {
     return LLM_MODELS[key as keyof typeof LLM_MODELS];
   }
+  console.warn(`⚠️ [LLM Registry] Model "${key}" not found`);
   return undefined;
 }
 

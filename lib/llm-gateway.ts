@@ -397,15 +397,12 @@ async function executeGroqCall(
 ): Promise<{ content: string; model: string; api: string; provider: 'groq' }> {
   console.log(`  🟢 [Groq] Executing with model: ${modelKey}`);
 
-  // مدل‌های پشتیبانی‌شده توسط Groq
+  // 🔥 مدل‌های پشتیبانی‌شده توسط Groq (بر اساس مستندات فعلی)
   const modelMap: Record<string, string> = {
-    'llama-3.1-70b': 'llama-3.1-70b-versatile',
-    'llama-3.1-8b': 'llama-3.1-8b-instant',
-    'llama3-70b': 'llama3-70b-8192',
-    'llama3-8b': 'llama3-8b-8192',
-    'mixtral-8x7b': 'mixtral-8x7b-32768',
+    'llama-3.1-70b': 'llama3-70b-8192',
+    'llama-3.1-8b': 'llama3-8b-8192',
     'gemma2-9b': 'gemma2-9b-it',
-    'gemma-7b': 'gemma-7b-it',
+    // در صورت نیاز به مدل‌های دیگر اضافه کنید
   };
 
   const model = modelMap[modelKey] || modelKey;
@@ -504,7 +501,7 @@ function getProviderModels(
 
   if (request.provider === 'groq') {
     console.log(`🔍 [LLM Gateway] Provider manually set to: GROQ`);
-    const keys = ['llama-3.1-70b', 'llama-3.1-8b', 'mixtral-8x7b', 'gemma2-9b'];
+    const keys = ['llama-3.1-70b', 'llama-3.1-8b', 'gemma2-9b'];
     models.push(
       ...keys.map((key) => ({
         provider: 'groq' as const,
@@ -551,14 +548,15 @@ function getProviderModels(
   // ===== اگر costFallback است، Groq را اول اضافه کن =====
   if (isCostFallback && groqApiKey) {
     console.log(`🔍 [LLM Gateway] → Adding Groq models (HIGHEST priority for cost optimization)`);
+    // از مدل‌های پشتیبانی‌شده استفاده کن
     models.push(
       { provider: 'groq', modelKey: 'llama-3.1-70b', model: null },
-      { provider: 'groq', modelKey: 'mixtral-8x7b', model: null },
-      { provider: 'groq', modelKey: 'llama-3.1-8b', model: null }
+      { provider: 'groq', modelKey: 'llama-3.1-8b', model: null },
+      { provider: 'groq', modelKey: 'gemma2-9b', model: null }
     );
     console.log(`  ✅ Added Groq: llama-3.1-70b (primary)`);
-    console.log(`  ✅ Added Groq: mixtral-8x7b (fallback)`);
-    console.log(`  ✅ Added Groq: llama-3.1-8b (lightweight)`);
+    console.log(`  ✅ Added Groq: llama-3.1-8b (fallback)`);
+    console.log(`  ✅ Added Groq: gemma2-9b (lightweight)`);
   }
 
   // ===== اضافه کردن OpenAI =====
@@ -589,8 +587,8 @@ function getProviderModels(
     console.log(`🔍 [LLM Gateway] → Adding Groq models (LOWEST priority - last resort)`);
     models.push(
       { provider: 'groq', modelKey: 'llama-3.1-70b', model: null },
-      { provider: 'groq', modelKey: 'mixtral-8x7b', model: null },
-      { provider: 'groq', modelKey: 'llama-3.1-8b', model: null }
+      { provider: 'groq', modelKey: 'llama-3.1-8b', model: null },
+      { provider: 'groq', modelKey: 'gemma2-9b', model: null }
     );
     console.log(`  ✅ Added Groq: llama-3.1-70b (last resort)`);
   }
@@ -897,7 +895,6 @@ export async function callLLM<T = unknown>(
   console.log(`❌ [LLM Gateway] Final error: ${finalError.message}`);
   console.log(`❌ [LLM Gateway] Total duration: ${durationMs}ms`);
   console.log(`❌ [LLM Gateway] Total attempts: ${attempts}`);
-  console.log(`❌ [LLM Gateway] Request ID: ${rootRequestId}`);
   console.log(`${'❌'.repeat(30)}\n`);
 
   logger.error('[LLM Gateway] All providers failed', {
