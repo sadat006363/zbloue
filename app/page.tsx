@@ -268,7 +268,7 @@ export default function HomePage() {
   }, [dispatch]);
 
   // ============================================================
-  // 🔥 handleGenerate (اصلاح‌شده)
+  // 🔥 handleGenerate (اصلاح‌شده نهایی)
   // ============================================================
 
   const handleGenerate = useCallback(async () => {
@@ -332,14 +332,16 @@ export default function HomePage() {
       }
 
       // ============================================================
-      // 🔥 ساخت SnippetData برای نمایش
-      // ============================================================
       // 🔥 اصلاح: what_this_code_does را از genData پر کنید
+      // ============================================================
       const whatThisCodeDoes = auditResult.executionOverview?.entryPoints?.join(', ') || 
                                genData.what_this_code_does || 
                                genData.analysis || 
                                '';
 
+      // ============================================================
+      // 🔥 ساخت SnippetData برای نمایش
+      // ============================================================
       const snippetData: Snippet = {
         id: saveResult.id,
         slug: saveResult.slug,
