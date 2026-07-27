@@ -332,9 +332,9 @@ export default function HomePage() {
       }
 
       // ============================================================
-      // 🔥 اصلاح: what_this_code_does را از genData پر کنید
+      // 🔥 اصلاح: what_this_code_does را از normalized بگیرید
       // ============================================================
-      const whatThisCodeDoes = auditResult.executionOverview?.entryPoints?.join(', ') || 
+      const whatThisCodeDoes = normalized.what_this_code_does || 
                                genData.what_this_code_does || 
                                genData.analysis || 
                                '';
