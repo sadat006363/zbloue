@@ -25,6 +25,7 @@ import {
   LegacySuggestedTest,
   LegacyScorecard,
 } from '@/types';
+import { adaptCanonicalToLegacy, hasCanonicalAudit, canonicalToLegacyResponse } from '@/lib/snippetAdapter';
 
 export const dynamic = 'force-dynamic';
 
@@ -365,13 +366,16 @@ export default function HomePage() {
       }
 
       // ============================================================
-      // 🔥 🔥 🔥 برای حالت Advanced، متن تحلیل را از داده‌های ساختاریافته تولید کن
+      // 🔥 🔥 🔥 برای حالت Advanced، fullAnalysis را از audit_result بساز
       // ============================================================
+      let fullAnalysisForOutput = genData;
+
       if (mode === 'advanced' && auditResult) {
-        // اگر analysis موجود نیست یا خیلی کوتاه است، آن را تولید کن
-        const hasAnalysis = auditResult.analysis && auditResult.analysis.length > 50;
-        if (!hasAnalysis) {
-          auditResult.analysis = generateAdvancedAnalysisText(auditResult);
+        // تبدیل audit_result به LegacyGenerateResponse کامل
+        fullAnalysisForOutput = canonicalToLegacyResponse(auditResult);
+        // اگر analysis خالی بود، از داده‌های ساختاریافته پر کن
+        if (!fullAnalysisForOutput.analysis) {
+          fullAnalysisForOutput.analysis = generateAdvancedAnalysisText(auditResult);
         }
       }
 
@@ -453,7 +457,7 @@ export default function HomePage() {
         payload: {
           mode: modeKey,
           snippet: snippetData,
-          fullAnalysis: genData,
+          fullAnalysis: fullAnalysisForOutput,
           lineExplanations: [],
           generatedPrompt: '',
         },
