@@ -82,6 +82,7 @@ export function hasCanonicalAudit(snippet: any): boolean {
 /**
  * تبدیل AdvancedAuditResult به LegacyGenerateResponse کامل
  * برای استفاده در کلاینت (مخصوص حالت Advanced)
+ * 🔥 از undefined به جای null استفاده می‌کنیم تا با تایپ‌های LegacyGenerateResponse سازگار باشد.
  */
 export function canonicalToLegacyResponse(audit: any): LegacyGenerateResponse {
   if (!audit || typeof audit !== 'object') {
@@ -94,13 +95,13 @@ export function canonicalToLegacyResponse(audit: any): LegacyGenerateResponse {
       optimization: '-',
       linkedin_post: 'Check out this code analysis! #Zbloue',
       findings: [],
-      scorecard: null,
-      verdict: null,
-      executionOverview: null,
+      scorecard: undefined,
+      verdict: undefined,
+      executionOverview: undefined,
       architecturalObservations: [],
       recommendedActions: [],
       suggestedTests: [],
-      complexity: null,
+      complexity: undefined,
       limitations: [],
       improvedCode: undefined,
       finalVerdict: undefined,
@@ -119,13 +120,13 @@ export function canonicalToLegacyResponse(audit: any): LegacyGenerateResponse {
       : '-',
     linkedin_post: audit.linkedinPost || 'Check out this code analysis! #Zbloue',
     findings: audit.findings || [],
-    scorecard: audit.scorecard || null,
-    verdict: audit.verdict || null,
-    executionOverview: audit.executionOverview || null,
+    scorecard: audit.scorecard || undefined,
+    verdict: audit.verdict || undefined,
+    executionOverview: audit.executionOverview || undefined,
     architecturalObservations: audit.architecturalObservations || [],
     recommendedActions: audit.recommendedActions || [],
     suggestedTests: audit.suggestedTests || [],
-    complexity: audit.complexity || null,
+    complexity: audit.complexity || undefined,
     limitations: audit.limitations || [],
     improvedCode: audit.improvedCode?.available
       ? {
