@@ -14,7 +14,6 @@ export interface SnippetCreationContext {
   githubUsername?: string | null;
   avatarUrl?: string | null;
   isPublic?: boolean;
-  // 🔥 اضافه کردن فیلد analysisText
   analysisText?: string | null;
 }
 
@@ -28,9 +27,10 @@ export function toSnippetInsert(
 ): SnippetInsert {
   const now = new Date().toISOString();
 
-  // 🔥 استخراج what_this_code_does از context یا audit_result
+  // 🔥 اولویت: analysisText از context، سپس audit.summary، سپس audit.title
   const whatThisCodeDoes = context.analysisText || 
                            audit.summary || 
+                           audit.title || 
                            '';
 
   const row = {
@@ -50,11 +50,9 @@ export function toSnippetInsert(
     // ===== 🔥 فقط audit_result =====
     audit_result: audit as any,
 
-    // ===== 🔥 فیلدهای Legacy با مقدار مناسب =====
-    // 🔥 اصلاح: what_this_code_does را از analysisText پر کنید
+    // ===== 🔥 فیلدهای Legacy =====
     what_this_code_does: whatThisCodeDoes,
 
-    // بقیه فیلدها null
     card_title: null,
     key_concept: null,
     debug_analysis: null,

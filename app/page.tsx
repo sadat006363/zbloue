@@ -143,7 +143,7 @@ function buildPromptInfo(
 }
 
 // ============================================================
-// 🔥 تابع ساخت audit_result برای Simple/Medium (اصلاح‌شده)
+// 🔥 تابع ساخت audit_result برای Simple/Medium
 // ============================================================
 
 function buildMinimalAuditResult(
@@ -156,7 +156,6 @@ function buildMinimalAuditResult(
   const linkedinPost = genData.linkedin_post || 'Check out this code analysis! #Zbloue';
   const cardTitle = genData.card_title || 'Code Analysis';
 
-  // 🔥 اصلاح 1: analysisCoverage محافظه‌کارانه
   const allDimensions = [
     'correctness', 'security', 'concurrency', 'liveness', 'performance',
     'resource-management', 'error-handling', 'input-validation', 'data-integrity',
@@ -164,7 +163,6 @@ function buildMinimalAuditResult(
     'compatibility'
   ] as const;
 
-  // فقط ابعادی که واقعاً در Simple/Medium تا حدی تحلیل می‌شوند
   const analyzedDims = ['correctness', 'api-design', 'maintainability'];
 
   const analysisCoverage = allDimensions.map((dim) => ({
@@ -174,7 +172,6 @@ function buildMinimalAuditResult(
     limitation: analyzedDims.includes(dim) ? null : `Limited evidence available for ${dim} dimension.`,
   }));
 
-  // تشخیص هم‌روندی از متن
   const hasConcurrency = analysisText.toLowerCase().includes('concurrency') ||
                          analysisText.toLowerCase().includes('thread') ||
                          analysisText.toLowerCase().includes('deadlock') ||
@@ -209,7 +206,6 @@ function buildMinimalAuditResult(
       variables: [],
       assumptions: [],
     },
-    // 🔥 اصلاح 2: scorecard - همه applicable: false, score: null
     scorecard: {
       correctness: { applicable: false, score: null, reason: 'No detailed score available in this mode.', relatedFindingIds: [] },
       concurrencySafety: { applicable: false, score: null, reason: 'No concurrency analysis performed.', relatedFindingIds: [] },
@@ -331,8 +327,7 @@ export default function HomePage() {
         github_username: normalizedGithubUsername,
         avatar_url: normalizedAvatarUrl,
         audit_result: auditResult,
-        // 🔥 اضافه کردن analysis_text برای استفاده در to-snippet
-        analysis_text: genData.analysis || normalized.what_this_code_does || '',
+        analysis_text: whatThisCodeDoes,
       };
 
       const saveResult = await snippetService.save(saveData);
@@ -553,10 +548,6 @@ export default function HomePage() {
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [handleGenerate]);
-
-  // ============================================================
-  // Render
-  // ============================================================
 
   return (
     <main className="min-h-screen bg-[#f8f9fa] p-2 md:p-3">

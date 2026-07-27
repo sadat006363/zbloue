@@ -22,7 +22,7 @@ const CreateSnippetRequestSchema = z
     github_username: z.string().min(1).max(100).nullable().optional(),
     avatar_url: z.string().url().nullable().optional(),
     audit_result: z.any().optional().nullable(),
-    analysis_text: z.string().optional().nullable(), // 🔥 اضافه شده
+    analysis_text: z.string().optional().nullable(),
   })
   .catchall(z.any());
 
@@ -118,7 +118,7 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
     githubUsername: body.github_username ?? null,
     avatarUrl: body.avatar_url ?? null,
     isPublic: true,
-    analysisText: body.analysis_text ?? null, // 🔥 اضافه شده
+    analysisText: body.analysis_text ?? null,
   };
 
   // اعتبارسنجی Context
@@ -153,7 +153,6 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
       row = toSnippetInsert(validated.data, context);
       logger.info('[Server] ✅ Mapper used with audit_result');
     } else {
-      // Fallback: اگر audit_result وجود نداشت
       logger.warn('[create-snippet] No audit_result provided');
       return NextResponse.json(
         { error: 'audit_result is required' },
@@ -196,7 +195,6 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || '';
   logger.info(`[create-snippet] ✅ Snippet created: ${data.slug} (IP ${ip})`);
 
-  // 🔥 فقط فیلدهای ضروری را برمی‌گردانیم
   return NextResponse.json(
     {
       success: true,
@@ -206,7 +204,6 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
       username: data.username ?? null,
       github_username: data.github_username ?? null,
       avatar_url: data.avatar_url ?? null,
-      // 🔥 audit_result را هم برمی‌گردانیم (برای مصرف downstream)
       audit_result: body.audit_result,
     },
     { status: 201 }
