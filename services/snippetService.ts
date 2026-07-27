@@ -4,20 +4,15 @@ import { Snippet, CreateSnippetResponse } from '@/types';
 
 /**
  * داده‌های مورد نیاز برای ذخیره‌سازی Snippet جدید
+ * 🔥 فقط audit_result ذخیره می‌شود – فیلدهای Legacy حذف شدند
  */
 export interface SaveSnippetData {
   code: string;
   language: string;
-  card_title?: string;
-  key_concept?: string;
-  what_this_code_does?: string;
-  debug_analysis?: string;
-  optimization?: string;
-  linkedin_post?: string;
   username?: string | null;
   github_username?: string | null;
   avatar_url?: string | null;
-  [key: string]: unknown; // برای فیلدهای اضافی مثل findings, scorecard و ...
+  audit_result: any; // AdvancedAuditResult
 }
 
 /**
@@ -26,23 +21,33 @@ export interface SaveSnippetData {
 export const snippetService = {
   /**
    * ذخیره‌سازی یک Snippet جدید در دیتابیس
+   * 🔥 فقط audit_result ذخیره می‌شود
    */
   async save(data: SaveSnippetData): Promise<CreateSnippetResponse> {
     // ============================================================
     // 🔥 لاگ در سرویس (قبل از ارسال)
     // ============================================================
     console.log('🔍 [snippetService.save] ===== START =====');
-    console.log('🔍 [snippetService.save] data.audit_result:', (data as any).audit_result);
-    console.log('🔍 [snippetService.save] data.findings:', data.findings);
-    console.log('🔍 [snippetService.save] data.scorecard_new:', data.scorecard_new);
-    console.log('🔍 [snippetService.save] data.verdict:', data.verdict);
+    console.log('🔍 [snippetService.save] audit_result keys:', Object.keys(data.audit_result || {}));
     console.log('🔍 [snippetService.save] Full data keys:', Object.keys(data));
     console.log('🔍 [snippetService.save] ===== END =====');
+
+    // ============================================================
+    // 🔥 فقط فیلدهای ضروری را ارسال می‌کنیم
+    // ============================================================
+    const payload = {
+      code: data.code,
+      language: data.language,
+      username: data.username ?? null,
+      github_username: data.github_username ?? null,
+      avatar_url: data.avatar_url ?? null,
+      audit_result: data.audit_result,
+    };
 
     const response = await fetch('/api/create-snippet', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     });
 
     const result = await response.json();
@@ -54,8 +59,17 @@ export const snippetService = {
 
   /**
    * به‌روزرسانی یک Snippet موجود با استفاده از slug
+   * 🔥 پشتیبانی از به‌روزرسانی audit_result و فیلدهای کاربر
    */
-  async update(slug: string, data: Record<string, unknown>): Promise<Snippet> {
+  async update(
+    slug: string,
+    data: {
+      username?: string | null;
+      github_username?: string | null;
+      avatar_url?: string | null;
+      audit_result?: any;
+    }
+  ): Promise<Snippet> {
     const apiKey = process.env.NEXT_PUBLIC_API_KEY || '';
     const response = await fetch(`/api/update-snippet/${slug}`, {
       method: 'PATCH',

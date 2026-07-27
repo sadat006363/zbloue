@@ -24,6 +24,12 @@ import {
   type NormalizedSnippetAudit,
 } from '@/lib/analysis/normalize-snippet-audit';
 import { type LineExplanation } from '@/types';
+import { adaptCanonicalToLegacy, hasCanonicalAudit } from '@/lib/snippetAdapter';
+
+// ============================================================
+// 🔥 تعریف نوع خروجی adaptCanonicalToLegacy برای استفاده در page
+// ============================================================
+type LegacyFields = ReturnType<typeof adaptCanonicalToLegacy>;
 
 // ============================================================
 // 🔥 params (Next.js 16)
@@ -42,60 +48,6 @@ function escapeHtml(value: string): string {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#039;');
-}
-
-// ============================================================
-// 🔥 تابع تولید متن تحلیل برای Advanced
-// ============================================================
-function buildAnalysisTextForAdvanced(snippet: any): string {
-  const parts: string[] = [];
-
-  // 1. خلاصه کلی
-  if (snippet.summary) {
-    parts.push(`📌 Summary:\n${snippet.summary}`);
-  }
-
-  // 2. Findings
-  const findings = snippet.findings || [];
-  if (findings.length > 0) {
-    parts.push(`\n🔍 Findings (${findings.length}):`);
-    findings.slice(0, 5).forEach((f: any) => {
-      parts.push(`  • ${f.title} [${f.severity}] - ${f.confidence}`);
-      if (f.remediation) {
-        parts.push(`    Fix: ${f.remediation}`);
-      }
-    });
-    if (findings.length > 5) {
-      parts.push(`  ... and ${findings.length - 5} more findings`);
-    }
-  }
-
-  // 3. Scorecard
-  const scorecard = snippet.scorecard_new || snippet.audit_result?.scorecard;
-  if (scorecard && typeof scorecard === 'object') {
-    const scores: string[] = [];
-    for (const [key, value] of Object.entries(scorecard)) {
-      const item = value as any;
-      if (item?.applicable === true && typeof item.score === 'number') {
-        const label = key.replace(/([A-Z])/g, ' $1').trim();
-        scores.push(`${label}: ${item.score}/100`);
-      }
-    }
-    if (scores.length > 0) {
-      parts.push(`\n📊 Scorecard:\n  ${scores.join('\n  ')}`);
-    }
-  }
-
-  // 4. Verdict
-  const verdict = snippet.verdict || snippet.audit_result?.verdict;
-  if (verdict) {
-    parts.push(`\n🏁 Verdict: ${verdict.status}`);
-    if (verdict.explanation) {
-      parts.push(`  ${verdict.explanation}`);
-    }
-  }
-
-  return parts.join('\n\n') || 'No detailed analysis available.';
 }
 
 // ============================================================
@@ -124,18 +76,41 @@ async function getSnippet(slug: string): Promise<Snippet> {
     return null as any;
   }
 
-  // 🔥 تبدیل تمام مقادیر null به undefined برای تطابق با SnippetDataSchema
+  // 🔥 STEP 1: اگر audit_result وجود دارد، فیلدهای Legacy را از آن پر کن
+  let legacyFields: LegacyFields = {
+    card_title: '',
+    key_concept: '',
+    what_this_code_does: '',
+    debug_analysis: '',
+    optimization: '',
+    linkedin_post: '',
+    summary: '',
+    findings: [],
+    scorecard_new: null,
+    verdict: null,
+  };
+
+  if (hasCanonicalAudit(data)) {
+    legacyFields = adaptCanonicalToLegacy(data.audit_result);
+  }
+
+  // 🔥 STEP 2: ساخت شیء نهایی با اولویت audit_result
   const candidate = {
     id: data.id ?? '',
     slug: data.slug ?? '',
     raw_code: data.raw_code ?? '',
     language: data.language ?? 'javascript',
-    card_title: data.card_title ?? 'Code Analysis',
-    key_concept: data.key_concept ?? '',
-    what_this_code_does: data.what_this_code_does ?? '',
-    debug_analysis: data.debug_analysis ?? '-',
-    optimization: data.optimization ?? '-',
-    linkedin_post: data.linkedin_post ?? '',
+
+    // 🔥 فیلدهای Legacy: از audit_result می‌آیند (اگر موجود باشد)
+    card_title: legacyFields.card_title || data.card_title || 'Code Analysis',
+    key_concept: legacyFields.key_concept || data.key_concept || '',
+    what_this_code_does: legacyFields.what_this_code_does || data.what_this_code_does || '',
+    debug_analysis: legacyFields.debug_analysis || data.debug_analysis || '-',
+    optimization: legacyFields.optimization || data.optimization || '-',
+    linkedin_post: legacyFields.linkedin_post || data.linkedin_post || '',
+    // 🔥 اصلاح: به‌جای data.summary (که وجود ندارد) از data.key_concept استفاده می‌کنیم
+    summary: legacyFields.summary || data.key_concept || '',
+
     is_public: data.is_public ?? false,
     created_at: data.created_at ?? new Date().toISOString(),
 
@@ -144,6 +119,23 @@ async function getSnippet(slug: string): Promise<Snippet> {
     avatar_url: data.avatar_url ?? undefined,
     card_image_url: data.card_image_url ?? undefined,
 
+    // 🔥 فیلدهای Advanced (کانونیکال) – مستقیماً از دیتابیس
+    findings: data.findings ?? legacyFields.findings ?? undefined,
+    scorecard_new: data.scorecard_new ?? legacyFields.scorecard_new ?? undefined,
+    verdict: data.verdict ?? legacyFields.verdict ?? undefined,
+    execution_overview: data.execution_overview ?? undefined,
+    architectural_observations: data.architectural_observations ?? undefined,
+    recommended_actions: data.recommended_actions ?? undefined,
+    suggested_tests_new: data.suggested_tests_new ?? undefined,
+    complexity: data.complexity ?? undefined,
+    limitations: data.limitations ?? undefined,
+    improved_code: data.improved_code ?? undefined,
+    debug_trace: data.debug_trace ?? undefined,
+
+    // 🔥 خود audit_result کامل (برای کامپوننت‌هایی که مستقیماً از آن استفاده می‌کنند)
+    audit_result: data.audit_result ?? undefined,
+
+    // بقیه فیلدهای Legacy (برای backward compatibility)
     code_walkthrough: data.code_walkthrough ?? undefined,
     what_works_well: data.what_works_well ?? undefined,
     bugs_and_risky_cases: data.bugs_and_risky_cases ?? undefined,
@@ -152,7 +144,6 @@ async function getSnippet(slug: string): Promise<Snippet> {
     security_analysis: data.security_analysis ?? undefined,
     production_readiness: data.production_readiness ?? undefined,
     recommended_improvements: data.recommended_improvements ?? undefined,
-    improved_code: data.improved_code ?? undefined,
     suggested_tests: data.suggested_tests ?? undefined,
     scorecard: data.scorecard ?? undefined,
     final_verdict_summary: data.final_verdict_summary ?? undefined,
@@ -160,18 +151,6 @@ async function getSnippet(slug: string): Promise<Snippet> {
     final_verdict_next_steps: data.final_verdict_next_steps ?? undefined,
     line_explanations: data.line_explanations ?? undefined,
     generated_prompt: data.generated_prompt ?? undefined,
-
-    findings: data.findings ?? undefined,
-    execution_overview: data.execution_overview ?? undefined,
-    architectural_observations: data.architectural_observations ?? undefined,
-    recommended_actions: data.recommended_actions ?? undefined,
-    suggested_tests_new: data.suggested_tests_new ?? undefined,
-    complexity: data.complexity ?? undefined,
-    scorecard_new: data.scorecard_new ?? undefined,
-    verdict: data.verdict ?? undefined,
-    limitations: data.limitations ?? undefined,
-    audit_result: data.audit_result ?? undefined,
-    debug_trace: data.debug_trace ?? undefined,
   };
 
   const validation = SnippetDataSchema.safeParse(candidate);
@@ -292,7 +271,7 @@ export default async function SnippetPage({ params }: PageProps) {
         <div className="max-w-5xl mx-auto px-4 py-6 md:py-8">
           
           <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-            <SnippetHeader shareUrl={shareUrl} />
+            <SnippetHeader shareUrl={shareUrl} title={snippet.card_title || 'Code Snippet'} />
             <SnippetJsonDropdown snippet={snippet} />
           </div>
 
@@ -314,13 +293,14 @@ export default async function SnippetPage({ params }: PageProps) {
           </div>
 
           {/* ============================================================
-              🔥 SnippetAnalysis - با ارسال fullAnalysis
+              🔥 SnippetAnalysis - با ارسال fullAnalysis و audit_result
               ============================================================ */}
           <div id="snippet-analysis">
             <SnippetAnalysis
               keyConcept={snippet.key_concept}
               whatItDoes={snippet.what_this_code_does}
               fullAnalysis={fullAnalysisText}
+              auditResult={snippet.audit_result}
             />
           </div>
 
@@ -371,4 +351,58 @@ export default async function SnippetPage({ params }: PageProps) {
       </main>
     </>
   );
+}
+
+// ============================================================
+// 🔥 تابع تولید متن تحلیل برای Advanced
+// ============================================================
+function buildAnalysisTextForAdvanced(snippet: any): string {
+  const parts: string[] = [];
+
+  // 1. خلاصه کلی
+  if (snippet.summary) {
+    parts.push(`📌 Summary:\n${snippet.summary}`);
+  }
+
+  // 2. Findings
+  const findings = snippet.findings || [];
+  if (findings.length > 0) {
+    parts.push(`\n🔍 Findings (${findings.length}):`);
+    findings.slice(0, 5).forEach((f: any) => {
+      parts.push(`  • ${f.title} [${f.severity}] - ${f.confidence}`);
+      if (f.remediation) {
+        parts.push(`    Fix: ${f.remediation}`);
+      }
+    });
+    if (findings.length > 5) {
+      parts.push(`  ... and ${findings.length - 5} more findings`);
+    }
+  }
+
+  // 3. Scorecard
+  const scorecard = snippet.scorecard_new || snippet.audit_result?.scorecard;
+  if (scorecard && typeof scorecard === 'object') {
+    const scores: string[] = [];
+    for (const [key, value] of Object.entries(scorecard)) {
+      const item = value as any;
+      if (item?.applicable === true && typeof item.score === 'number') {
+        const label = key.replace(/([A-Z])/g, ' $1').trim();
+        scores.push(`${label}: ${item.score}/100`);
+      }
+    }
+    if (scores.length > 0) {
+      parts.push(`\n📊 Scorecard:\n  ${scores.join('\n  ')}`);
+    }
+  }
+
+  // 4. Verdict
+  const verdict = snippet.verdict || snippet.audit_result?.verdict;
+  if (verdict) {
+    parts.push(`\n🏁 Verdict: ${verdict.status}`);
+    if (verdict.explanation) {
+      parts.push(`  ${verdict.explanation}`);
+    }
+  }
+
+  return parts.join('\n\n') || 'No detailed analysis available.';
 }

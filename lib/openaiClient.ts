@@ -2,6 +2,7 @@
 
 import OpenAI from 'openai';
 import type { z } from 'zod';
+import { getRoleForMode, getStrategy } from './llm-strategy';
 
 // ============================================================
 // 🔥 تنظیمات مدل‌ها (برای حالت مستقیم و Gateway)
@@ -69,21 +70,31 @@ export async function callOpenAI(
   const mode = options.mode || 'advanced';
   const config = MODEL_CONFIG[mode];
 
+  console.log(`\n${'='.repeat(60)}`);
+  console.log(`🔥 [OpenAI Client] ===== NEW REQUEST =====`);
+  console.log(`📌 [OpenAI Client] Mode: ${mode}`);
+  console.log(`📌 [OpenAI Client] Timestamp: ${new Date().toISOString()}`);
+  console.log(`${'='.repeat(60)}\n`);
+
   // ===== اگر Gateway فعال است =====
   if (process.env.LLM_GATEWAY_ENABLED !== 'false') {
-    console.log('[Gateway] Using LLM Gateway for mode:', mode);
+    console.log(`🌐 [OpenAI Client] LLM Gateway is ENABLED`);
     try {
       const { callLLM } = await import('./llm-gateway');
-      const roleMap: Record<ModelMode, 'primary' | 'codeFallback' | 'stableFallback'> = {
-        simple: 'stableFallback',
-        medium: 'codeFallback',
-        advanced: 'primary',
-      };
+
+      // ===== 🔥 دریافت Role بر اساس استراتژی =====
+      const role = getRoleForMode(mode);
+      const strategy = getStrategy();
+
+      console.log(`📊 [OpenAI Client] Strategy: ${strategy}`);
+      console.log(`🎯 [OpenAI Client] Role: ${role}`);
+      console.log(`🚀 [OpenAI Client] Calling LLM Gateway...`);
 
       const result = await callLLM<string>({
         systemPrompt,
         userPrompt,
-        role: roleMap[mode],
+        role: role,
+        provider: 'auto',
         temperature: options.temperature ?? config.temperature,
         maxTokens: options.maxCompletionTokens || config.maxCompletionTokens,
         responseFormat: options.responseFormat || 'json_object',
@@ -91,20 +102,32 @@ export async function callOpenAI(
       });
 
       if (result.success && result.data !== undefined) {
-        console.log('[Gateway] Success, raw content length:', result.data.length);
+        console.log(`\n${'='.repeat(60)}`);
+        console.log(`✅ [OpenAI Client] ===== REQUEST SUCCESS =====`);
+        console.log(`✅ [OpenAI Client] Provider used: ${result.provider.toUpperCase()}`);
+        console.log(`✅ [OpenAI Client] Model used: ${result.modelUsed}`);
+        console.log(`✅ [OpenAI Client] Attempt: ${result.attempt}`);
+        console.log(`⏱️ [OpenAI Client] Duration: ${result.durationMs}ms`);
+        console.log(`📊 [OpenAI Client] Response length: ${result.data.length} characters`);
+        console.log(`${'='.repeat(60)}\n`);
         return result.data as string;
       }
-      console.warn('[Gateway] Failed, error:', result.error);
-      throw new Error(result.error?.message || 'LLM Gateway request failed');
+
+      console.warn(`\n⚠️ [OpenAI Client] Gateway returned error:`, result.error);
+      console.warn(`⚠️ [OpenAI Client] Falling back to direct OpenAI call...`);
     } catch (gatewayError) {
-      console.error('[Gateway] Exception:', gatewayError);
-      // اگر Gateway خطا داد، به حالت مستقیم برگردیم
-      console.warn('[Gateway] Falling back to direct OpenAI call');
+      console.error(`\n❌ [OpenAI Client] Gateway exception:`, gatewayError);
+      console.warn(`⚠️ [OpenAI Client] Falling back to direct OpenAI call...`);
     }
+  } else {
+    console.log(`🌐 [OpenAI Client] LLM Gateway is DISABLED (using direct call)`);
   }
 
   // ===== حالت مستقیم (زمانی که Gateway غیرفعال است یا خطا داد) =====
-  console.log('[OpenAI] Direct call for mode:', mode);
+  console.log(`\n${'='.repeat(60)}`);
+  console.log(`🔵 [OpenAI Client] ===== DIRECT OPENAI CALL =====`);
+  console.log(`📌 [OpenAI Client] Mode: ${mode}`);
+  console.log(`${'='.repeat(60)}\n`);
 
   const model = options.model || config.model;
   const maxCompletionTokens = options.maxCompletionTokens || config.maxCompletionTokens;
@@ -112,10 +135,18 @@ export async function callOpenAI(
   const temperature = options.temperature ?? config.temperature;
   const responseFormat = options.responseFormat || 'json_object';
 
+  console.log(`📊 [OpenAI Client] Model: ${model}`);
+  console.log(`📊 [OpenAI Client] Max tokens: ${maxCompletionTokens}`);
+  console.log(`📊 [OpenAI Client] Timeout: ${timeout}ms`);
+  console.log(`📊 [OpenAI Client] Temperature: ${temperature}`);
+  console.log(`📊 [OpenAI Client] Response format: ${responseFormat}`);
+  console.log(`⏳ [OpenAI Client] Sending request to OpenAI...`);
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
 
   try {
+    const startTime = Date.now();
     const response = await openai.chat.completions.create(
       {
         model,
@@ -134,11 +165,24 @@ export async function callOpenAI(
     clearTimeout(timeoutId);
 
     const content = response.choices[0]?.message?.content || '';
-    console.log('[OpenAI] Direct call success, content length:', content.length);
+    const duration = Date.now() - startTime;
+
+    console.log(`\n${'='.repeat(60)}`);
+    console.log(`✅ [OpenAI Client] ===== DIRECT CALL SUCCESS =====`);
+    console.log(`✅ [OpenAI Client] Model: ${model}`);
+    console.log(`⏱️ [OpenAI Client] Duration: ${duration}ms`);
+    console.log(`📊 [OpenAI Client] Response length: ${content.length} characters`);
+    console.log(`📊 [OpenAI Client] Usage:`, response.usage);
+    console.log(`${'='.repeat(60)}\n`);
+
     return content;
   } catch (error: unknown) {
     clearTimeout(timeoutId);
-    console.error('[OpenAI] Direct call error:', error);
+    console.error(`\n${'='.repeat(60)}`);
+    console.error(`❌ [OpenAI Client] ===== DIRECT CALL FAILED =====`);
+    console.error(`❌ [OpenAI Client] Error:`, error);
+    console.error(`${'='.repeat(60)}\n`);
+
     if (error instanceof Error && error.name === 'AbortError') {
       throw new Error(`Request timed out after ${timeout / 1000}s`);
     }
@@ -155,16 +199,20 @@ export async function callOpenAIJson<T>(
   userPrompt: string,
   options: OpenAICallOptions = {}
 ): Promise<T> {
+  console.log(`📦 [OpenAI Client] JSON mode request`);
+
   const content = await callOpenAI(systemPrompt, userPrompt, {
     ...options,
     responseFormat: 'json_object',
   });
 
   try {
-    return JSON.parse(content) as T;
+    const parsed = JSON.parse(content) as T;
+    console.log(`✅ [OpenAI Client] JSON parsed successfully`);
+    return parsed;
   } catch (parseError) {
-    console.error('[OpenAI] JSON Parse Error:', parseError);
-    console.error('[OpenAI] Raw content:', content);
+    console.error(`❌ [OpenAI Client] JSON Parse Error:`, parseError);
+    console.error(`📄 [OpenAI Client] Raw content (first 500 chars):`, content.slice(0, 500));
     throw new Error('AI response format error. Please try again.');
   }
 }

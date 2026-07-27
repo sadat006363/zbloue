@@ -10,7 +10,7 @@ import {
   LegacySecurityAnalysis,
   LegacyProductionReadiness,
   LegacyRecommendedImprovement,
-  LegacySuggestedTest, // 🔥 اضافه شد
+  LegacySuggestedTest,
   LegacyScorecard,
 } from '@/types';
 import { toPng } from 'html-to-image';
@@ -28,6 +28,7 @@ import PromptTab from './tabs/PromptTab';
 import AllOutputsTab from './tabs/AllOutputsTab';
 import MonitoringTab from './tabs/MonitoringTab';
 import { useAppContext } from '@/context';
+import { adaptCanonicalToLegacy, hasCanonicalAudit } from '@/lib/snippetAdapter';
 
 export interface OutputPanelProps {
   onUsernameChange?: (name: string) => void;
@@ -92,6 +93,34 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
     const generatedPrompt = currentOutput?.generatedPrompt ?? '';
     const isAdvanced = mode === 'advanced';
 
+    // ============================================================
+    // 🔥 STEP 1: ایجاد displaySnippet با اولویت audit_result
+    // ============================================================
+    const displaySnippet = useMemo(() => {
+      if (!snippet) return null;
+
+      // اگر audit_result وجود دارد، فیلدهای Legacy را از آن پر کن
+      if (hasCanonicalAudit(snippet)) {
+        const legacy = adaptCanonicalToLegacy(snippet.audit_result);
+        return {
+          ...snippet,
+          card_title: legacy.card_title || snippet.card_title,
+          key_concept: legacy.key_concept || snippet.key_concept,
+          what_this_code_does: legacy.what_this_code_does || snippet.what_this_code_does,
+          debug_analysis: legacy.debug_analysis || snippet.debug_analysis,
+          optimization: legacy.optimization || snippet.optimization,
+          linkedin_post: legacy.linkedin_post || snippet.linkedin_post,
+          summary: legacy.summary || snippet.summary,
+          findings: legacy.findings || snippet.findings,
+          scorecard_new: legacy.scorecard_new || snippet.scorecard_new,
+          verdict: legacy.verdict || snippet.verdict,
+        };
+      }
+
+      // Fallback به داده‌های Legacy
+      return snippet;
+    }, [snippet]);
+
     const [activeTab, setActiveTab] = useState<TabType>('explanation');
     const [toastMessage, setToastMessage] = useState<string | null>(null);
     const [cardImageDataUrl, setCardImageDataUrl] = useState<string | null>(null);
@@ -145,7 +174,7 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
 
     // Upload card image
     const handleUploadImage = useCallback(async () => {
-      if (!snippet?.slug || !cardImageDataUrl) {
+      if (!displaySnippet?.slug || !cardImageDataUrl) {
         internalShowToast('❌ No image to upload');
         return;
       }
@@ -156,7 +185,7 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            slug: snippet.slug,
+            slug: displaySnippet.slug,
             imageDataUrl: cardImageDataUrl,
           }),
         });
@@ -177,11 +206,11 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
       } finally {
         setIsUploading(false);
       }
-    }, [snippet, cardImageDataUrl, internalShowToast]);
+    }, [displaySnippet, cardImageDataUrl, internalShowToast]);
 
     // Upload avatar
     const handleUploadAvatar = useCallback(async (file: File) => {
-      if (!snippet?.slug) {
+      if (!displaySnippet?.slug) {
         internalShowToast('❌ No snippet available');
         return;
       }
@@ -190,7 +219,7 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
       try {
         const formData = new FormData();
         formData.append('avatar', file);
-        formData.append('slug', snippet.slug);
+        formData.append('slug', displaySnippet.slug);
 
         const response = await fetch('/api/upload-avatar', {
           method: 'POST',
@@ -216,15 +245,15 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
       } finally {
         setIsUploadingAvatar(false);
       }
-    }, [snippet, onAvatarChange, dispatch, internalShowToast]);
+    }, [displaySnippet, onAvatarChange, dispatch, internalShowToast]);
 
     // Update database
     const updateSnippetInDatabase = useCallback(async (username: string, githubUsername: string) => {
-      if (!snippet || !snippet.slug) return;
+      if (!displaySnippet || !displaySnippet.slug) return;
 
       setIsUpdating(true);
       try {
-        const response = await fetch(`/api/update-snippet/${snippet.slug}`, {
+        const response = await fetch(`/api/update-snippet/${displaySnippet.slug}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -260,7 +289,7 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
       } finally {
         setIsUpdating(false);
       }
-    }, [snippet, onSnippetUpdate, dispatch, internalShowToast]);
+    }, [displaySnippet, onSnippetUpdate, dispatch, internalShowToast]);
 
     // Generate card image
     const generateCardImage = useCallback(async (): Promise<string> => {
@@ -292,7 +321,7 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
         return;
       }
 
-      if (!snippet) {
+      if (!displaySnippet) {
         internalShowToast('❌ No snippet available');
         return;
       }
@@ -329,11 +358,11 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
       } finally {
         isDownloading.current = false;
       }
-    }, [snippet, cardImageDataUrl, generateCardImage, internalShowToast]);
+    }, [displaySnippet, cardImageDataUrl, generateCardImage, internalShowToast]);
 
     // Update card
     const updateCardImage = useCallback(async () => {
-      if (!snippet || activeTab !== 'preview' || isUpdatingCard.current) return;
+      if (!displaySnippet || activeTab !== 'preview' || isUpdatingCard.current) return;
 
       isUpdatingCard.current = true;
 
@@ -366,25 +395,25 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
         setIsGeneratingCard(false);
         isUpdatingCard.current = false;
       }
-    }, [snippet, activeTab, generateCardImage, tempUsername, tempGithubUsername, onUsernameChange, onGithubChange, updateSnippetInDatabase, internalShowToast]);
+    }, [displaySnippet, activeTab, generateCardImage, tempUsername, tempGithubUsername, onUsernameChange, onGithubChange, updateSnippetInDatabase, internalShowToast]);
 
     // Initial card load
     useEffect(() => {
-      if (snippet && activeTab === 'preview' && isFirstRender.current) {
+      if (displaySnippet && activeTab === 'preview' && isFirstRender.current) {
         isFirstRender.current = false;
 
-        if (snippet.username) {
-          setDisplayUsername(snippet.username);
-          setTempUsername(snippet.username);
+        if (displaySnippet.username) {
+          setDisplayUsername(displaySnippet.username);
+          setTempUsername(displaySnippet.username);
         }
-        if (snippet.github_username) {
-          setDisplayGithubUsername(snippet.github_username);
-          setTempGithubUsername(snippet.github_username);
+        if (displaySnippet.github_username) {
+          setDisplayGithubUsername(displaySnippet.github_username);
+          setTempGithubUsername(displaySnippet.github_username);
         }
-        if (snippet.avatar_url) {
-          setLocalAvatarUrl(snippet.avatar_url);
+        if (displaySnippet.avatar_url) {
+          setLocalAvatarUrl(displaySnippet.avatar_url);
           if (onAvatarChange) {
-            onAvatarChange(snippet.avatar_url);
+            onAvatarChange(displaySnippet.avatar_url);
           }
         } else {
           setLocalAvatarUrl(null);
@@ -408,7 +437,7 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
             setIsGeneratingCard(false);
           });
       }
-    }, [snippet, activeTab, generateCardImage, onAvatarChange, internalShowToast]);
+    }, [displaySnippet, activeTab, generateCardImage, onAvatarChange, internalShowToast]);
 
     useEffect(() => {
       if (showUsernameInput) {
@@ -427,7 +456,7 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
       try {
         let content = `📊 Code Analysis Report\n`;
         content += `═══════════════════════════════════════\n\n`;
-        content += `📌 Title: ${safeString(fullAnalysis.card_title)}\n\n`;
+        content += `📌 Title: ${safeString(displaySnippet?.card_title || fullAnalysis.card_title)}\n\n`;
         if (fullAnalysis.key_concept) {
           content += `💡 Key Concept:\n${safeString(fullAnalysis.key_concept)}\n\n`;
         }
@@ -533,7 +562,6 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
         }
         if (fullAnalysis.suggestedTests && fullAnalysis.suggestedTests.length > 0) {
           content += `🧪 Suggested Tests:\n`;
-          // 🔥 FIX: اضافه کردن نوع صریح برای test
           fullAnalysis.suggestedTests.forEach((test: LegacySuggestedTest) => {
             content += `  • ${safeString(test.name)}\n`;
             if (test.input) content += `    Input: ${safeString(test.input)}\n`;
@@ -579,7 +607,7 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
         }
         internalShowToast('❌ Failed to copy analysis');
       }
-    }, [fullAnalysis, isAdvanced, internalShowToast]);
+    }, [fullAnalysis, isAdvanced, displaySnippet, internalShowToast]);
 
     const downloadAnalysisNew = useCallback(() => {
       if (!fullAnalysis || !isAdvanced) {
@@ -590,14 +618,14 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
       try {
         let content = `Zbloue - Code Analysis Report\n`;
         content += `═══════════════════════════════════════\n\n`;
-        content += `📌 Title: ${safeString(fullAnalysis.card_title)}\n\n`;
+        content += `📌 Title: ${safeString(displaySnippet?.card_title || fullAnalysis.card_title)}\n\n`;
         // Build similar content as copy
         // (simplified for brevity; full implementation in real code)
         const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `code-analysis-${snippet?.slug || Date.now()}.txt`;
+        a.download = `code-analysis-${displaySnippet?.slug || Date.now()}.txt`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -609,10 +637,10 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
         }
         internalShowToast('❌ Failed to download');
       }
-    }, [fullAnalysis, isAdvanced, snippet, internalShowToast]);
+    }, [fullAnalysis, isAdvanced, displaySnippet, internalShowToast]);
 
-    const publicUrl = `${appUrl}/snippet/${snippet?.slug || ''}`;
-    const cardPageUrl = snippet?.slug ? `${appUrl}/snippet/${snippet.slug}/card?theme=${selectedTheme}` : '';
+    const publicUrl = `${appUrl}/snippet/${displaySnippet?.slug || ''}`;
+    const cardPageUrl = displaySnippet?.slug ? `${appUrl}/snippet/${displaySnippet.slug}/card?theme=${selectedTheme}` : '';
     const quickAnalysisText = !isAdvanced && fullAnalysis?.analysis ? fullAnalysis.analysis : null;
 
     // Loading
@@ -620,7 +648,7 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
       return <SkeletonLoader />;
     }
 
-    if (!snippet) {
+    if (!displaySnippet) {
       return <EmptyState />;
     }
 
@@ -635,15 +663,15 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
         <div className="absolute left-[-9999px] top-[-9999px]">
           <CardPreview
             ref={cardRef}
-            title={snippet?.card_title || 'Code Analysis'}
-            summary={snippet?.key_concept || 'Analysis of the provided code snippet.'}
+            title={displaySnippet?.card_title || 'Code Analysis'}
+            summary={displaySnippet?.key_concept || 'Analysis of the provided code snippet.'}
             username={displayUsername || 'Developer'}
-            slug={snippet?.slug || ''}
-            language={snippet?.language || 'javascript'}
+            slug={displaySnippet?.slug || ''}
+            language={displaySnippet?.language || 'javascript'}
             theme={selectedTheme}
             showCode={true}
-            codeSnippet={snippet?.raw_code || ''}
-            createdAt={snippet?.created_at}
+            codeSnippet={displaySnippet?.raw_code || ''}
+            createdAt={displaySnippet?.created_at}
             githubUsername={displayGithubUsername || undefined}
             avatarUrl={localAvatarUrl}
           />
@@ -654,21 +682,21 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
         <div className="flex-1 p-4 md:p-6 overflow-y-auto max-h-[calc(100vh-200px)] text-[#1a1a2e]">
           {activeTab === 'explanation' && (
             <ExplanationTab
-              snippet={snippet}
+              snippet={displaySnippet}
               isAdvanced={isAdvanced}
               quickAnalysisText={quickAnalysisText}
-              analysisText={snippet.what_this_code_does || ''}
-              debugAnalysis={snippet.debug_analysis || ''}
-              optimization={snippet.optimization || ''}
-              keyConcept={snippet.key_concept || ''}
-              cardTitle={snippet.card_title || ''}
+              analysisText={displaySnippet.what_this_code_does || ''}
+              debugAnalysis={displaySnippet.debug_analysis || ''}
+              optimization={displaySnippet.optimization || ''}
+              keyConcept={displaySnippet.key_concept || ''}
+              cardTitle={displaySnippet.card_title || ''}
               fullAnalysis={fullAnalysis}
             />
           )}
 
           {activeTab === 'linkedin' && (
             <LinkedInTab
-              linkedinPost={snippet.linkedin_post || ''}
+              linkedinPost={displaySnippet.linkedin_post || ''}
               shareUrl={publicUrl}
               showToast={internalShowToast}
             />
@@ -676,7 +704,7 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
 
           {activeTab === 'preview' && (
             <PreviewTab
-              snippet={snippet}
+              snippet={displaySnippet}
               selectedTheme={selectedTheme}
               setSelectedTheme={setSelectedTheme}
               cardImageDataUrl={cardImageDataUrl}
@@ -709,7 +737,7 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
               fullAnalysis={fullAnalysis}
               isAdvanced={isAdvanced}
               quickAnalysisText={quickAnalysisText}
-              snippet={snippet}
+              snippet={displaySnippet}
               onCopyFullAnalysis={copyFullAnalysisNew}
               onDownloadFullAnalysis={downloadAnalysisNew}
             />
@@ -717,7 +745,7 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
 
           {activeTab === 'line-by-line' && (
             <LineByLineTab
-              snippet={snippet}
+              snippet={displaySnippet}
               lineExplanations={lineExplanations}
               isExplaining={isExplaining}
               hoveredLine={hoveredLine}
@@ -729,7 +757,7 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
 
           {activeTab === 'prompt' && (
             <PromptTab
-              snippet={snippet}
+              snippet={displaySnippet}
               generatedPrompt={generatedPrompt}
               isGeneratingPrompt={isGeneratingPrompt}
               showToast={internalShowToast}
@@ -739,7 +767,7 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
 
           {activeTab === 'all-outputs' && (
             <AllOutputsTab
-              snippet={snippet}
+              snippet={displaySnippet}
               showToast={internalShowToast}
               appUrl={appUrl}
             />

@@ -132,7 +132,7 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
   }
 
   // ============================================================
-  // 🔥 ساخت Row با استفاده از Mapper
+  // 🔥 ساخت Row با استفاده از Mapper – فقط audit_result
   // ============================================================
 
   let row: any;
@@ -166,6 +166,50 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
   }
 
   // ============================================================
+  // 🔥 🔥 🔥 حذف مقداردهی فیلدهای Legacy – فقط audit_result
+  // ============================================================
+
+  // اطمینان از اینکه فیلدهای Legacy خالی یا null باشند
+  const legacyFields = [
+    'card_title',
+    'key_concept',
+    'what_this_code_does',
+    'debug_analysis',
+    'optimization',
+    'linkedin_post',
+    'code_walkthrough',
+    'what_works_well',
+    'bugs_and_risky_cases',
+    'edge_cases',
+    'performance_analysis',
+    'security_analysis',
+    'production_readiness',
+    'recommended_improvements',
+    'improved_code',
+    'suggested_tests',
+    'scorecard',
+    'final_verdict_summary',
+    'final_verdict_approved',
+    'final_verdict_next_steps',
+    'findings',
+    'execution_overview',
+    'architectural_observations',
+    'recommended_actions',
+    'suggested_tests_new',
+    'complexity',
+    'scorecard_new',
+    'verdict',
+    'limitations',
+    'debug_trace',
+  ];
+
+  for (const field of legacyFields) {
+    if (field in row) {
+      (row as any)[field] = null;
+    }
+  }
+
+  // ============================================================
   // 4. Insert into Supabase
   // ============================================================
 
@@ -173,7 +217,7 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
   const { data, error } = await supabase
     .from('snippets')
     .insert(row as any)
-    .select('id, slug, username, github_username, avatar_url')
+    .select('id, slug, username, github_username, avatar_url, audit_result')
     .single();
 
   if (error) {
@@ -187,7 +231,7 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
   }
 
   // ============================================================
-  // 🔥 Response: فقط فیلدهای ضروری در Root
+  // 🔥 Response: فقط فیلدهای ضروری + audit_result
   // ============================================================
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || '';
@@ -202,7 +246,7 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
       username: data.username ?? null,
       github_username: data.github_username ?? null,
       avatar_url: data.avatar_url ?? null,
-      audit_result: body.audit_result,
+      audit_result: data.audit_result,
     },
     { status: 201 }
   );

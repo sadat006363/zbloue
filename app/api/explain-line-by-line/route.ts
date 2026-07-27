@@ -7,6 +7,7 @@ import { removeComments } from '@/lib/utils';
 import { rateLimiter, getClientIP } from '@/lib/rateLimiter';
 import logger from '@/lib/logger';
 import { withErrorHandlerAndLog } from '@/lib/errorHandler';
+import { cache, getCacheKey } from '@/lib/cache';
 
 const openaiApiKey = process.env.OPENAI_API_KEY || 'placeholder-key';
 const openai = new OpenAI({ apiKey: openaiApiKey });
@@ -49,6 +50,21 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
       { status: 400 }
     );
   }
+
+  // ============================================================
+  // 🔥 🔥 🔥 بررسی کش
+  // ============================================================
+  const cacheKey = getCacheKey(codeWithoutComments, language, 'explain');
+  const cachedResult = await cache.get<{ explanations: any[] }>(cacheKey);
+
+  if (cachedResult) {
+    logger.info(`[explain-line-by-line] Cache hit for IP ${ip}`);
+    return NextResponse.json(cachedResult);
+  }
+
+  // ============================================================
+  // 🔥 تولید توضیحات
+  // ============================================================
 
   const systemPrompt = `
 You are an expert programming tutor. Explain the provided code line by line.
@@ -117,8 +133,20 @@ Provide a clear explanation for each line of code.
     );
   }
 
-  logger.info(`[explain-line-by-line] Success for IP ${ip}, ${data.explanations?.length || 0} explanations`);
-  return NextResponse.json({
+  const result = {
     explanations: data.explanations || [],
-  });
+  };
+
+  // ============================================================
+  // 🔥 🔥 🔥 ذخیره در کش (به مدت ۲۴ ساعت)
+  // ============================================================
+  try {
+    await cache.set(cacheKey, result);
+    logger.info(`[explain-line-by-line] Cached result for IP ${ip}`);
+  } catch (cacheError) {
+    logger.warn('[explain-line-by-line] Failed to cache result:', cacheError);
+  }
+
+  logger.info(`[explain-line-by-line] Success for IP ${ip}, ${result.explanations.length} explanations`);
+  return NextResponse.json(result);
 });

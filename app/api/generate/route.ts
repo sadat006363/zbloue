@@ -22,9 +22,10 @@ import {
   type LegacyGenerateResponse,
   type AnalysisMode,
 } from '@/types';
+import { cache, getCacheKey } from '@/lib/cache';
 
 // ============================================================
-// 🔥 Cache (In-Memory)
+// 🔥 Cache (توزیع‌شده با Redis + Fallback In-Memory)
 // ============================================================
 
 interface CacheEntry {
@@ -33,36 +34,40 @@ interface CacheEntry {
   pipelineTrace?: unknown;
 }
 
-const cache = new Map<string, CacheEntry>();
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
-function getCacheKey(code: string, language: string, mode: string): string {
-  const hash = crypto.createHash('sha256').update(`${code}|${language}|${mode}`).digest('hex');
-  return hash;
-}
+// ============================================================
+// 🔥 توابع کش اصلاح‌شده با await
+// ============================================================
 
-function getCachedResult(key: string): CacheEntry | null {
-  const entry = cache.get(key);
-  if (!entry) return null;
-  if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
-    cache.delete(key);
+async function getCachedResult(key: string): Promise<CacheEntry | null> {
+  try {
+    const entry = await cache.get<CacheEntry>(key);
+    if (!entry) return null;
+
+    // بررسی انقضا (توسط cache.ts انجام می‌شود)
+    return entry;
+  } catch (error) {
+    logger.warn('[generate] Cache get failed:', error);
     return null;
   }
-  return entry;
 }
 
-function setCacheResult(key: string, result: LegacyGenerateResponse, pipelineTrace?: unknown): void {
-  cache.set(key, {
-    result,
-    timestamp: Date.now(),
-    pipelineTrace,
-  });
-  if (cache.size > 1000) {
-    const keys = Array.from(cache.keys());
-    const toDelete = keys.slice(0, cache.size - 1000);
-    for (const k of toDelete) {
-      cache.delete(k);
-    }
+async function setCacheResult(
+  key: string,
+  result: LegacyGenerateResponse,
+  pipelineTrace?: unknown
+): Promise<void> {
+  try {
+    const entry: CacheEntry = {
+      result,
+      timestamp: Date.now(),
+      pipelineTrace,
+    };
+    await cache.set(key, entry);
+    logger.debug('[generate] Cache set successful', { key: key.slice(0, 16) });
+  } catch (error) {
+    logger.warn('[generate] Cache set failed:', error);
   }
 }
 
@@ -172,7 +177,7 @@ function mapCanonicalToLegacy(canonical: any): LegacyGenerateResponse {
 }
 
 // ============================================================
-// 3. Main POST handler (با try-catch برای لاگ‌گیری دقیق)
+// 3. Main POST handler
 // ============================================================
 
 export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
@@ -239,10 +244,12 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
       return NextResponse.json({ error: 'Payload too large (max 100KB)' }, { status: 413 });
     }
 
-    // Check cache (only for advanced mode to avoid caching simple/medium)
+    // ============================================================
+    // 🔥 🔥 🔥 بررسی کش (با await)
+    // ============================================================
     if (mode === 'advanced') {
       const cacheKey = getCacheKey(code, language, mode);
-      const cached = getCachedResult(cacheKey);
+      const cached = await getCachedResult(cacheKey);
       if (cached) {
         logger.info(`[generate] Cache hit for IP ${ip}, mode ${mode}, key ${cacheKey.slice(0, 8)}...`);
         const auditResult = cached.result.audit_result;
@@ -266,7 +273,7 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
       logger.info(`[generate] Using mock response for advanced mode (IP ${ip})`);
       const mock = validateResponse(MOCK_RESPONSE);
       if (mode === 'advanced') {
-        setCacheResult(getCacheKey(code, language, mode), mock);
+        await setCacheResult(getCacheKey(code, language, mode), mock);
       }
       const auditResult = mock.audit_result;
       if (!auditResult) {
@@ -355,7 +362,7 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
         console.log(`🔍 [generate] Legacy generation completed for mode ${mode}`);
       } catch (legacyError) {
         console.error(`❌ [generate] Legacy generation failed for mode ${mode}:`, legacyError);
-        throw legacyError; // re-throw to be caught by outer try-catch
+        throw legacyError;
       }
     }
 
@@ -368,9 +375,11 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
       );
     }
 
-    // Cache only advanced results
+    // ============================================================
+    // 🔥 🔥 🔥 ذخیره در کش (با await)
+    // ============================================================
     if (mode === 'advanced' && legacyResult) {
-      setCacheResult(getCacheKey(code, language, mode), legacyResult, pipelineTrace);
+      await setCacheResult(getCacheKey(code, language, mode), legacyResult, pipelineTrace);
     }
 
     const duration = Date.now() - startTime;

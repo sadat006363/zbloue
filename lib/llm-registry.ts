@@ -42,7 +42,7 @@ export interface ModelCapability {
 }
 
 // ============================================================
-// 🔥 Model Registry (OpenAI + Anthropic)
+// 🔥 Model Registry (OpenAI + Anthropic + Groq)
 // ============================================================
 
 export const LLM_MODELS = {
@@ -138,6 +138,59 @@ export const LLM_MODELS = {
     tokenParam: 'max_tokens',
     defaultMaxTokens: 4000,
   },
+
+  // ===== Groq (Llama, Mistral, Gemma) =====
+  'llama-3.1-70b': {
+    model: 'llama-3.1-70b-versatile',
+    api: 'chat-completions',
+    purpose: 'advanced-analysis',
+    supportsReasoning: false,
+    supportsTemperature: true,
+    supportsTopP: true,
+    supportsFrequencyPenalty: false,
+    supportsPresencePenalty: false,
+    tokenParam: 'max_tokens',
+    defaultMaxTokens: 8000,
+  },
+
+  'llama-3.1-8b': {
+    model: 'llama-3.1-8b-instant',
+    api: 'chat-completions',
+    purpose: 'code-analysis',
+    supportsReasoning: false,
+    supportsTemperature: true,
+    supportsTopP: true,
+    supportsFrequencyPenalty: false,
+    supportsPresencePenalty: false,
+    tokenParam: 'max_tokens',
+    defaultMaxTokens: 8000,
+  },
+
+  'mixtral-8x7b': {
+    model: 'mixtral-8x7b-32768',
+    api: 'chat-completions',
+    purpose: 'code-analysis',
+    supportsReasoning: false,
+    supportsTemperature: true,
+    supportsTopP: true,
+    supportsFrequencyPenalty: false,
+    supportsPresencePenalty: false,
+    tokenParam: 'max_tokens',
+    defaultMaxTokens: 8000,
+  },
+
+  'gemma2-9b': {
+    model: 'gemma2-9b-it',
+    api: 'chat-completions',
+    purpose: 'code-analysis',
+    supportsReasoning: false,
+    supportsTemperature: true,
+    supportsTopP: true,
+    supportsFrequencyPenalty: false,
+    supportsPresencePenalty: false,
+    tokenParam: 'max_tokens',
+    defaultMaxTokens: 8000,
+  },
 } as const;
 
 // ============================================================
@@ -148,6 +201,7 @@ export const ADVANCED_MODEL_ROLES = {
   primary: 'gpt-4o',
   codeFallback: 'gpt-4o-mini',
   stableFallback: 'gpt-4o-mini-fallback',
+  costFallback: 'groq', // 🔥 جدید: برای حالت‌های کم‌هزینه
 } as const;
 
 export type AdvancedModelRole = keyof typeof ADVANCED_MODEL_ROLES;

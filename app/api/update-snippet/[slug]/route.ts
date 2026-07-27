@@ -6,6 +6,7 @@ import { Snippet } from '@/types';
 import { rateLimiter, getClientIP } from '@/lib/rateLimiter';
 import logger from '@/lib/logger';
 import { withErrorHandlerAndLog } from '@/lib/errorHandler';
+import { AdvancedAuditResultSchema } from '@/lib/analysis/schema';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -27,7 +28,7 @@ const supabaseAdmin = createClient(
 
 type UpdateSnippetData = Partial<Pick<
   Snippet,
-  'username' | 'github_username' | 'line_explanations' | 'generated_prompt' | 'avatar_url'
+  'username' | 'github_username' | 'avatar_url' | 'audit_result'
 >>;
 
 export const PATCH = withErrorHandlerAndLog(
@@ -65,22 +66,36 @@ export const PATCH = withErrorHandlerAndLog(
 
     const updateData: UpdateSnippetData = {};
 
+    // ===== فیلدهای کاربر =====
     if (body.username !== undefined) {
       updateData.username = body.username?.trim().slice(0, 50) || null;
     }
     if (body.github_username !== undefined) {
       updateData.github_username = body.github_username?.trim().slice(0, 50) || null;
     }
-    if (body.line_explanations !== undefined) {
-      updateData.line_explanations = body.line_explanations || null;
-    }
-    if (body.generated_prompt !== undefined) {
-      updateData.generated_prompt = body.generated_prompt || null;
-    }
     if (body.avatar_url !== undefined) {
       updateData.avatar_url = body.avatar_url || null;
     }
 
+    // ============================================================
+    // 🔥 🔥 🔥 پشتیبانی از به‌روزرسانی audit_result
+    // ============================================================
+    if (body.audit_result !== undefined) {
+      // اعتبارسنجی audit_result قبل از ذخیره
+      const validated = AdvancedAuditResultSchema.safeParse(body.audit_result);
+      if (!validated.success) {
+        logger.error('[update-snippet] Invalid audit_result:', validated.error.issues);
+        return NextResponse.json(
+          { error: 'Invalid audit result structure' },
+          { status: 400 }
+        );
+      }
+      updateData.audit_result = validated.data;
+    }
+
+    // ============================================================
+    // 🔥 اگر چیزی برای به‌روزرسانی وجود نداشت
+    // ============================================================
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json(
         { error: 'No fields to update' },
@@ -88,6 +103,9 @@ export const PATCH = withErrorHandlerAndLog(
       );
     }
 
+    // ============================================================
+    // اجرای به‌روزرسانی در دیتابیس
+    // ============================================================
     const { data, error } = await supabaseAdmin
       .from('snippets')
       .update(updateData)
