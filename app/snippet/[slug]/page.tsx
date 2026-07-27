@@ -45,6 +45,60 @@ function escapeHtml(value: string): string {
 }
 
 // ============================================================
+// 🔥 تابع تولید متن تحلیل برای Advanced
+// ============================================================
+function buildAnalysisTextForAdvanced(snippet: any): string {
+  const parts: string[] = [];
+
+  // 1. خلاصه کلی
+  if (snippet.summary) {
+    parts.push(`📌 Summary:\n${snippet.summary}`);
+  }
+
+  // 2. Findings
+  const findings = snippet.findings || [];
+  if (findings.length > 0) {
+    parts.push(`\n🔍 Findings (${findings.length}):`);
+    findings.slice(0, 5).forEach((f: any) => {
+      parts.push(`  • ${f.title} [${f.severity}] - ${f.confidence}`);
+      if (f.remediation) {
+        parts.push(`    Fix: ${f.remediation}`);
+      }
+    });
+    if (findings.length > 5) {
+      parts.push(`  ... and ${findings.length - 5} more findings`);
+    }
+  }
+
+  // 3. Scorecard
+  const scorecard = snippet.scorecard_new || snippet.audit_result?.scorecard;
+  if (scorecard && typeof scorecard === 'object') {
+    const scores: string[] = [];
+    for (const [key, value] of Object.entries(scorecard)) {
+      const item = value as any;
+      if (item?.applicable === true && typeof item.score === 'number') {
+        const label = key.replace(/([A-Z])/g, ' $1').trim();
+        scores.push(`${label}: ${item.score}/100`);
+      }
+    }
+    if (scores.length > 0) {
+      parts.push(`\n📊 Scorecard:\n  ${scores.join('\n  ')}`);
+    }
+  }
+
+  // 4. Verdict
+  const verdict = snippet.verdict || snippet.audit_result?.verdict;
+  if (verdict) {
+    parts.push(`\n🏁 Verdict: ${verdict.status}`);
+    if (verdict.explanation) {
+      parts.push(`  ${verdict.explanation}`);
+    }
+  }
+
+  return parts.join('\n\n') || 'No detailed analysis available.';
+}
+
+// ============================================================
 // 🔥 تابع دریافت اسنیپت
 // ============================================================
 async function getSnippet(slug: string): Promise<Snippet> {
@@ -206,11 +260,16 @@ export default async function SnippetPage({ params }: PageProps) {
   const shareUrl = `${baseUrl}/snippet/${snippet.slug}`;
   const highlightedHtml = await highlightCode(snippet.raw_code, snippet.language);
 
-  // 🔥 استفاده از normalizedAudit برای تشخیص وجود تحلیل کامل
+  // 🔥 تشخیص وجود تحلیل کامل (Advanced)
   const fullAnalysisExists = normalizedAudit ? normalizedAudit.hasFullAnalysis : false;
 
   // 🔥 استخراج متن کامل تحلیل از audit_result (برای Simple/Medium)
-  const fullAnalysisText = snippet?.audit_result?.analysis || '';
+  let fullAnalysisText = snippet?.audit_result?.analysis || '';
+
+  // 🔥 اگر Advanced است و analysis خالی است، از داده‌های ساختاریافته متن بساز
+  if (fullAnalysisExists && !fullAnalysisText) {
+    fullAnalysisText = buildAnalysisTextForAdvanced(snippet);
+  }
 
   const debugData = {
     fullAnalysisExists,
@@ -221,7 +280,6 @@ export default async function SnippetPage({ params }: PageProps) {
     normalizedAudit,
   };
 
-  // 🔥 نرمالایز کردن line_explanations
   const lineExplanations = snippet.line_explanations && Array.isArray(snippet.line_explanations)
     ? (snippet.line_explanations as LineExplanation[])
     : [];
@@ -262,7 +320,7 @@ export default async function SnippetPage({ params }: PageProps) {
             <SnippetAnalysis
               keyConcept={snippet.key_concept}
               whatItDoes={snippet.what_this_code_does}
-              fullAnalysis={fullAnalysisText} // 🔥 ارسال متن کامل تحلیل
+              fullAnalysis={fullAnalysisText}
             />
           </div>
 
