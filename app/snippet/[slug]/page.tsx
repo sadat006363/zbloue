@@ -172,10 +172,8 @@ export default async function SnippetPage({ params }: PageProps) {
       if (normalizedAudit && (normalizedAudit.status.type === 'valid' || normalizedAudit.status.type === 'legacy')) {
         const auditData = normalizedAudit.status.audit;
         if (auditData) {
-          // ادغام داده‌های Advanced به snippet
           snippet = {
             ...snippet,
-            // فیلدهای اصلی Advanced
             findings: auditData.findings ?? snippet.findings,
             scorecard_new: auditData.scorecard ?? snippet.scorecard_new,
             verdict: auditData.verdict ?? snippet.verdict,
@@ -211,18 +209,11 @@ export default async function SnippetPage({ params }: PageProps) {
   // 🔥 استفاده از normalizedAudit برای تشخیص وجود تحلیل کامل
   const fullAnalysisExists = normalizedAudit ? normalizedAudit.hasFullAnalysis : false;
 
-  // 🔥 بررسی وجود Scorecard معتبر (اعداد واقعی) - بدون useMemo
-  const hasValidScorecard = (() => {
-    const sc = snippet.scorecard_new || snippet.audit_result?.scorecard;
-    if (!sc || typeof sc !== 'object') return false;
-    return Object.values(sc).some((item: any) => 
-      item?.applicable === true && typeof item?.score === 'number' && item.score > 0
-    );
-  })();
+  // 🔥 استخراج متن کامل تحلیل از audit_result (برای Simple/Medium)
+  const fullAnalysisText = snippet?.audit_result?.analysis || '';
 
   const debugData = {
     fullAnalysisExists,
-    hasValidScorecard,
     findings: snippet.findings,
     scorecard_new: snippet.scorecard_new,
     verdict: snippet.verdict,
@@ -264,10 +255,14 @@ export default async function SnippetPage({ params }: PageProps) {
             />
           </div>
 
+          {/* ============================================================
+              🔥 SnippetAnalysis - با ارسال fullAnalysis
+              ============================================================ */}
           <div id="snippet-analysis">
             <SnippetAnalysis
               keyConcept={snippet.key_concept}
               whatItDoes={snippet.what_this_code_does}
+              fullAnalysis={fullAnalysisText} // 🔥 ارسال متن کامل تحلیل
             />
           </div>
 
@@ -278,9 +273,6 @@ export default async function SnippetPage({ params }: PageProps) {
             />
           </div>
 
-          {/* ============================================================
-              🔥 SnippetFullAnalysis - فقط در صورت وجود تحلیل کامل نمایش داده شود
-              ============================================================ */}
           <div id="snippet-full-analysis">
             {fullAnalysisExists ? (
               <SnippetFullAnalysis snippet={snippet} />
@@ -298,7 +290,6 @@ export default async function SnippetPage({ params }: PageProps) {
             )}
           </div>
 
-          {/* 🔥 خط به خط - با استفاده از lineExplanations نرمالایز شده */}
           {lineExplanations.length > 0 && (
             <div id="snippet-line-by-line">
               <SnippetLineByLine lineExplanations={lineExplanations} />

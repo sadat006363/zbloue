@@ -143,7 +143,7 @@ function buildPromptInfo(
 }
 
 // ============================================================
-// 🔥 تابع ساخت audit_result برای Simple/Medium
+// 🔥 تابع ساخت audit_result برای Simple/Medium (اصلاح‌شده با analysis)
 // ============================================================
 
 function buildMinimalAuditResult(
@@ -156,6 +156,7 @@ function buildMinimalAuditResult(
   const linkedinPost = genData.linkedin_post || 'Check out this code analysis! #Zbloue';
   const cardTitle = genData.card_title || 'Code Analysis';
 
+  // 🔥 اصلاح 1: analysisCoverage محافظه‌کارانه
   const allDimensions = [
     'correctness', 'security', 'concurrency', 'liveness', 'performance',
     'resource-management', 'error-handling', 'input-validation', 'data-integrity',
@@ -187,6 +188,8 @@ function buildMinimalAuditResult(
     title: cardTitle,
     language: language,
     summary: summary,
+    // 🔥 🔥 🔥 اضافه کردن فیلد analysis با متن کامل تحلیل
+    analysis: genData.analysis || '',
     analysisCoverage,
     executionOverview: {
       entryPoints: [],
@@ -264,7 +267,7 @@ export default function HomePage() {
   }, [dispatch]);
 
   // ============================================================
-  // 🔥 handleGenerate (اصلاح‌شده نهایی - بدون analysis_text)
+  // 🔥 handleGenerate (اصلاح‌شده نهایی)
   // ============================================================
 
   const handleGenerate = useCallback(async () => {
@@ -319,7 +322,6 @@ export default function HomePage() {
         github_username: normalizedGithubUsername,
         avatar_url: normalizedAvatarUrl,
         audit_result: auditResult,
-        // 🔥 analysis_text حذف شد - toSnippetInsert از audit.summary استفاده می‌کند
       };
 
       const saveResult = await snippetService.save(saveData);
