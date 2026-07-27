@@ -314,6 +314,14 @@ export default function HomePage() {
       }
 
       // ============================================================
+      // 🔥 اصلاح: what_this_code_does را از normalized بگیرید
+      // ============================================================
+      const whatThisCodeDoes = normalized.what_this_code_does || 
+                               genData.what_this_code_does || 
+                               genData.analysis || 
+                               '';
+
+      // ============================================================
       // 🔥 ذخیره در دیتابیس (برای هر سه حالت)
       // ============================================================
       const saveData = {
@@ -323,6 +331,8 @@ export default function HomePage() {
         github_username: normalizedGithubUsername,
         avatar_url: normalizedAvatarUrl,
         audit_result: auditResult,
+        // 🔥 اضافه کردن analysis_text برای استفاده در to-snippet
+        analysis_text: genData.analysis || normalized.what_this_code_does || '',
       };
 
       const saveResult = await snippetService.save(saveData);
@@ -330,14 +340,6 @@ export default function HomePage() {
       if (!saveResult.success) {
         throw new Error(saveResult.error || 'Failed to save snippet');
       }
-
-      // ============================================================
-      // 🔥 اصلاح: what_this_code_does را از normalized بگیرید
-      // ============================================================
-      const whatThisCodeDoes = normalized.what_this_code_does || 
-                               genData.what_this_code_does || 
-                               genData.analysis || 
-                               '';
 
       // ============================================================
       // 🔥 ساخت SnippetData برای نمایش

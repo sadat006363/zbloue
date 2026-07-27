@@ -22,6 +22,7 @@ const CreateSnippetRequestSchema = z
     github_username: z.string().min(1).max(100).nullable().optional(),
     avatar_url: z.string().url().nullable().optional(),
     audit_result: z.any().optional().nullable(),
+    analysis_text: z.string().optional().nullable(), // 🔥 اضافه شده
   })
   .catchall(z.any());
 
@@ -117,6 +118,7 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
     githubUsername: body.github_username ?? null,
     avatarUrl: body.avatar_url ?? null,
     isPublic: true,
+    analysisText: body.analysis_text ?? null, // 🔥 اضافه شده
   };
 
   // اعتبارسنجی Context
