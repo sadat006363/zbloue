@@ -1,17 +1,8 @@
 {
   "framework": "nextjs",
   "functions": {
-    "api/generate.js": {
+    "app/api/**/route.ts": {
       "maxDuration": 60
-    },
-    "api/generate-prompt.js": {
-      "maxDuration": 30
-    },
-    "api/explain-line-by-line.js": {
-      "maxDuration": 60
-    },
-    "api/convert-code.js": {
-      "maxDuration": 30
     }
   },
   "headers": [
