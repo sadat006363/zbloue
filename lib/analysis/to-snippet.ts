@@ -14,7 +14,6 @@ export interface SnippetCreationContext {
   githubUsername?: string | null;
   avatarUrl?: string | null;
   isPublic?: boolean;
-  analysisText?: string | null;
 }
 
 // ============================================================
@@ -27,9 +26,8 @@ export function toSnippetInsert(
 ): SnippetInsert {
   const now = new Date().toISOString();
 
-  // 🔥 اولویت: analysisText از context، سپس audit.summary، سپس audit.title
-  const whatThisCodeDoes = context.analysisText || 
-                           audit.summary || 
+  // 🔥 از audit.summary برای پر کردن what_this_code_does استفاده می‌کنیم
+  const whatThisCodeDoes = audit.summary || 
                            audit.title || 
                            '';
 

@@ -264,7 +264,7 @@ export default function HomePage() {
   }, [dispatch]);
 
   // ============================================================
-  // 🔥 handleGenerate (اصلاح‌شده نهایی)
+  // 🔥 handleGenerate (اصلاح‌شده نهایی - بدون analysis_text)
   // ============================================================
 
   const handleGenerate = useCallback(async () => {
@@ -310,14 +310,6 @@ export default function HomePage() {
       }
 
       // ============================================================
-      // 🔥 اصلاح: what_this_code_does را از normalized بگیرید
-      // ============================================================
-      const whatThisCodeDoes = normalized.what_this_code_does || 
-                               genData.what_this_code_does || 
-                               genData.analysis || 
-                               '';
-
-      // ============================================================
       // 🔥 ذخیره در دیتابیس (برای هر سه حالت)
       // ============================================================
       const saveData = {
@@ -327,7 +319,7 @@ export default function HomePage() {
         github_username: normalizedGithubUsername,
         avatar_url: normalizedAvatarUrl,
         audit_result: auditResult,
-        analysis_text: whatThisCodeDoes,
+        // 🔥 analysis_text حذف شد - toSnippetInsert از audit.summary استفاده می‌کند
       };
 
       const saveResult = await snippetService.save(saveData);
@@ -346,7 +338,7 @@ export default function HomePage() {
         language,
         card_title: auditResult.title || 'Code Analysis',
         key_concept: auditResult.summary || '',
-        what_this_code_does: whatThisCodeDoes,
+        what_this_code_does: auditResult.summary || '',
         debug_analysis: auditResult.findings?.length ? `${auditResult.findings.length} findings` : 
                        (genData.debug_analysis || '-'),
         optimization: auditResult.recommendedActions?.length
