@@ -2,4 +2,4 @@
 
 export { snippetService } from './snippetService';
 export { analysisService } from './analysisService';
-export type { SaveSnippetData } from './snippetService';
+export type { SaveSnippetData, UpdateSnippetData } from './snippetService';

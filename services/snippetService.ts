@@ -1,93 +1,96 @@
-// services/analysisService.ts
+// services/snippetService.ts
 
-import { LegacyGenerateResponse, LineExplanation, AnalysisMode } from '@/types';
+import { Snippet, CreateSnippetResponse } from '@/types';
 
-interface GenerateOptions {
+/**
+ * داده‌های مورد نیاز برای ذخیره‌سازی Snippet جدید
+ */
+export interface SaveSnippetData {
   code: string;
   language: string;
-  mode: AnalysisMode;
-  signal?: AbortSignal;
+  username?: string | null;
+  github_username?: string | null;
+  avatar_url?: string | null;
+  audit_result: any;
 }
 
-export const analysisService = {
+/**
+ * داده‌های قابل به‌روزرسانی برای Snippet
+ */
+export interface UpdateSnippetData {
+  username?: string | null;
+  github_username?: string | null;
+  avatar_url?: string | null;
+  audit_result?: any;
+  line_explanations?: any;
+  generated_prompt?: string | null;
+}
+
+/**
+ * سرویس مدیریت Snippetها
+ */
+export const snippetService = {
   /**
-   * Generate code analysis with increased timeout (120 seconds)
+   * ذخیره‌سازی یک Snippet جدید در دیتابیس
    */
-  async generate({ code, language, mode, signal }: GenerateOptions): Promise<LegacyGenerateResponse> {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 120000); // 120 seconds
+  async save(data: SaveSnippetData): Promise<CreateSnippetResponse> {
+    console.log('🔍 [snippetService.save] ===== START =====');
+    console.log('🔍 [snippetService.save] audit_result keys:', Object.keys(data.audit_result || {}));
+    console.log('🔍 [snippetService.save] Full data keys:', Object.keys(data));
+    console.log('🔍 [snippetService.save] ===== END =====');
 
-    try {
-      const response = await fetch('/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, language, mode }),
-        signal: signal || controller.signal,
-      });
+    const payload = {
+      code: data.code,
+      language: data.language,
+      username: data.username ?? null,
+      github_username: data.github_username ?? null,
+      avatar_url: data.avatar_url ?? null,
+      audit_result: data.audit_result,
+    };
 
-      clearTimeout(timeoutId);
+    const response = await fetch('/api/create-snippet', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || 'AI generation failed');
-      }
-      return data as LegacyGenerateResponse;
-    } catch (error) {
-      clearTimeout(timeoutId);
-      throw error;
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to save snippet');
     }
+    return result;
   },
 
   /**
-   * Generate line-by-line explanations
-   * 🔥 پارامتر mode اضافه شد
+   * به‌روزرسانی یک Snippet موجود با استفاده از slug
    */
-  async explainLineByLine(code: string, language: string, mode: AnalysisMode): Promise<LineExplanation[]> {
-    const response = await fetch('/api/explain-line-by-line', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code, language, mode }),
+  async update(slug: string, data: UpdateSnippetData): Promise<Snippet> {
+    const apiKey = process.env.NEXT_PUBLIC_API_KEY || '';
+    const response = await fetch(`/api/update-snippet/${slug}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+      },
+      body: JSON.stringify(data),
     });
 
-    const data = await response.json();
+    const result = await response.json();
     if (!response.ok) {
-      throw new Error(data.error || 'Failed to generate explanations');
+      throw new Error(result.error || 'Failed to update snippet');
     }
-    return data.explanations || [];
+    return result.data;
   },
 
   /**
-   * Generate prompt from code
-   * 🔥 پارامتر mode اضافه شد
+   * دریافت یک Snippet با slug (در صورت نیاز در سمت کلاینت)
    */
-  async generatePrompt(code: string, language: string, mode: AnalysisMode): Promise<string> {
-    const response = await fetch('/api/generate-prompt', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code, language, mode }),
-    });
-
-    const data = await response.json();
+  async getBySlug(slug: string): Promise<Snippet | null> {
+    const response = await fetch(`/api/snippet/${slug}`);
     if (!response.ok) {
-      throw new Error(data.error || 'Failed to generate prompt');
+      if (response.status === 404) return null;
+      throw new Error('Failed to fetch snippet');
     }
-    return data.prompt || '';
-  },
-
-  /**
-   * Convert code to another language
-   */
-  async convertCode(code: string, sourceLanguage: string, targetLanguage: string): Promise<string> {
-    const response = await fetch('/api/convert-code', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code, sourceLanguage, targetLanguage }),
-    });
-
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || 'Conversion failed');
-    }
-    return data.convertedCode;
+    return response.json();
   },
 };
