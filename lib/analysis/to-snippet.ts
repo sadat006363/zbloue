@@ -50,10 +50,9 @@ export function toSnippetInsert(
     // ===== فیلدهای جانبی (غیرتحلیلی) =====
     line_explanations: null,
     generated_prompt: null,
-    card_image_url: null,
 
+    // ⚠️ card_image_url حذف شد چون در دیتابیس وجود ندارد
     // ⚠️ تمام ستون‌های Legacy دیگر حذف شدند
-    // چون در دیتابیس وجود ندارند
   } as SnippetInsert;
 
   return row;
