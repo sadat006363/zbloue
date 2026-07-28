@@ -6,6 +6,8 @@ import { MAX_LINES_PROMPT, MAX_CODE_LENGTH } from '@/lib/constants';
 import { rateLimiter, getClientIP } from '@/lib/rateLimiter';
 import logger from '@/lib/logger';
 import { withErrorHandlerAndLog } from '@/lib/errorHandler';
+import { callOpenAI } from '@/lib/openaiClient';
+import { AnalysisModeSchema } from '@/types';
 
 const openaiApiKey = process.env.OPENAI_API_KEY || 'placeholder-key';
 const openai = new OpenAI({ apiKey: openaiApiKey });
@@ -86,6 +88,16 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
     );
   }
 
+  // 🔥 اعتبارسنجی mode
+  const modeValidation = AnalysisModeSchema.safeParse(mode);
+  if (!modeValidation.success) {
+    return NextResponse.json(
+      { error: 'Invalid mode. Must be simple, medium, or advanced.' },
+      { status: 400 }
+    );
+  }
+  const validMode = modeValidation.data;
+
   const lines = code.split('\n').filter((line: string) => line.trim().length > 0);
   if (lines.length > MAX_LINES_PROMPT) {
     return NextResponse.json(
@@ -101,7 +113,7 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
     );
   }
 
-  const systemPrompt = getSystemPrompt(mode);
+  const systemPrompt = getSystemPrompt(validMode);
 
   const userPrompt = `
 Generate a detailed analysis prompt for the following ${language} code:
@@ -116,27 +128,28 @@ Create a prompt that would help someone understand this code deeply.
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-  const response = await openai.chat.completions.create(
-    {
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-      temperature: 0.5,
-      response_format: { type: 'json_object' },
-      max_completion_tokens: 4000,
-    },
-    { signal: controller.signal }
-  );
+  try {
+    // 🔥 استفاده از callOpenAI با mode کاربر
+    const content = await callOpenAI(systemPrompt, userPrompt, {
+      mode: validMode, // ← simple/medium → Groq, advanced → OpenAI
+      responseFormat: 'json_object',
+      signal: controller.signal,
+    });
 
-  clearTimeout(timeoutId);
+    clearTimeout(timeoutId);
 
-  const content = response.choices[0].message.content || '{}';
-  const data = JSON.parse(content);
+    const data = JSON.parse(content);
 
-  logger.info(`[generate-prompt] Success for IP ${ip}, mode: ${mode}`);
-  return NextResponse.json({
-    prompt: data.prompt || '',
-  });
+    logger.info(`[generate-prompt] Success for IP ${ip}, mode: ${validMode}`);
+    return NextResponse.json({
+      prompt: data.prompt || '',
+    });
+  } catch (error) {
+    clearTimeout(timeoutId);
+    logger.error('[generate-prompt] Error:', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Failed to generate prompt' },
+      { status: 500 }
+    );
+  }
 });

@@ -320,7 +320,7 @@ export default function HomePage() {
   }, [dispatch]);
 
   // ============================================================
-  // 🔥 handleGenerate (اصلاح‌شده نهایی با پشتیبانی از Advanced)
+  // 🔥 handleGenerate
   // ============================================================
 
   const handleGenerate = useCallback(async () => {
@@ -356,32 +356,21 @@ export default function HomePage() {
       const normalizedGithubUsername = githubUsername && githubUsername.trim() !== '' ? githubUsername : undefined;
       const normalizedAvatarUrl = avatarUrl && avatarUrl.trim() !== '' ? avatarUrl : undefined;
 
-      // ============================================================
-      // 🔥 ساخت audit_result (اگر موجود نبود)
-      // ============================================================
       let auditResult = genData.audit_result;
 
       if (!auditResult) {
         auditResult = buildMinimalAuditResult(genData, language, mode);
       }
 
-      // ============================================================
-      // 🔥 🔥 🔥 برای حالت Advanced، fullAnalysis را از audit_result بساز
-      // ============================================================
       let fullAnalysisForOutput = genData;
 
       if (mode === 'advanced' && auditResult) {
-        // تبدیل audit_result به LegacyGenerateResponse کامل
         fullAnalysisForOutput = canonicalToLegacyResponse(auditResult);
-        // اگر analysis خالی بود، از داده‌های ساختاریافته پر کن
         if (!fullAnalysisForOutput.analysis) {
           fullAnalysisForOutput.analysis = generateAdvancedAnalysisText(auditResult);
         }
       }
 
-      // ============================================================
-      // 🔥 ذخیره در دیتابیس (برای هر سه حالت)
-      // ============================================================
       const saveData = {
         code: cleanedCode,
         language,
@@ -397,9 +386,6 @@ export default function HomePage() {
         throw new Error(saveResult.error || 'Failed to save snippet');
       }
 
-      // ============================================================
-      // 🔥 ساخت SnippetData برای نمایش
-      // ============================================================
       const snippetData: Snippet = {
         id: saveResult.id,
         slug: saveResult.slug,
@@ -473,7 +459,15 @@ export default function HomePage() {
         outputPanelRef.current.setActiveTab('analysis');
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Analysis failed. Please try again.';
+      let message = error instanceof Error ? error.message : 'Analysis failed. Please try again.';
+      
+      // مدیریت خطای Timeout یا Connection Closed
+      if (message.includes('ERR_CONNECTION_CLOSED') || 
+          message.includes('timed out') || 
+          message.includes('AbortError')) {
+        message = '⏱️ The analysis is taking longer than expected. Please wait a moment and refresh the page, or try again with a simpler code.';
+      }
+      
       setErrorMessage(message);
       dispatch({ type: 'SET_ERROR', payload: message });
     } finally {
@@ -482,7 +476,7 @@ export default function HomePage() {
   }, [code, language, mode, username, githubUsername, avatarUrl, dispatch, clearError]);
 
   // ============================================================
-  // 🔥 handleExplain (اصلاح‌شده با ذخیره‌سازی در دیتابیس)
+  // 🔥 handleExplain (با ارسال mode و ذخیره در دیتابیس)
   // ============================================================
 
   const handleExplain = useCallback(async () => {
@@ -495,14 +489,14 @@ export default function HomePage() {
     dispatch({ type: 'SET_EXPLAINING', payload: true });
 
     try {
-      const explanations = await analysisService.explainLineByLine(code, language);
+      // 🔥 ارسال mode به سرویس
+      const explanations = await analysisService.explainLineByLine(code, language, mode);
       const modeKey = mode as 'simple' | 'medium' | 'advanced';
 
-      // 🔥 دریافت اسنیپت فعلی از state
       const currentOutput = outputs[modeKey];
       const currentSnippet = currentOutput?.snippet;
 
-      // 🔥 اگر اسنیپت موجود است و slug دارد، در دیتابیس ذخیره کن
+      // 🔥 ذخیره در دیتابیس
       if (currentSnippet?.slug) {
         await snippetService.update(currentSnippet.slug, {
           line_explanations: explanations,
@@ -512,7 +506,6 @@ export default function HomePage() {
         console.warn('⚠️ No snippet found to save line-by-line explanations');
       }
 
-      // به‌روزرسانی state
       const updatedOutput = {
         snippet: currentOutput?.snippet || null,
         fullAnalysis: currentOutput?.fullAnalysis || null,
@@ -544,7 +537,7 @@ export default function HomePage() {
   }, [code, language, mode, outputs, dispatch, clearError]);
 
   // ============================================================
-  // 🔥 handleGeneratePrompt (اصلاح‌شده با ذخیره‌سازی در دیتابیس)
+  // 🔥 handleGeneratePrompt (با ارسال mode و ذخیره در دیتابیس)
   // ============================================================
 
   const handleGeneratePrompt = useCallback(async () => {
@@ -557,14 +550,14 @@ export default function HomePage() {
     dispatch({ type: 'SET_GENERATING_PROMPT', payload: true });
 
     try {
+      // 🔥 ارسال mode به سرویس
       const prompt = await analysisService.generatePrompt(code, language, mode);
       const modeKey = mode as 'simple' | 'medium' | 'advanced';
 
-      // 🔥 دریافت اسنیپت فعلی از state
       const currentOutput = outputs[modeKey];
       const currentSnippet = currentOutput?.snippet;
 
-      // 🔥 اگر اسنیپت موجود است و slug دارد، در دیتابیس ذخیره کن
+      // 🔥 ذخیره در دیتابیس
       if (currentSnippet?.slug) {
         await snippetService.update(currentSnippet.slug, {
           generated_prompt: prompt,
@@ -574,7 +567,6 @@ export default function HomePage() {
         console.warn('⚠️ No snippet found to save generated prompt');
       }
 
-      // به‌روزرسانی state
       const updatedOutput = {
         snippet: currentOutput?.snippet || null,
         fullAnalysis: currentOutput?.fullAnalysis || null,

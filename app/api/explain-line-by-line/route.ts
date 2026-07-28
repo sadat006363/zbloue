@@ -8,6 +8,8 @@ import { rateLimiter, getClientIP } from '@/lib/rateLimiter';
 import logger from '@/lib/logger';
 import { withErrorHandlerAndLog } from '@/lib/errorHandler';
 import { cache, getCacheKey } from '@/lib/cache';
+import { callOpenAI } from '@/lib/openaiClient';
+import { AnalysisModeSchema } from '@/types';
 
 const openaiApiKey = process.env.OPENAI_API_KEY || 'placeholder-key';
 const openai = new OpenAI({ apiKey: openaiApiKey });
@@ -25,7 +27,7 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
     );
   }
 
-  const { code, language } = await req.json();
+  const { code, language, mode = 'simple' } = await req.json();
 
   if (!code || !language) {
     return NextResponse.json(
@@ -33,6 +35,16 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
       { status: 400 }
     );
   }
+
+  // 🔥 اعتبارسنجی mode
+  const modeValidation = AnalysisModeSchema.safeParse(mode);
+  if (!modeValidation.success) {
+    return NextResponse.json(
+      { error: 'Invalid mode. Must be simple, medium, or advanced.' },
+      { status: 400 }
+    );
+  }
+  const validMode = modeValidation.data;
 
   const codeWithoutComments = removeComments(code, language);
 
@@ -52,9 +64,9 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
   }
 
   // ============================================================
-  // 🔥 🔥 🔥 بررسی کش
+  // 🔥 بررسی کش
   // ============================================================
-  const cacheKey = getCacheKey(codeWithoutComments, language, 'explain');
+  const cacheKey = getCacheKey(codeWithoutComments, language, `explain-${validMode}`);
   const cachedResult = await cache.get<{ explanations: any[] }>(cacheKey);
 
   if (cachedResult) {
@@ -63,7 +75,7 @@ export const POST = withErrorHandlerAndLog(async (req: NextRequest) => {
   }
 
   // ============================================================
-  // 🔥 تولید توضیحات
+  // 🔥 تولید توضیحات با استفاده از callOpenAI و mode کاربر
   // ============================================================
 
   const systemPrompt = `
@@ -101,52 +113,52 @@ Provide a clear explanation for each line of code.
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 90000);
 
-  const response = await openai.chat.completions.create(
-    {
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-      temperature: 0.3,
-      response_format: { type: 'json_object' },
-      max_completion_tokens: 12000,
-    },
-    { signal: controller.signal }
-  );
-
-  clearTimeout(timeoutId);
-
-  const content = response.choices[0].message.content || '{}';
-
-  let data;
   try {
-    data = JSON.parse(content);
-  } catch (parseError) {
-    if (process.env.NODE_ENV === 'development') {
-      console.error('JSON Parse Error:', parseError);
-      console.error('Raw content:', content);
+    // 🔥 استفاده از callOpenAI با mode کاربر
+    const content = await callOpenAI(systemPrompt, userPrompt, {
+      mode: validMode, // ← simple/medium → Groq, advanced → OpenAI
+      responseFormat: 'json_object',
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    let data;
+    try {
+      data = JSON.parse(content);
+    } catch (parseError) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('JSON Parse Error:', parseError);
+        console.error('Raw content:', content);
+      }
+      return NextResponse.json(
+        { error: 'AI response format error. Please try again with shorter code.' },
+        { status: 500 }
+      );
     }
+
+    const result = {
+      explanations: data.explanations || [],
+    };
+
+    // ============================================================
+    // 🔥 ذخیره در کش
+    // ============================================================
+    try {
+      await cache.set(cacheKey, result);
+      logger.info(`[explain-line-by-line] Cached result for IP ${ip}`);
+    } catch (cacheError) {
+      logger.warn('[explain-line-by-line] Failed to cache result:', cacheError);
+    }
+
+    logger.info(`[explain-line-by-line] Success for IP ${ip}, ${result.explanations.length} explanations, mode: ${validMode}`);
+    return NextResponse.json(result);
+  } catch (error) {
+    clearTimeout(timeoutId);
+    logger.error('[explain-line-by-line] Error:', error);
     return NextResponse.json(
-      { error: 'AI response format error. Please try again with shorter code.' },
+      { error: error instanceof Error ? error.message : 'Failed to generate explanations' },
       { status: 500 }
     );
   }
-
-  const result = {
-    explanations: data.explanations || [],
-  };
-
-  // ============================================================
-  // 🔥 🔥 🔥 ذخیره در کش (به مدت ۲۴ ساعت)
-  // ============================================================
-  try {
-    await cache.set(cacheKey, result);
-    logger.info(`[explain-line-by-line] Cached result for IP ${ip}`);
-  } catch (cacheError) {
-    logger.warn('[explain-line-by-line] Failed to cache result:', cacheError);
-  }
-
-  logger.info(`[explain-line-by-line] Success for IP ${ip}, ${result.explanations.length} explanations`);
-  return NextResponse.json(result);
 });
