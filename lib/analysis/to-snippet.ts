@@ -16,6 +16,10 @@ export interface SnippetCreationContext {
   isPublic?: boolean;
 }
 
+// ============================================================
+// 🔥 تبدیل AdvancedAuditResult به SnippetInsert
+// ============================================================
+
 export function toSnippetInsert(
   audit: AdvancedAuditResult,
   context: SnippetCreationContext
@@ -71,4 +75,19 @@ export function toSnippetInsert(
   } as SnippetInsert;
 }
 
-// ❌ تابع legacyRowToAudit حذف شد – چون داده‌های قدیمی وجود ندارند
+// ============================================================
+// 🔥 اعتبارسنجی Context
+// ============================================================
+
+export function isValidSnippetContext(context: SnippetCreationContext): boolean {
+  if (!context.rawCode || context.rawCode.trim().length === 0) {
+    throw new Error('rawCode is required and must not be empty');
+  }
+  if (!context.sourceLanguage || context.sourceLanguage.trim().length === 0) {
+    throw new Error('sourceLanguage is required and must not be empty');
+  }
+  if (!context.slug || context.slug.trim().length === 0) {
+    throw new Error('slug is required and must not be empty');
+  }
+  return true;
+}
