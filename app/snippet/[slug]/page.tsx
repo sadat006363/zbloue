@@ -42,11 +42,17 @@ function escapeHtml(value: string): string {
 }
 
 async function getSnippet(slug: string): Promise<Snippet> {
+  console.log(`🔍 [SnippetPage] ===== START getSnippet =====`);
+  console.log(`🔍 [SnippetPage] Received slug: "${slug}"`);
+
   const normalizedSlug = slug.trim();
 
   if (!normalizedSlug) {
+    console.error(`❌ [SnippetPage] Invalid slug: empty`);
     throw new Error('Invalid slug');
   }
+
+  console.log(`🔍 [SnippetPage] Fetching from Supabase for slug: "${normalizedSlug}"`);
 
   const { data, error } = await supabase
     .from('snippets')
@@ -56,11 +62,20 @@ async function getSnippet(slug: string): Promise<Snippet> {
     .maybeSingle();
 
   if (error) {
-    console.error(`[SnippetPage] Supabase error for slug "${normalizedSlug}":`, error);
+    console.error(`❌ [SnippetPage] Supabase error for slug "${normalizedSlug}":`, error);
     throw new Error('Failed to load snippet');
   }
 
+  console.log(`🔍 [SnippetPage] Supabase response:`, {
+    hasData: !!data,
+    dataKeys: data ? Object.keys(data) : [],
+    slug: data?.slug,
+    hasAuditResult: !!data?.audit_result,
+    auditResultType: data?.audit_result ? typeof data.audit_result : 'undefined',
+  });
+
   if (!data) {
+    console.warn(`⚠️ [SnippetPage] No data found for slug "${normalizedSlug}"`);
     return null as any;
   }
 
@@ -68,21 +83,35 @@ async function getSnippet(slug: string): Promise<Snippet> {
   // 🔥 نرمال‌سازی audit_result (اگر string باشد، parse کن)
   // ============================================================
   let auditResult = data.audit_result;
+  console.log(`🔍 [SnippetPage] Raw audit_result type: ${typeof auditResult}`);
+
   if (typeof auditResult === 'string') {
+    console.log(`🔍 [SnippetPage] audit_result is string, attempting to parse...`);
     try {
       auditResult = JSON.parse(auditResult);
+      console.log(`✅ [SnippetPage] audit_result parsed successfully`);
+      console.log(`🔍 [SnippetPage] Parsed audit_result keys:`, Object.keys(auditResult || {}));
     } catch (parseError) {
-      console.error(`[SnippetPage] Failed to parse audit_result for slug "${normalizedSlug}":`, parseError);
+      console.error(`❌ [SnippetPage] Failed to parse audit_result JSON:`, parseError);
+      console.error(`❌ [SnippetPage] Raw audit_result preview:`, (data.audit_result as string).slice(0, 200));
       throw new Error('Snippet has invalid audit_result JSON');
     }
   }
 
   if (!auditResult || typeof auditResult !== 'object' || Array.isArray(auditResult)) {
-    console.error(`[SnippetPage] audit_result is not an object for slug "${normalizedSlug}"`);
+    console.error(`❌ [SnippetPage] audit_result is not an object`);
+    console.error(`❌ [SnippetPage] auditResult:`, auditResult);
     throw new Error('Snippet has invalid audit_result');
   }
 
   const typedAudit = auditResult as any;
+  console.log(`🔍 [SnippetPage] audit_result fields:`, {
+    hasTitle: !!typedAudit.title,
+    hasSummary: !!typedAudit.summary,
+    hasFindings: !!typedAudit.findings,
+    hasScorecard: !!typedAudit.scorecard,
+    hasVerdict: !!typedAudit.verdict,
+  });
 
   // ============================================================
   // 🔥 ساخت candidate با فیلدهای مجاز
@@ -111,15 +140,23 @@ async function getSnippet(slug: string): Promise<Snippet> {
     generated_prompt: data.generated_prompt ?? undefined,
   };
 
+  console.log(`🔍 [SnippetPage] Candidate built, fields:`, Object.keys(candidate));
+
+  // ============================================================
+  // 🔥 اعتبارسنجی با Zod
+  // ============================================================
+  console.log(`🔍 [SnippetPage] Validating with SnippetDataSchema...`);
   const validation = SnippetDataSchema.safeParse(candidate);
 
   if (!validation.success) {
-    console.error(
-      `[SnippetPage] Invalid data for slug "${normalizedSlug}":`,
-      validation.error.flatten()
-    );
+    console.error(`❌ [SnippetPage] Schema validation FAILED for slug "${normalizedSlug}"`);
+    console.error(`❌ [SnippetPage] Validation errors:`, JSON.stringify(validation.error.flatten(), null, 2));
+    console.error(`❌ [SnippetPage] Candidate data:`, JSON.stringify(candidate, null, 2));
     throw new Error('Snippet data is invalid');
   }
+
+  console.log(`✅ [SnippetPage] Schema validation PASSED for slug "${normalizedSlug}"`);
+  console.log(`🔍 [SnippetPage] ===== END getSnippet =====`);
 
   return validation.data;
 }
@@ -140,14 +177,29 @@ async function highlightCode(code: string, language: string): Promise<string> {
 export default async function SnippetPage({ params }: PageProps) {
   const { slug } = await params;
 
+  console.log(`🚀 [SnippetPage] ===== PAGE RENDER START =====`);
+  console.log(`🚀 [SnippetPage] Route param slug: "${slug}"`);
+
   let snippet: Snippet | null = null;
   let error: Error | null = null;
   let normalizedAudit: NormalizedSnippetAudit | null = null;
 
   try {
     snippet = await getSnippet(slug);
+    console.log(`🔍 [SnippetPage] getSnippet returned:`, {
+      hasSnippet: !!snippet,
+      snippetSlug: snippet?.slug,
+      hasAuditResult: !!snippet?.audit_result,
+    });
+
     if (snippet) {
       normalizedAudit = normalizeSnippetAudit(snippet);
+      console.log(`🔍 [SnippetPage] normalizedAudit:`, {
+        hasAudit: !!normalizedAudit,
+        statusType: normalizedAudit?.status.type,
+        hasFullAnalysis: normalizedAudit?.hasFullAnalysis,
+        findingsCount: normalizedAudit?.findingsCount,
+      });
 
       if (normalizedAudit && normalizedAudit.status.type === 'valid') {
         const auditData = normalizedAudit.status.audit;
@@ -159,16 +211,22 @@ export default async function SnippetPage({ params }: PageProps) {
             what_this_code_does: auditData.executionOverview?.entryPoints?.join(', ') ?? snippet.what_this_code_does,
             linkedin_post: auditData.linkedinPost ?? snippet.linkedin_post,
           };
+          console.log(`✅ [SnippetPage] Updated snippet with audit data`);
         }
       }
     }
   } catch (err) {
     error = err as Error;
-    console.error('[SnippetPage] Error loading snippet:', error);
+    console.error(`❌ [SnippetPage] Error in getSnippet:`, error.message);
+    console.error(`❌ [SnippetPage] Stack:`, error.stack);
   }
 
   if (error || !snippet) {
+    console.warn(`⚠️ [SnippetPage] Returning 404 - error or no snippet`);
+    console.warn(`⚠️ [SnippetPage] error:`, error?.message);
+    console.warn(`⚠️ [SnippetPage] snippet:`, !!snippet);
     notFound();
+    return null;
   }
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || '';
@@ -198,6 +256,8 @@ export default async function SnippetPage({ params }: PageProps) {
   const lineExplanations = snippet.line_explanations && Array.isArray(snippet.line_explanations)
     ? (snippet.line_explanations as LineExplanation[])
     : [];
+
+  console.log(`✅ [SnippetPage] ===== PAGE RENDER SUCCESS =====`);
 
   return (
     <>
