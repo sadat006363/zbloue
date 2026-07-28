@@ -64,16 +64,29 @@ async function getSnippet(slug: string): Promise<Snippet> {
     return null as any;
   }
 
-  // 🔥 audit_result باید وجود داشته باشد و شیء باشد
-  const auditResult = data.audit_result;
+  // ============================================================
+  // 🔥 نرمال‌سازی audit_result (اگر string باشد، parse کن)
+  // ============================================================
+  let auditResult = data.audit_result;
+  if (typeof auditResult === 'string') {
+    try {
+      auditResult = JSON.parse(auditResult);
+    } catch (parseError) {
+      console.error(`[SnippetPage] Failed to parse audit_result for slug "${normalizedSlug}":`, parseError);
+      throw new Error('Snippet has invalid audit_result JSON');
+    }
+  }
+
   if (!auditResult || typeof auditResult !== 'object' || Array.isArray(auditResult)) {
+    console.error(`[SnippetPage] audit_result is not an object for slug "${normalizedSlug}"`);
     throw new Error('Snippet has invalid audit_result');
   }
 
-  // 🔥 استفاده از `as any` برای دسترسی به فیلدهای شیء
   const typedAudit = auditResult as any;
 
+  // ============================================================
   // 🔥 ساخت candidate با فیلدهای مجاز
+  // ============================================================
   const candidate = {
     id: data.id ?? '',
     slug: data.slug ?? '',
@@ -136,7 +149,6 @@ export default async function SnippetPage({ params }: PageProps) {
     if (snippet) {
       normalizedAudit = normalizeSnippetAudit(snippet);
 
-      // 🔥 فقط وضعیت `'valid'` وجود دارد (چون داده‌های Legacy حذف شده‌اند)
       if (normalizedAudit && normalizedAudit.status.type === 'valid') {
         const auditData = normalizedAudit.status.audit;
         if (auditData) {
@@ -167,10 +179,7 @@ export default async function SnippetPage({ params }: PageProps) {
   const fullAnalysisExists = hasAudit && !!(snippet.audit_result?.findings?.length ||
     snippet.audit_result?.scorecard || snippet.audit_result?.verdict);
 
-  // 🔥 استفاده از `as any` برای دسترسی به `analysis`
   const fullAnalysisText = (snippet.audit_result as any)?.analysis || '';
-
-  // 🔥 اگر Advanced است و analysis خالی است، از داده‌های ساختاریافته متن بساز
   let finalFullAnalysisText = fullAnalysisText;
   if (fullAnalysisExists && !finalFullAnalysisText) {
     finalFullAnalysisText = buildAnalysisTextForAdvanced(snippet.audit_result);
