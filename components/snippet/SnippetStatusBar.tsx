@@ -21,26 +21,28 @@ export default function SnippetStatusBar({ snippet }: SnippetStatusBarProps) {
     return Array.isArray(snippet.line_explanations) && snippet.line_explanations.length > 0;
   }, [snippet.line_explanations]);
 
-  // 🔥 بررسی وجود تحلیل کامل (Advanced)
+  // 🔥 بررسی وجود تحلیل کامل (Advanced) از audit_result
   const hasFullAnalysis = useMemo(() => {
+    const audit = snippet.audit_result;
+    if (!audit) return false;
     return !!(
-      snippet.findings?.length > 0 ||
-      snippet.scorecard_new ||
-      snippet.verdict ||
-      snippet.execution_overview ||
-      snippet.architectural_observations?.length > 0 ||
-      snippet.recommended_actions?.length > 0
+      audit.findings?.length > 0 ||
+      audit.scorecard ||
+      audit.verdict ||
+      audit.executionOverview ||
+      audit.architecturalObservations?.length > 0 ||
+      audit.recommendedActions?.length > 0
     );
-  }, [snippet]);
+  }, [snippet.audit_result]);
 
   // 🔥 بررسی وجود Scorecard معتبر
   const hasValidScorecard = useMemo(() => {
-    const sc = snippet.scorecard_new || snippet.audit_result?.scorecard;
+    const sc = snippet.audit_result?.scorecard;
     if (!sc || typeof sc !== 'object') return false;
     return Object.values(sc).some((item: any) => 
       item?.applicable === true && typeof item?.score === 'number' && item.score > 0
     );
-  }, [snippet.scorecard_new, snippet.audit_result]);
+  }, [snippet.audit_result]);
 
   const statusItems: StatusItem[] = useMemo(() => {
     return [
@@ -53,13 +55,13 @@ export default function SnippetStatusBar({ snippet }: SnippetStatusBarProps) {
       {
         label: 'Analysis',
         icon: '📝',
-        available: !!snippet.key_concept || !!snippet.what_this_code_does,
+        available: !!(snippet.key_concept || snippet.what_this_code_does),
         sectionId: 'snippet-analysis',
       },
       {
         label: 'Debug',
         icon: '🐛',
-        available: !!snippet.debug_analysis && snippet.debug_analysis !== '-',
+        available: !!(snippet.audit_result?.findings?.length > 0),
         sectionId: 'snippet-debug',
       },
       {
@@ -97,12 +99,12 @@ export default function SnippetStatusBar({ snippet }: SnippetStatusBarProps) {
     snippet.raw_code,
     snippet.key_concept,
     snippet.what_this_code_does,
-    snippet.debug_analysis,
     hasFullAnalysis,
     hasValidScorecard,
     hasLineExplanations,
     snippet.generated_prompt,
     snippet.linkedin_post,
+    snippet.audit_result,
   ]);
 
   const availableCount = statusItems.filter((item) => item.available).length;

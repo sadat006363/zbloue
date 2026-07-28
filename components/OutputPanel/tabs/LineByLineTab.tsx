@@ -1,10 +1,13 @@
+// components/OutputPanel/tabs/LineByLineTab.tsx
 'use client';
+
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { CopyButton, DownloadButton } from '@/components/common';
 import LineByLineExplanation from '../../LineByLineExplanation';
+import type { Snippet } from '@/types';
 
 interface LineByLineTabProps {
-  snippet: any;
+  snippet: Snippet | null;
   lineExplanations: any[];
   isExplaining: boolean;
   hoveredLine: number | null | undefined;
@@ -48,7 +51,6 @@ export default function LineByLineTab({
     const codeLines = snippet.raw_code.split('\n');
     const result: any[] = [];
 
-    // ایجاد یک کپی از توضیحات برای پیمایش
     let expIndex = 0;
     const explanationsCopy = [...lineExplanations];
 
@@ -57,7 +59,6 @@ export default function LineByLineTab({
       const lineContent = codeLines[i];
       const trimmedLine = lineContent.trim();
 
-      // اگر خط خالی است، توضیح خالی بده
       if (trimmedLine === '') {
         result.push({
           lineNumber,
@@ -67,12 +68,8 @@ export default function LineByLineTab({
         continue;
       }
 
-      // اگر توضیحی برای این خط وجود دارد
       if (expIndex < explanationsCopy.length) {
         const exp = explanationsCopy[expIndex];
-        
-        // بررسی اینکه آیا توضیح مربوط به این خط است یا خیر
-        // (با تطابق محتوای کد)
         if (exp && exp.code && trimmedLine.includes(exp.code.trim())) {
           result.push({
             ...exp,
@@ -80,17 +77,13 @@ export default function LineByLineTab({
           });
           expIndex++;
         } else {
-          // اگر مطابقت نداشت، ممکن است توضیح برای خط بعدی باشد
-          // پس این خط را با توضیح خالی ذخیره می‌کنیم و توضیح را برای خط بعدی نگه می‌داریم
           result.push({
             lineNumber,
             code: lineContent,
             explanation: 'No explanation provided.',
           });
-          // توضیح را برای خط بعدی نگه می‌داریم (expIndex را افزایش نمی‌دهیم)
         }
       } else {
-        // دیگر توضیحی وجود ندارد
         result.push({
           lineNumber,
           code: lineContent,
