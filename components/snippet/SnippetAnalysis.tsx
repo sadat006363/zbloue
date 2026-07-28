@@ -1,8 +1,6 @@
 // components/snippet/SnippetAnalysis.tsx
 'use client';
 
-import { adaptCanonicalToLegacy } from '@/lib/snippetAdapter';
-
 interface SnippetAnalysisProps {
   keyConcept?: string;
   whatItDoes?: string;
@@ -18,8 +16,6 @@ export default function SnippetAnalysis({
 }: SnippetAnalysisProps) {
   // 🔥 اولویت ۱: اگر auditResult وجود دارد، از آن استفاده کن
   if (auditResult && typeof auditResult === 'object') {
-    const legacy = adaptCanonicalToLegacy(auditResult);
-
     // اگر analysis موجود است، آن را نمایش بده
     if (auditResult.analysis && auditResult.analysis.trim().length > 0) {
       return (
@@ -37,20 +33,23 @@ export default function SnippetAnalysis({
     }
 
     // اگر analysis خالی بود، از خلاصه استفاده کن
-    if (legacy.key_concept || legacy.what_this_code_does) {
+    const summary = auditResult.summary || '';
+    const title = auditResult.title || '';
+
+    if (summary || title) {
       return (
         <div className="mt-6">
           <div className="bg-[#11111b] p-4 rounded-lg border border-[#313244] space-y-3">
-            {legacy.key_concept && (
+            {title && (
               <div>
-                <h3 className="text-sm font-semibold text-[#89b4fa]">💡 Key Concept</h3>
-                <p className="text-sm text-[#cdd6f4] mt-1">{legacy.key_concept}</p>
+                <h3 className="text-sm font-semibold text-[#89b4fa]">📌 Title</h3>
+                <p className="text-sm text-[#cdd6f4] mt-1">{title}</p>
               </div>
             )}
-            {legacy.what_this_code_does && (
-              <div className={legacy.key_concept ? 'pt-3 border-t border-[#313244]' : ''}>
-                <h3 className="text-sm font-semibold text-[#89b4fa]">📖 What This Code Does</h3>
-                <p className="text-sm text-[#cdd6f4] mt-1 whitespace-pre-wrap">{legacy.what_this_code_does}</p>
+            {summary && (
+              <div className={title ? 'pt-3 border-t border-[#313244]' : ''}>
+                <h3 className="text-sm font-semibold text-[#89b4fa]">💡 Summary</h3>
+                <p className="text-sm text-[#cdd6f4] mt-1 whitespace-pre-wrap">{summary}</p>
               </div>
             )}
           </div>
