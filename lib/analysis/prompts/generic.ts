@@ -125,6 +125,32 @@ You must return a JSON object with the following structure. **All fields are man
 4. RESOURCE MANAGEMENT & LIFECYCLE
 5. PRODUCTION READINESS
 
+==================== ENHANCED ANALYSIS CHECKLIST ====================
+
+You MUST perform the following specialized checks when the corresponding code patterns are present. If a pattern is not present, the dimension should still be marked as "analyzed" with a note that no issues were found.
+
+1. CONCURRENCY - Anti-patterns:
+   - Double-Checked Locking: Check for improper lazy initialization in multi-threaded environments. Ensure volatile variables are used correctly.
+   - Volatile fields: Verify that volatile is used only for simple flags and not for complex state.
+   - Thread-safe Singleton: Check if Singleton implementations are thread-safe.
+
+2. SECURITY - Information Exposure:
+   - Mutable Collections: Do not return mutable collections directly. Use Collections.unmodifiableList() or defensive copying.
+   - Internal Leakage: Check if internal state is exposed via getters returning references to mutable objects.
+
+3. API DESIGN - Encapsulation:
+   - Internal Leakage: Check if public methods expose internal implementation details (e.g., returning internal arrays, collections, or mutable objects).
+   - Side effects: Ensure public methods do not unexpectedly modify internal state.
+
+4. RESOURCE MANAGEMENT - Shutdown & Cleanup:
+   - Check if executors, streams, or other resources are properly shut down in finally blocks or using try-with-resources.
+   - Verify that streams are closed even in exceptional cases.
+   - Ensure that the code uses appropriate cleanup mechanisms (e.g., shutdown() for executors).
+
+5. analysisCoverage:
+   - For each dimension, if the source code contains relevant constructs (e.g., for concurrency, any thread/executor/synchronized code), the dimension MUST be marked as "analyzed" even if no issues are found.
+   - Do NOT mark a dimension as "limited" when the code contains relevant elements but no bugs were found. Use "limited" only when the dimension is genuinely not applicable (e.g., no concurrency in a single-threaded script) or when there is insufficient evidence to analyze.
+
 ==================== FINDINGS GENERATION (CRITICAL - HIGHEST PRIORITY) ====================
 
 🔥 THIS IS THE MOST IMPORTANT SECTION. FOLLOW IT EXACTLY.

@@ -90,6 +90,26 @@ Keep identifiers, code, enum values, IDs, and schema keys unchanged.
    - Otherwise, set available: false.
    - 🔥 Output in improvedCode.
 
+==================== ENHANCED CONCURRENCY CHECKLIST ====================
+
+In addition to the concurrency rules above, you MUST check:
+
+1. Double-Checked Locking: Look for patterns like:
+   if (instance == null) {
+     synchronized (this) {
+       if (instance == null) {
+         instance = new Instance();
+       }
+     }
+   }
+   Ensure instance is volatile.
+
+2. Volatile fields: Verify volatile is used correctly. Volatile should be used for simple flags, not for complex state.
+
+3. Thread-safe Singleton: Verify Singleton implementations are properly synchronized.
+
+4. Analysis Coverage: If code contains any concurrency-related constructs, mark the "concurrency" dimension as "analyzed" even if no issues are found.
+
 ==================== FINDINGS GENERATION (CRITICAL - HIGHEST PRIORITY) ====================
 
 🔥 THIS IS THE MOST IMPORTANT SECTION. FOLLOW IT EXACTLY.
@@ -151,7 +171,7 @@ if (timeLimitMillis > 0) {
 - confidence: "definite" (if proven by code) or "likely"
 - mechanisms: ["deadlock", "thread-starvation"]
 - category: "concurrency"
-- remediation: "Use a dedicated executor or separate thread for timeout enforcement, or restructure the design to avoid submitting inner tasks to the same pool and then waiting on them."
+- remediation: "Use a dedicated executor for timeout enforcement or restructure the design to avoid submitting inner tasks to the same pool and then waiting on them."
 
 **If you find this pattern, create a separate finding with the above specifications.**
 

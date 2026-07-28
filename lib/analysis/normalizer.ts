@@ -36,6 +36,93 @@ type Mechanism = z.infer<typeof MechanismSchema>;
 const DEFAULT_TITLE = 'Code Analysis Report';
 const DEFAULT_LINKEDIN_POST = 'Check out this code analysis! #Zbloue';
 
+// ============================================================
+// 🔥 Helper: تشخیص وجود کد مرتبط با هر بُعد
+// ============================================================
+
+function detectRelevantCodeForDimension(code: string, dimension: string): boolean {
+  if (!code || code.trim().length === 0) return false;
+
+  const patterns: Record<string, RegExp[]> = {
+    'concurrency': [
+      /\bThread\b/, /\bRunnable\b/, /\bCallable\b/, /\bExecutor\b/,
+      /\bExecutorService\b/, /\bThreadPoolExecutor\b/, /\bForkJoinPool\b/,
+      /\bCompletableFuture\b/, /\bFuture\b/, /\bSemaphore\b/,
+      /\bCountDownLatch\b/, /\bCyclicBarrier\b/, /\bsynchronized\b/,
+      /\bvolatile\b/, /\bLock\b/, /\bReentrantLock\b/, /\bBlockingQueue\b/,
+      /\bConcurrentHashMap\b/, /\bAtomicInteger\b/, /\.submit\s*\(/,
+      /\.execute\s*\(/, /\.get\s*\(/, /\.tryAcquire\s*\(/,
+      /\basync\b/, /\bawait\b/, /\bPromise\b/, /\bWorker\b/
+    ],
+    'liveness': [
+      /\bdeadlock\b/, /\bstarvation\b/, /\blivelock\b/,
+      /\bfuture\.get\b/, /\bjoin\b/, /\bawait\b/, /\bLockSupport\.park\b/
+    ],
+    'security': [
+      /\bpassword\b/, /\bsecret\b/, /\btoken\b/, /\bauth\b/,
+      /\bencrypt\b/, /\bdecrypt\b/, /\bhash\b/, /\bsalt\b/,
+      /\bsecurity\b/, /\bpermission\b/, /\bAuthentication\b/,
+      /\bAuthorization\b/, /\bCORS\b/, /\bXSS\b/, /\bSQL\s+inject\b/,
+      /\bunmodifiable\b/, /\bdefensive\s+copy\b/
+    ],
+    'error-handling': [
+      /\btry\s*{/, /\bcatch\s*\(/, /\bfinally\b/, /\bthrow\b/,
+      /\bthrows\b/, /\bException\b/, /\bError\b/, /\bRuntimeException\b/
+    ],
+    'resource-management': [
+      /\bclose\b/, /\bshutdown\b/, /\brelease\b/, /\bdispose\b/,
+      /\btry-with-resources\b/, /\bAutoCloseable\b/, /\bStream\b/,
+      /\bconnection\b/, /\bsession\b/, /\bfactory\b/
+    ],
+    'api-design': [
+      /\bpublic\s+interface\b/, /\bpublic\s+class\b/, /\bpublic\s+method\b/,
+      /\b@Deprecated\b/, /\b@Override\b/, /\b@SuppressWarnings\b/
+    ],
+    'maintainability': [
+      /\bTODO\b/, /\bFIXME\b/, /\b@Deprecated\b/, /\bduplicate\b/,
+      /\brefact\b/, /\bcomplex\b/
+    ],
+    'performance': [
+      /\bO\(/, /\bcomplexity\b/, /\bnested\s+loop\b/, /\brecursion\b/,
+      /\bcache\b/, /\bpool\b/, /\bbuffer\b/
+    ],
+    'input-validation': [
+      /\bvalidate\b/, /\bcheck\b/, /\bassert\b/, /\bif\s*\(.*\s*==\s*null\b/,
+      /\bthrow\s+.*\s+IllegalArgumentException\b/, /\bObjects\.requireNonNull\b/
+    ],
+    'data-integrity': [
+      /\bimmutable\b/, /\bfinal\b/, /\bCopyOnWrite\b/, /\bunmodifiable\b/,
+      /\btransaction\b/, /\bconsistent\b/
+    ],
+    'architecture': [
+      /\bfactory\b/, /\bbuilder\b/, /\bsingleton\b/, /\bproxy\b/,
+      /\bobserver\b/, /\bstrategy\b/, /\bdecorator\b/
+    ],
+    'testability': [
+      /\b@Test\b/, /\bmock\b/, /\bstub\b/, /\bspy\b/, /\bassert\b/,
+      /\bMockito\b/, /\bJUnit\b/, /\bTest\b/
+    ],
+    'observability': [
+      /\blog\b/, /\blogger\b/, /\bmetrics\b/, /\btrace\b/, /\bmonitor\b/,
+      /\bconsole\.log\b/, /\bSystem\.out\b/, /\bprintln\b/
+    ],
+    'compatibility': [
+      /\bversion\b/, /\bcompatible\b/, /\bdeprecated\b/, /\blegacy\b/
+    ]
+  };
+
+  const dimensionPatterns = patterns[dimension] || [];
+  if (dimensionPatterns.length === 0) return false;
+
+  // بررسی تطابق هر الگو با کد
+  for (const pattern of dimensionPatterns) {
+    if (pattern.test(code)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function isObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
@@ -123,12 +210,13 @@ const ALL_DIMENSIONS = [
 type Dimension = typeof ALL_DIMENSIONS[number];
 
 // ============================================================
-// 🔥 اصلاح: تابع normalizeAnalysisCoverage با بررسی Findings
+// 🔥 اصلاح: تابع normalizeAnalysisCoverage با تشخیص کد مرتبط
 // ============================================================
 
 function normalizeAnalysisCoverage(
   source: unknown,
-  findings?: any[]
+  findings?: any[],
+  rawCode?: string
 ): AnalysisCoverageItem[] {
   const input = getSafeObject(source);
   const coverageMap: Record<string, { status: string; summary: string; limitation: string | null }> = {};
@@ -201,7 +289,6 @@ function normalizeAnalysisCoverage(
       if (category === 'compatibility') {
         analyzedDimensions.add('compatibility');
       }
-      // 🔥 امنیت و ورودی فقط در صورت وجود شواهد خاص
       if (category === 'security') {
         analyzedDimensions.add('security');
       }
@@ -211,29 +298,53 @@ function normalizeAnalysisCoverage(
     }
   }
 
+  // 🔥 تشخیص کد مرتبط با هر بُعد (اگر کد وجود داشته باشد)
+  const code = rawCode || '';
+  const dimensionsWithRelevantCode = new Set<string>();
+  if (code) {
+    for (const dim of ALL_DIMENSIONS) {
+      if (detectRelevantCodeForDimension(code, dim)) {
+        dimensionsWithRelevantCode.add(dim);
+      }
+    }
+  }
+
   const result: AnalysisCoverageItem[] = [];
   for (const dim of ALL_DIMENSIONS) {
     const existing = coverageMap[dim];
-    const isAnalyzed = analyzedDimensions.has(dim);
+    const isAnalyzedByFindings = analyzedDimensions.has(dim);
+    const hasRelevantCode = dimensionsWithRelevantCode.has(dim);
 
     let status: 'analyzed' | 'not-applicable' | 'limited' = 'limited';
     let limitation: string | null = null;
 
-    if (isAnalyzed) {
+    // 🔥 منطق جدید:
+    // 1. اگر در Findings پوشش داده شده → analyzed
+    // 2. اگر کد مرتبط وجود دارد → analyzed (حتی اگر باگی پیدا نشده باشد)
+    // 3. در غیر این صورت → limited یا not-applicable
+    if (isAnalyzedByFindings) {
       status = 'analyzed';
-    } else if (dim === 'concurrency' && !isAnalyzed) {
-      // اگر هم‌روندی وجود نداشته باشد
-      status = 'not-applicable';
-      limitation = 'No concurrency primitives detected in the code.';
-    } else if (dim === 'input-validation' && !isAnalyzed) {
-      status = 'limited';
-      limitation = 'No explicit input validation analysis was performed.';
-    } else if (dim === 'security' && !isAnalyzed) {
-      status = 'limited';
-      limitation = 'No explicit security analysis was performed.';
+    } else if (hasRelevantCode) {
+      status = 'analyzed';
+      limitation = null;
     } else {
-      status = 'limited';
-      limitation = `Limited evidence available for ${dim} dimension.`;
+      // اگر کد مرتبطی وجود ندارد، بررسی کنیم که آیا این بُعد قابل‌اعمال است یا خیر
+      if (dim === 'concurrency' && !hasRelevantCode) {
+        status = 'not-applicable';
+        limitation = 'No concurrency primitives detected in the code.';
+      } else if (dim === 'input-validation' && !hasRelevantCode) {
+        status = 'limited';
+        limitation = 'No explicit input validation analysis was performed.';
+      } else if (dim === 'security' && !hasRelevantCode) {
+        status = 'limited';
+        limitation = 'No explicit security analysis was performed.';
+      } else if (dim === 'liveness' && !hasRelevantCode) {
+        status = 'not-applicable';
+        limitation = 'No liveness issues detected in the code.';
+      } else {
+        status = 'limited';
+        limitation = `Limited evidence available for ${dim} dimension.`;
+      }
     }
 
     result.push({
@@ -274,7 +385,6 @@ function normalizeScoreItem(
   if (isObject(value)) {
     const score = normalizeScore(value.score, fallback);
     const reason = typeof value.reason === 'string' ? value.reason.trim() : defaultReason;
-    // 🔥 پشتیبانی از هر دو نام فیلد (relatedFindingIds و relatedFindings)
     let relatedFindingIds: string[] = [];
     if (Array.isArray(value.relatedFindingIds)) {
       relatedFindingIds = value.relatedFindingIds.filter((id): id is string => typeof id === 'string');
@@ -623,7 +733,6 @@ function normalizeArchitecturalObservations(
       const o = getSafeObject(obs);
       const title = getSafeString(o.title, '');
       const explanation = getSafeString(o.explanation, '');
-      // 🔥 پشتیبانی از هر دو نام فیلد
       let relatedFindingIds: string[] = [];
       if (Array.isArray(o.relatedFindingIds)) {
         relatedFindingIds = o.relatedFindingIds.filter((id) => findingIds.has(id));
@@ -647,7 +756,6 @@ function normalizeRecommendedActions(
       const severity = sanitizeEnum(a.severity, SeveritySchema.options, 'medium');
       const title = getSafeString(a.title, '');
       const action = getSafeString(a.action, '');
-      // 🔥 پشتیبانی از هر دو نام فیلد
       let relatedFindingIds: string[] = [];
       if (Array.isArray(a.relatedFindingIds)) {
         relatedFindingIds = a.relatedFindingIds.filter((id) => findingIds.has(id));
@@ -674,7 +782,6 @@ function normalizeSuggestedTests(
       const setup = getStringArray(t.setup) || [];
       const steps = getStringArray(t.steps) || [];
       const expectedResult = getSafeString(t.expectedResult, getSafeString(t.expectedOutput, ''));
-      // 🔥 پشتیبانی از هر دو نام فیلد
       let relatedFindingIds: string[] = [];
       if (Array.isArray(t.relatedFindingIds)) {
         relatedFindingIds = t.relatedFindingIds.filter((id) => findingIds.has(id));
@@ -702,7 +809,8 @@ function createMinimalAuditFromPartial(
 
     let analysisCoverage = normalizeAnalysisCoverage(
       input.analysisCoverage ?? input.coverage ?? {},
-      getSafeArray(input.findings, [])
+      getSafeArray(input.findings, []),
+      input.rawCode || ''
     );
     if (analysisCoverage.length === 0) {
       analysisCoverage = ALL_DIMENSIONS.map(dim => ({
@@ -855,7 +963,6 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
 
   const limitations = getStringArray(input.limitations);
 
-  // 🔥 پشتیبانی از هر دو نام فیلد (camelCase و snake_case)
   let linkedinPost =
     typeof input.linkedinPost === 'string'
       ? input.linkedinPost.trim()
@@ -867,10 +974,11 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
     linkedinPost = DEFAULT_LINKEDIN_POST;
   }
 
-  // 🔥 analysisCoverage را با findings واقعی بساز
+  // 🔥 اصلاح: ارسال rawCode به normalizeAnalysisCoverage
   let analysisCoverage = normalizeAnalysisCoverage(
     input.analysisCoverage ?? input.coverage ?? {},
-    normalizedFindings  // ← ارسال findings واقعی
+    normalizedFindings,
+    input.rawCode || ''
   );
   if (analysisCoverage.length === 0) {
     analysisCoverage = ALL_DIMENSIONS.map(dim => ({
@@ -881,7 +989,6 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
     }));
   }
 
-  // 🔥 ساخت نتیجه نهایی با schemaVersion صحیح
   const result: AdvancedAuditResult = {
     schemaVersion: '1.0.0',
     auditType: 'comprehensive',
