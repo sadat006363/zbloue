@@ -26,7 +26,7 @@ export function toSnippetInsert(
 ): SnippetInsert {
   const now = new Date().toISOString();
 
-  // 🔥 فقط فیلدهای پاکت‌نامه (Envelope) در سطح Root ذخیره می‌شوند
+  // 🔥 فقط فیلدهای پاکت‌نامه (Envelope) و فیلدهای موجود در دیتابیس
   const row = {
     // ===== Primary keys =====
     slug: context.slug,
@@ -45,7 +45,8 @@ export function toSnippetInsert(
     audit_result: audit as any,
 
     // ============================================================
-    // 🔥 🔥 🔥 تمام فیلدهای Legacy و تحلیلی در سطح Root NULL هستند
+    // 🔥 تمام فیلدهای Legacy و تحلیلی در سطح Root NULL هستند
+    // (فقط فیلدهایی که در اسکیما وجود دارند)
     // ============================================================
     card_title: null,
     key_concept: null,
@@ -62,6 +63,7 @@ export function toSnippetInsert(
     production_readiness: null,
     recommended_improvements: null,
     improved_code: null,
+    improved_code_jsonb: null,
     suggested_tests: null,
     scorecard: null,
     final_verdict_summary: null,
@@ -77,7 +79,10 @@ export function toSnippetInsert(
     verdict: null,
     limitations: null,
     debug_trace: null,
-    summary: null,
+    schema_version: '1.0',
+    card_image_url: null,
+    line_explanations: null,
+    generated_prompt: null,
   } as SnippetInsert;
 
   return row;
