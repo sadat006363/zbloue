@@ -26,34 +26,43 @@ export function toSnippetInsert(
 ): SnippetInsert {
   const now = new Date().toISOString();
 
-  // 🔥 فقط فیلدهای پاکت‌نامه (Envelope) و فیلدهای موجود در دیتابیس
+  // ============================================================
+  // 🔥 فقط فیلدهای پاکت‌نامه و فیلدهای موجود در دیتابیس
+  // ============================================================
   const row = {
-    // ===== Primary keys =====
+    // ===== شناسه و پاکت‌نامه =====
     slug: context.slug,
     raw_code: context.rawCode,
     language: context.sourceLanguage,
+    is_public: context.isPublic ?? true,
+    created_at: now,
 
-    // ===== User metadata =====
+    // ===== اطلاعات کاربر =====
     username: context.username ?? null,
     github_username: context.githubUsername ?? null,
     avatar_url: context.avatarUrl ?? null,
     user_id: context.userId ?? null,
-    is_public: context.isPublic ?? true,
-    created_at: now,
 
-    // ===== 🔥 فقط audit_result (همه داده‌های تحلیلی در اینجا) =====
+    // ===== فقط audit_result (همه داده‌های تحلیلی) =====
     audit_result: audit as any,
 
     // ============================================================
-    // 🔥 تمام فیلدهای Legacy و تحلیلی در سطح Root NULL هستند
-    // (فقط فیلدهایی که در اسکیما وجود دارند)
+    // 🔥 فیلدهای کمکی (برای نمایش Legacy)
     // ============================================================
     card_title: null,
     key_concept: null,
     what_this_code_does: null,
-    debug_analysis: null,
-    optimization: null,
     linkedin_post: null,
+
+    // ============================================================
+    // 🔥 Line-by-line و Prompt
+    // ============================================================
+    line_explanations: null,
+    generated_prompt: null,
+
+    // ============================================================
+    // 🔥 تمام فیلدهای تحلیلی در سطح Root NULL هستند
+    // ============================================================
     code_walkthrough: null,
     what_works_well: null,
     bugs_and_risky_cases: null,
@@ -69,20 +78,15 @@ export function toSnippetInsert(
     final_verdict_summary: null,
     final_verdict_approved: null,
     final_verdict_next_steps: null,
-    findings: null,
-    execution_overview: null,
-    architectural_observations: null,
-    recommended_actions: null,
-    suggested_tests_new: null,
-    complexity: null,
-    scorecard_new: null,
-    verdict: null,
-    limitations: null,
-    debug_trace: null,
+
+    // ⚠️ فیلدهای زیر حذف شدند – فقط در audit_result هستند:
+    // findings, execution_overview, architectural_observations,
+    // recommended_actions, suggested_tests_new, complexity,
+    // scorecard_new, verdict, limitations, debug_trace, summary,
+    // debug_analysis, optimization
+
     schema_version: '1.0',
     card_image_url: null,
-    line_explanations: null,
-    generated_prompt: null,
   } as SnippetInsert;
 
   return row;
@@ -117,7 +121,7 @@ export function snippetRowToAudit(row: any): AdvancedAuditResult | null {
 
 export function legacyRowToAudit(row: any): AdvancedAuditResult | null {
   try {
-    const hasConcurrency = row.execution_overview && 
+    const hasConcurrency = row.execution_overview &&
       (row.execution_overview.entryPoints?.length > 0 ||
        row.execution_overview.taskSubmissionPoints?.length > 0 ||
        row.execution_overview.blockingWaitPoints?.length > 0);
@@ -213,12 +217,12 @@ export function legacyRowToAudit(row: any): AdvancedAuditResult | null {
       repairApplied: false,
       language: row.language || 'unknown',
       summary: row.key_concept || '',
-      executionOverview: row.execution_overview || { 
-        entryPoints: [], 
-        taskSubmissionPoints: [], 
-        blockingWaitPoints: [], 
-        sharedResources: [], 
-        resourceLifecycle: [] 
+      executionOverview: row.execution_overview || {
+        entryPoints: [],
+        taskSubmissionPoints: [],
+        blockingWaitPoints: [],
+        sharedResources: [],
+        resourceLifecycle: [],
       },
       findings: row.findings || [],
       architecturalObservations: row.architectural_observations || [],

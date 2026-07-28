@@ -387,53 +387,33 @@ export default function HomePage() {
       }
 
       // ============================================================
-      // 🔥 ساخت SnippetData با ساختار Canonical: فقط فیلدهای شناسه و پاکت‌نامه
+      // 🔥 ساخت SnippetData با ساختار Canonical: فقط فیلدهای پاکت‌نامه
       // ============================================================
       const snippetData: Snippet = {
+        // ===== شناسه و پاکت‌نامه =====
         id: saveResult.id,
         slug: saveResult.slug,
         raw_code: cleanedCode,
         language,
         is_public: true,
         created_at: new Date().toISOString(),
+
+        // ===== اطلاعات کاربر =====
         username: saveResult.username || normalizedUsername,
         github_username: saveResult.github_username ?? normalizedGithubUsername,
         avatar_url: normalizedAvatarUrl,
         card_image_url: undefined,
-        // 🔥 همه داده‌های تحلیلی فقط در audit_result
+
+        // ===== داده‌های تحلیلی (فقط در اینجا) =====
         audit_result: auditResult,
-        // فیلدهای زیر برای سازگاری با کامپوننت‌ها (از طریق Adapter در OutputPanel پر می‌شوند)
-        card_title: undefined,
-        key_concept: undefined,
-        what_this_code_does: undefined,
-        debug_analysis: undefined,
-        optimization: undefined,
-        linkedin_post: undefined,
-        summary: undefined,
-        findings: undefined,
-        scorecard_new: undefined,
-        verdict: undefined,
-        execution_overview: undefined,
-        architectural_observations: undefined,
-        recommended_actions: undefined,
-        suggested_tests_new: undefined,
-        complexity: undefined,
-        limitations: undefined,
-        improved_code: undefined,
-        debug_trace: undefined,
-        code_walkthrough: undefined,
-        what_works_well: undefined,
-        bugs_and_risky_cases: undefined,
-        edge_cases: undefined,
-        performance_analysis: undefined,
-        security_analysis: undefined,
-        production_readiness: undefined,
-        recommended_improvements: undefined,
-        suggested_tests: undefined,
-        scorecard: undefined,
-        final_verdict_summary: undefined,
-        final_verdict_approved: undefined,
-        final_verdict_next_steps: undefined,
+
+        // ===== فیلدهای کمکی (برای نمایش Legacy) =====
+        card_title: auditResult.title || 'Code Analysis',
+        key_concept: auditResult.summary || '',
+        what_this_code_does: auditResult.executionOverview?.entryPoints?.join(', ') || auditResult.summary || '',
+        linkedin_post: auditResult.linkedinPost || '',
+
+        // ===== Line-by-line و Prompt =====
         line_explanations: undefined,
         generated_prompt: undefined,
       };
@@ -462,13 +442,13 @@ export default function HomePage() {
       }
     } catch (error) {
       let message = error instanceof Error ? error.message : 'Analysis failed. Please try again.';
-      
-      if (message.includes('ERR_CONNECTION_CLOSED') || 
-          message.includes('timed out') || 
+
+      if (message.includes('ERR_CONNECTION_CLOSED') ||
+          message.includes('timed out') ||
           message.includes('AbortError')) {
         message = '⏱️ The analysis is taking longer than expected. Please wait a moment and refresh the page, or try again with a simpler code.';
       }
-      
+
       setErrorMessage(message);
       dispatch({ type: 'SET_ERROR', payload: message });
     } finally {

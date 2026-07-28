@@ -1,15 +1,6 @@
 // types/index.ts
 
-// ============================================================
-// 1. Import Zod for runtime schemas
-// ============================================================
-
 import { z } from 'zod';
-
-// ============================================================
-// 2. Canonical runtime schemas (from schema.ts)
-// ============================================================
-
 import {
   AdvancedAuditResultSchema,
   AuditFindingSchema,
@@ -21,10 +12,6 @@ import {
   SuggestedTestSchema,
   ExecutionOverviewSchema,
 } from '@/lib/analysis/schema';
-
-// ============================================================
-// 3. Canonical types (import type, then re-export)
-// ============================================================
 
 import type {
   AdvancedAuditResult,
@@ -45,7 +32,10 @@ import type {
   ExecutionOverview,
 } from '@/lib/analysis/types';
 
-// Re-export canonical types from the type-only gateway
+// ============================================================
+// Re-export canonical types
+// ============================================================
+
 export type {
   AdvancedAuditResult,
   AuditFinding,
@@ -66,16 +56,14 @@ export type {
 };
 
 // ============================================================
-// 4. AnalysisMode – UI contract, not canonical
+// AnalysisMode – UI contract
 // ============================================================
 
 export type AnalysisMode = 'simple' | 'medium' | 'advanced';
-
-// Runtime schema for AnalysisMode (used at API boundary)
 export const AnalysisModeSchema = z.enum(['simple', 'medium', 'advanced']);
 
 // ============================================================
-// 5. GenerateRequest – runtime schema and derived type
+// GenerateRequest
 // ============================================================
 
 export const GenerateRequestSchema = z.object({
@@ -83,11 +71,10 @@ export const GenerateRequestSchema = z.object({
   language: z.string().min(1),
   mode: AnalysisModeSchema,
 });
-
 export type GenerateRequest = z.infer<typeof GenerateRequestSchema>;
 
 // ============================================================
-// 6. PromptInfo – derived from canonical metadata
+// PromptInfo
 // ============================================================
 
 export interface PromptInfo {
@@ -100,7 +87,44 @@ export interface PromptInfo {
 }
 
 // ============================================================
-// 7. Legacy persisted schemas (historical data only)
+// 🔥 Canonical Envelope: فقط فیلدهای پاکت‌نامه در Root
+// ============================================================
+
+export interface Snippet {
+  // ===== شناسه و پاکت‌نامه =====
+  id: string;
+  slug: string;
+  raw_code: string;
+  language: string;
+  is_public: boolean;
+  created_at: string;
+
+  // ===== اطلاعات کاربر =====
+  username?: string;
+  github_username?: string;
+  avatar_url?: string;
+  card_image_url?: string;
+
+  // ===== داده‌های تحلیلی (فقط در اینجا) =====
+  audit_result: AdvancedAuditResult;
+
+  // ===== فیلدهای کمکی (برای نمایش Legacy – از Adapter پر می‌شوند) =====
+  card_title?: string;
+  key_concept?: string;
+  what_this_code_does?: string;
+  linkedin_post?: string;
+
+  // ===== Line-by-line و Prompt (در Root ذخیره می‌شوند) =====
+  line_explanations?: any;
+  generated_prompt?: string;
+
+  // ⚠️ فیلدهای زیر حذف شدند – فقط در audit_result وجود دارند:
+  // findings, scorecard_new, suggested_tests_new, execution_overview,
+  // recommended_actions, complexity, summary, debug_analysis, optimization
+}
+
+// ============================================================
+// Legacy types (برای سازگاری با کدهای قدیمی)
 // ============================================================
 
 const LegacyCodeWalkthroughItemSchema = z.object({
@@ -171,66 +195,7 @@ const LegacyScorecardSchema = z.object({
 });
 
 // ============================================================
-// 8. Union Schemas for Legacy ↔ Canonical compatibility
-// ============================================================
-
-// ===== Verdict Union =====
-const LegacyVerdictSchema = z.object({
-  status: z.enum(['approved', 'requires-changes', 'not-production-ready']),
-  explanation: z.string(),
-});
-
-export const VerdictSchemaUnion = z.union([
-  CanonicalVerdictSchema,
-  LegacyVerdictSchema,
-]);
-
-// ===== Complexity Union =====
-const LegacyComplexitySchema = z.object({
-  time: z.string(),
-  space: z.string(),
-  resourceGrowth: z.string(),
-  assumptions: z.array(z.string()),
-});
-
-export const ComplexitySchemaUnion = z.union([
-  ComplexitySchema,
-  LegacyComplexitySchema,
-]);
-
-// ===== Scorecard Union =====
-const LegacyScorecardSchemaForUnion = z.object({
-  correctness: z.number().min(0).max(10),
-  readability: z.number().min(0).max(10),
-  performance: z.number().min(0).max(10),
-  maintainability: z.number().min(0).max(10),
-  productionReadiness: z.number().min(0).max(10),
-  security: z.number().min(0).max(10).optional(),
-  overall: z.number().min(0).max(10).optional(),
-});
-
-export const ScorecardSchemaUnion = z.union([
-  AuditScorecardSchema,
-  LegacyScorecardSchemaForUnion,
-]);
-
-// ============================================================
-// 9. SnippetDataSchema – TEMPORARY: accept any shape to unblock build
-// ============================================================
-
-/**
- * 🔥 TEMPORARY: This schema accepts any shape to bypass type errors
- * during the canonical migration. After the UI components are updated
- * to use canonical types, this will be replaced with a proper schema.
- */
-export const SnippetDataSchema: z.ZodSchema<any> = z.unknown();
-
-export type PersistedSnippetRow = any;
-export type Snippet = any;
-export type SnippetData = any;
-
-// ============================================================
-// 10. Legacy generate response (historical API shape)
+// LegacyGenerateResponse
 // ============================================================
 
 export const LegacyGenerateResponseSchema = z.object({
@@ -262,13 +227,10 @@ export const LegacyGenerateResponseSchema = z.object({
   }).optional(),
   linkedin_post: z.string().optional(),
   error: z.string().optional(),
-
-  // ===== Canonical fields (for advanced mode – without duplicates) =====
   findings: z.any().optional(),
   executionOverview: z.any().optional(),
   architecturalObservations: z.any().optional(),
   recommendedActions: z.any().optional(),
-  // 🔥 suggestedTests and scorecard already defined above; do not duplicate
   complexity: z.any().optional(),
   verdict: z.any().optional(),
   limitations: z.any().optional(),
@@ -279,15 +241,26 @@ export const LegacyGenerateResponseSchema = z.object({
   title: z.any().optional(),
   summary: z.any().optional(),
   debug_trace: z.any().optional(),
-
-  // ===== New: audit_result (full Pipeline output) =====
   audit_result: z.any().optional(),
 });
-
 export type LegacyGenerateResponse = z.infer<typeof LegacyGenerateResponseSchema>;
 
 // ============================================================
-// 11. CreateSnippetResponse (discriminated union)
+// Legacy types (exported for historical data access)
+// ============================================================
+
+export type LegacyCodeWalkthroughItem = z.infer<typeof LegacyCodeWalkthroughItemSchema>;
+export type LegacyBugAndRiskyCase = z.infer<typeof LegacyBugAndRiskyCaseSchema>;
+export type LegacyEdgeCase = z.infer<typeof LegacyEdgeCaseSchema>;
+export type LegacyPerformanceAnalysis = z.infer<typeof LegacyPerformanceAnalysisSchema>;
+export type LegacySecurityAnalysis = z.infer<typeof LegacySecurityAnalysisSchema>;
+export type LegacyProductionReadiness = z.infer<typeof LegacyProductionReadinessSchema>;
+export type LegacyRecommendedImprovement = z.infer<typeof LegacyRecommendedImprovementSchema>;
+export type LegacySuggestedTest = z.infer<typeof LegacySuggestedTestSchema>;
+export type LegacyScorecard = z.infer<typeof LegacyScorecardSchema>;
+
+// ============================================================
+// CreateSnippetResponse
 // ============================================================
 
 export type CreateSnippetResponse =
@@ -305,26 +278,7 @@ export type CreateSnippetResponse =
     };
 
 // ============================================================
-// 12. Legacy types (exported for historical data access)
-// ============================================================
-
-export type LegacyCodeWalkthroughItem = z.infer<typeof LegacyCodeWalkthroughItemSchema>;
-export type LegacyBugAndRiskyCase = z.infer<typeof LegacyBugAndRiskyCaseSchema>;
-export type LegacyEdgeCase = z.infer<typeof LegacyEdgeCaseSchema>;
-export type LegacyPerformanceAnalysis = z.infer<typeof LegacyPerformanceAnalysisSchema>;
-export type LegacySecurityAnalysis = z.infer<typeof LegacySecurityAnalysisSchema>;
-export type LegacyProductionReadiness = z.infer<typeof LegacyProductionReadinessSchema>;
-export type LegacyRecommendedImprovement = z.infer<typeof LegacyRecommendedImprovementSchema>;
-export type LegacySuggestedTest = z.infer<typeof LegacySuggestedTestSchema>;
-export type LegacyScorecard = z.infer<typeof LegacyScorecardSchema>;
-export interface LegacyImprovedCode {
-  available: boolean;
-  code: string;
-  notes: string;
-}
-
-// ============================================================
-// 13. UI State
+// UI State
 // ============================================================
 
 export interface LineExplanation {
@@ -334,7 +288,7 @@ export interface LineExplanation {
 }
 
 export interface ModeOutput {
-  snippet: PersistedSnippetRow | null;
+  snippet: Snippet | null;
   fullAnalysis: LegacyGenerateResponse | null;
   lineExplanations: LineExplanation[];
   generatedPrompt: string;
@@ -367,7 +321,7 @@ export interface AppState {
 }
 
 // ============================================================
-// 14. Future canonical API contract
+// Future canonical API contract
 // ============================================================
 
 export type CanonicalGenerateResponse =

@@ -100,47 +100,40 @@ async function getSnippet(slug: string): Promise<Snippet> {
     legacyFields = adaptCanonicalToLegacy(data.audit_result);
   }
 
-  // 🔥 STEP 2: ساخت شیء نهایی با اولویت audit_result
+  // 🔥 STEP 2: ساخت شیء نهایی با اولویت audit_result (فقط فیلدهای مجاز Root)
   const candidate = {
+    // ===== شناسه و پاکت‌نامه =====
     id: data.id ?? '',
     slug: data.slug ?? '',
     raw_code: data.raw_code ?? '',
     language: data.language ?? 'javascript',
-
-    // 🔥 فیلدهای Legacy: از audit_result می‌آیند (اگر موجود باشد)
-    card_title: legacyFields.card_title || data.card_title || 'Code Analysis',
-    key_concept: legacyFields.key_concept || data.key_concept || '',
-    what_this_code_does: legacyFields.what_this_code_does || data.what_this_code_does || '',
-    debug_analysis: legacyFields.debug_analysis || data.debug_analysis || '-',
-    optimization: legacyFields.optimization || data.optimization || '-',
-    linkedin_post: legacyFields.linkedin_post || data.linkedin_post || '',
-    summary: legacyFields.summary || data.key_concept || '',
-
     is_public: data.is_public ?? false,
     created_at: data.created_at ?? new Date().toISOString(),
 
+    // ===== اطلاعات کاربر =====
     username: data.username ?? undefined,
     github_username: data.github_username ?? undefined,
     avatar_url: data.avatar_url ?? undefined,
     card_image_url: data.card_image_url ?? undefined,
 
-    // 🔥 فیلدهای Advanced (کانونیکال) – مستقیماً از دیتابیس
-    findings: data.findings ?? legacyFields.findings ?? undefined,
-    scorecard_new: data.scorecard_new ?? legacyFields.scorecard_new ?? undefined,
-    verdict: data.verdict ?? legacyFields.verdict ?? undefined,
-    execution_overview: data.execution_overview ?? undefined,
-    architectural_observations: data.architectural_observations ?? undefined,
-    recommended_actions: data.recommended_actions ?? undefined,
-    suggested_tests_new: data.suggested_tests_new ?? undefined,
-    complexity: data.complexity ?? undefined,
-    limitations: data.limitations ?? undefined,
-    improved_code: data.improved_code ?? undefined,
-    debug_trace: data.debug_trace ?? undefined,
-
-    // 🔥 خود audit_result کامل (برای کامپوننت‌هایی که مستقیماً از آن استفاده می‌کنند)
+    // ===== داده‌های تحلیلی (فقط از audit_result) =====
     audit_result: data.audit_result ?? undefined,
 
-    // بقیه فیلدهای Legacy (برای backward compatibility)
+    // ===== فیلدهای کمکی (از Adapter پر می‌شوند) =====
+    card_title: legacyFields.card_title || data.card_title || 'Code Analysis',
+    key_concept: legacyFields.key_concept || data.key_concept || '',
+    what_this_code_does: legacyFields.what_this_code_does || data.what_this_code_does || '',
+    linkedin_post: legacyFields.linkedin_post || data.linkedin_post || '',
+
+    // ===== Line-by-line و Prompt =====
+    line_explanations: data.line_explanations ?? undefined,
+    generated_prompt: data.generated_prompt ?? undefined,
+
+    // ⚠️ تمام فیلدهای تحلیلی زیر حذف شدند (فقط در audit_result هستند):
+    // findings, scorecard_new, suggested_tests_new, execution_overview,
+    // recommended_actions, complexity, summary, debug_analysis, optimization
+
+    // فیلدهای Legacy اضافی (برای backward compatibility – در صورت وجود)
     code_walkthrough: data.code_walkthrough ?? undefined,
     what_works_well: data.what_works_well ?? undefined,
     bugs_and_risky_cases: data.bugs_and_risky_cases ?? undefined,
@@ -154,8 +147,6 @@ async function getSnippet(slug: string): Promise<Snippet> {
     final_verdict_summary: data.final_verdict_summary ?? undefined,
     final_verdict_approved: data.final_verdict_approved ?? undefined,
     final_verdict_next_steps: data.final_verdict_next_steps ?? undefined,
-    line_explanations: data.line_explanations ?? undefined,
-    generated_prompt: data.generated_prompt ?? undefined,
   };
 
   const validation = SnippetDataSchema.safeParse(candidate);
@@ -212,22 +203,13 @@ export default async function SnippetPage({ params }: PageProps) {
         if (auditData) {
           snippet = {
             ...snippet,
-            findings: auditData.findings ?? snippet.findings,
-            scorecard_new: auditData.scorecard ?? snippet.scorecard_new,
-            verdict: auditData.verdict ?? snippet.verdict,
-            execution_overview: auditData.executionOverview ?? snippet.execution_overview,
-            architectural_observations: auditData.architecturalObservations ?? snippet.architectural_observations,
-            recommended_actions: auditData.recommendedActions ?? snippet.recommended_actions,
-            suggested_tests_new: auditData.suggestedTests ?? snippet.suggested_tests_new,
-            complexity: auditData.complexity ?? snippet.complexity,
-            limitations: auditData.limitations ?? snippet.limitations,
-            improved_code: auditData.improvedCode?.code ?? snippet.improved_code,
-            linkedin_post: auditData.linkedinPost ?? snippet.linkedin_post,
-            summary: auditData.summary ?? snippet.key_concept,
+            // فقط فیلدهای کمکی را از auditData به‌روز می‌کنیم
             card_title: auditData.title ?? snippet.card_title,
             key_concept: auditData.summary ?? snippet.key_concept,
             what_this_code_does: auditData.executionOverview?.entryPoints?.join(', ') ?? snippet.what_this_code_does,
+            linkedin_post: auditData.linkedinPost ?? snippet.linkedin_post,
           };
+          // audit_result قبلاً تنظیم شده است و نیازی به تغییر ندارد
         }
       }
     }
@@ -244,23 +226,22 @@ export default async function SnippetPage({ params }: PageProps) {
   const shareUrl = `${baseUrl}/snippet/${snippet.slug}`;
   const highlightedHtml = await highlightCode(snippet.raw_code, snippet.language);
 
-  // 🔥 تشخیص وجود تحلیل کامل (Advanced)
-  const fullAnalysisExists = normalizedAudit ? normalizedAudit.hasFullAnalysis : false;
+  // 🔥 تشخیص وجود تحلیل کامل (Advanced) – از audit_result
+  const hasAudit = !!(snippet.audit_result);
+  const fullAnalysisExists = hasAudit && !!(snippet.audit_result?.findings?.length ||
+    snippet.audit_result?.scorecard || snippet.audit_result?.verdict);
 
-  // 🔥 استخراج متن کامل تحلیل از audit_result (برای Simple/Medium)
-  let fullAnalysisText = snippet?.audit_result?.analysis || '';
+  // 🔥 استخراج متن کامل تحلیل از audit_result
+  let fullAnalysisText = snippet.audit_result?.analysis || '';
 
   // 🔥 اگر Advanced است و analysis خالی است، از داده‌های ساختاریافته متن بساز
   if (fullAnalysisExists && !fullAnalysisText) {
-    fullAnalysisText = buildAnalysisTextForAdvanced(snippet);
+    fullAnalysisText = buildAnalysisTextForAdvanced(snippet.audit_result);
   }
 
   const debugData = {
     fullAnalysisExists,
-    findings: snippet.findings,
-    scorecard_new: snippet.scorecard_new,
-    verdict: snippet.verdict,
-    execution_overview: snippet.execution_overview,
+    hasAudit,
     normalizedAudit,
   };
 
@@ -274,7 +255,7 @@ export default async function SnippetPage({ params }: PageProps) {
 
       <main className="min-h-screen bg-[#f8f9fa]">
         <div className="max-w-5xl mx-auto px-4 py-6 md:py-8">
-          
+
           <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
             <SnippetHeader shareUrl={shareUrl} title={snippet.card_title || 'Code Snippet'} />
             <SnippetJsonDropdown snippet={snippet} />
@@ -298,7 +279,7 @@ export default async function SnippetPage({ params }: PageProps) {
           </div>
 
           {/* ============================================================
-              🔥 SnippetAnalysis - با ارسال fullAnalysis و audit_result
+              🔥 SnippetAnalysis - با ارسال audit_result
               ============================================================ */}
           <div id="snippet-analysis">
             <SnippetAnalysis
@@ -310,9 +291,12 @@ export default async function SnippetPage({ params }: PageProps) {
           </div>
 
           <div id="snippet-debug">
+            {/* debug_analysis از audit_result استخراج می‌شود */}
             <SnippetDebug
-              debugAnalysis={snippet.debug_analysis}
-              optimization={snippet.optimization}
+              debugAnalysis={snippet.audit_result?.findings?.length ? `${snippet.audit_result.findings.length} findings` : '-'}
+              optimization={snippet.audit_result?.recommendedActions?.length
+                ? snippet.audit_result.recommendedActions.map((a: any) => a.title).join('; ')
+                : '-'}
             />
           </div>
 
@@ -385,52 +369,58 @@ export default async function SnippetPage({ params }: PageProps) {
 // ============================================================
 // 🔥 تابع تولید متن تحلیل برای Advanced
 // ============================================================
-function buildAnalysisTextForAdvanced(snippet: any): string {
+function buildAnalysisTextForAdvanced(audit: any): string {
+  if (!audit) return 'No detailed analysis available.';
+
   const parts: string[] = [];
 
-  // 1. خلاصه کلی
-  if (snippet.summary) {
-    parts.push(`📌 Summary:\n${snippet.summary}`);
+  if (audit.title) {
+    parts.push(`📌 Title: ${audit.title}`);
   }
 
-  // 2. Findings
-  const findings = snippet.findings || [];
-  if (findings.length > 0) {
-    parts.push(`\n🔍 Findings (${findings.length}):`);
-    findings.slice(0, 5).forEach((f: any) => {
-      parts.push(`  • ${f.title} [${f.severity}] - ${f.confidence}`);
+  if (audit.summary) {
+    parts.push(`📝 Summary: ${audit.summary}`);
+    parts.push('');
+  }
+
+  if (audit.findings && audit.findings.length > 0) {
+    parts.push(`🔍 Findings (${audit.findings.length}):`);
+    audit.findings.slice(0, 5).forEach((f: any) => {
+      const confidence = f.confidence || 'unknown';
+      parts.push(`  - [${f.severity}] ${f.title} (${confidence})`);
       if (f.remediation) {
         parts.push(`    Fix: ${f.remediation}`);
       }
     });
-    if (findings.length > 5) {
-      parts.push(`  ... and ${findings.length - 5} more findings`);
+    if (audit.findings.length > 5) {
+      parts.push(`  ... and ${audit.findings.length - 5} more findings`);
     }
+    parts.push('');
   }
 
-  // 3. Scorecard
-  const scorecard = snippet.scorecard_new || snippet.audit_result?.scorecard;
-  if (scorecard && typeof scorecard === 'object') {
-    const scores: string[] = [];
-    for (const [key, value] of Object.entries(scorecard)) {
-      const item = value as any;
-      if (item?.applicable === true && typeof item.score === 'number') {
-        const label = key.replace(/([A-Z])/g, ' $1').trim();
-        scores.push(`${label}: ${item.score}/100`);
-      }
+  if (audit.scorecard) {
+    const scoreItems = Object.entries(audit.scorecard)
+      .filter(([_, v]: [string, any]) => v?.applicable === true && typeof v?.score === 'number')
+      .map(([k, v]: [string, any]) => `${k}: ${v.score}`);
+    if (scoreItems.length > 0) {
+      parts.push(`📊 Scorecard:\n  ${scoreItems.join('\n  ')}`);
     }
-    if (scores.length > 0) {
-      parts.push(`\n📊 Scorecard:\n  ${scores.join('\n  ')}`);
-    }
+    parts.push('');
   }
 
-  // 4. Verdict
-  const verdict = snippet.verdict || snippet.audit_result?.verdict;
-  if (verdict) {
-    parts.push(`\n🏁 Verdict: ${verdict.status}`);
-    if (verdict.explanation) {
-      parts.push(`  ${verdict.explanation}`);
+  if (audit.verdict) {
+    parts.push(`🏁 Verdict: ${audit.verdict.status}`);
+    if (audit.verdict.explanation) {
+      parts.push(`  ${audit.verdict.explanation}`);
     }
+    parts.push('');
+  }
+
+  if (audit.limitations && audit.limitations.length > 0) {
+    parts.push(`⚠️ Limitations:`);
+    audit.limitations.slice(0, 3).forEach((lim: string) => {
+      parts.push(`  - ${lim}`);
+    });
   }
 
   return parts.join('\n\n') || 'No detailed analysis available.';
