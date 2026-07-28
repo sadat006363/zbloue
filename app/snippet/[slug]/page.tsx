@@ -27,6 +27,12 @@ import { type LineExplanation } from '@/types';
 import { adaptCanonicalToLegacy, hasCanonicalAudit } from '@/lib/snippetAdapter';
 
 // ============================================================
+// 🔥 غیرفعال کردن کش
+// ============================================================
+export const revalidate = 0;
+export const dynamic = 'force-dynamic';
+
+// ============================================================
 // 🔥 تعریف نوع خروجی adaptCanonicalToLegacy برای استفاده در page
 // ============================================================
 type LegacyFields = ReturnType<typeof adaptCanonicalToLegacy>;
@@ -108,7 +114,6 @@ async function getSnippet(slug: string): Promise<Snippet> {
     debug_analysis: legacyFields.debug_analysis || data.debug_analysis || '-',
     optimization: legacyFields.optimization || data.optimization || '-',
     linkedin_post: legacyFields.linkedin_post || data.linkedin_post || '',
-    // 🔥 اصلاح: به‌جای data.summary (که وجود ندارد) از data.key_concept استفاده می‌کنیم
     summary: legacyFields.summary || data.key_concept || '',
 
     is_public: data.is_public ?? false,
@@ -328,17 +333,41 @@ export default async function SnippetPage({ params }: PageProps) {
             )}
           </div>
 
-          {lineExplanations.length > 0 && (
-            <div id="snippet-line-by-line">
+          {/* ============================================================
+              🔥 Line-by-Line Section - Always show
+              ============================================================ */}
+          <div id="snippet-line-by-line" className="mt-8 pt-6 border-t border-[#313244]">
+            {lineExplanations.length > 0 ? (
               <SnippetLineByLine lineExplanations={lineExplanations} />
-            </div>
-          )}
+            ) : (
+              <div className="bg-[#11111b] p-6 rounded-lg border border-[#313244] text-center">
+                <p className="text-[#a6adc8] text-sm">
+                  📝 No line-by-line explanation generated yet.
+                </p>
+                <p className="text-[#6c7086] text-xs mt-2">
+                  Click the <span className="font-semibold text-[#89b4fa]">"Explain"</span> button in the editor toolbar to generate line-by-line explanations.
+                </p>
+              </div>
+            )}
+          </div>
 
-          {snippet.generated_prompt && (
-            <div id="snippet-prompt">
+          {/* ============================================================
+              🔥 Prompt Section - Always show
+              ============================================================ */}
+          <div id="snippet-prompt" className="mt-8 pt-6 border-t border-[#313244]">
+            {snippet.generated_prompt ? (
               <SnippetPrompt generatedPrompt={snippet.generated_prompt} />
-            </div>
-          )}
+            ) : (
+              <div className="bg-[#11111b] p-6 rounded-lg border border-[#313244] text-center">
+                <p className="text-[#a6adc8] text-sm">
+                  📝 No prompt generated yet.
+                </p>
+                <p className="text-[#6c7086] text-xs mt-2">
+                  Click the <span className="font-semibold text-[#89b4fa]">"Generate Prompt"</span> button in the editor toolbar to create a prompt from your code.
+                </p>
+              </div>
+            )}
+          </div>
 
           {snippet.linkedin_post && (
             <div id="snippet-linkedin">

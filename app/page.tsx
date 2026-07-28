@@ -25,7 +25,7 @@ import {
   LegacySuggestedTest,
   LegacyScorecard,
 } from '@/types';
-import { adaptCanonicalToLegacy, hasCanonicalAudit, canonicalToLegacyResponse } from '@/lib/snippetAdapter';
+import { canonicalToLegacyResponse } from '@/lib/snippetAdapter';
 
 export const dynamic = 'force-dynamic';
 
@@ -482,7 +482,7 @@ export default function HomePage() {
   }, [code, language, mode, username, githubUsername, avatarUrl, dispatch, clearError]);
 
   // ============================================================
-  // Other handlers (Explain, Prompt, Convert, Clear)
+  // 🔥 handleExplain (اصلاح‌شده با ذخیره‌سازی در دیتابیس)
   // ============================================================
 
   const handleExplain = useCallback(async () => {
@@ -498,15 +498,36 @@ export default function HomePage() {
       const explanations = await analysisService.explainLineByLine(code, language);
       const modeKey = mode as 'simple' | 'medium' | 'advanced';
 
-      const currentOutput = outputs[modeKey] || { snippet: null, fullAnalysis: null, lineExplanations: [], generatedPrompt: '' };
+      // 🔥 دریافت اسنیپت فعلی از state
+      const currentOutput = outputs[modeKey];
+      const currentSnippet = currentOutput?.snippet;
+
+      // 🔥 اگر اسنیپت موجود است و slug دارد، در دیتابیس ذخیره کن
+      if (currentSnippet?.slug) {
+        await snippetService.update(currentSnippet.slug, {
+          line_explanations: explanations,
+        });
+        console.log('✅ Line-by-line explanations saved to database!');
+      } else {
+        console.warn('⚠️ No snippet found to save line-by-line explanations');
+      }
+
+      // به‌روزرسانی state
+      const updatedOutput = {
+        snippet: currentOutput?.snippet || null,
+        fullAnalysis: currentOutput?.fullAnalysis || null,
+        lineExplanations: explanations,
+        generatedPrompt: currentOutput?.generatedPrompt || '',
+      };
+
       dispatch({
         type: 'SET_OUTPUTS',
         payload: {
           mode: modeKey,
-          snippet: currentOutput.snippet,
-          fullAnalysis: currentOutput.fullAnalysis,
-          lineExplanations: explanations,
-          generatedPrompt: currentOutput.generatedPrompt,
+          snippet: updatedOutput.snippet,
+          fullAnalysis: updatedOutput.fullAnalysis,
+          lineExplanations: updatedOutput.lineExplanations,
+          generatedPrompt: updatedOutput.generatedPrompt,
         },
       });
 
@@ -522,6 +543,10 @@ export default function HomePage() {
     }
   }, [code, language, mode, outputs, dispatch, clearError]);
 
+  // ============================================================
+  // 🔥 handleGeneratePrompt (اصلاح‌شده با ذخیره‌سازی در دیتابیس)
+  // ============================================================
+
   const handleGeneratePrompt = useCallback(async () => {
     if (!code.trim()) {
       setErrorMessage('Please enter some code to generate a prompt.');
@@ -535,15 +560,36 @@ export default function HomePage() {
       const prompt = await analysisService.generatePrompt(code, language, mode);
       const modeKey = mode as 'simple' | 'medium' | 'advanced';
 
-      const currentOutput = outputs[modeKey] || { snippet: null, fullAnalysis: null, lineExplanations: [], generatedPrompt: '' };
+      // 🔥 دریافت اسنیپت فعلی از state
+      const currentOutput = outputs[modeKey];
+      const currentSnippet = currentOutput?.snippet;
+
+      // 🔥 اگر اسنیپت موجود است و slug دارد، در دیتابیس ذخیره کن
+      if (currentSnippet?.slug) {
+        await snippetService.update(currentSnippet.slug, {
+          generated_prompt: prompt,
+        });
+        console.log('✅ Generated prompt saved to database!');
+      } else {
+        console.warn('⚠️ No snippet found to save generated prompt');
+      }
+
+      // به‌روزرسانی state
+      const updatedOutput = {
+        snippet: currentOutput?.snippet || null,
+        fullAnalysis: currentOutput?.fullAnalysis || null,
+        lineExplanations: currentOutput?.lineExplanations || [],
+        generatedPrompt: prompt,
+      };
+
       dispatch({
         type: 'SET_OUTPUTS',
         payload: {
           mode: modeKey,
-          snippet: currentOutput.snippet,
-          fullAnalysis: currentOutput.fullAnalysis,
-          lineExplanations: currentOutput.lineExplanations,
-          generatedPrompt: prompt,
+          snippet: updatedOutput.snippet,
+          fullAnalysis: updatedOutput.fullAnalysis,
+          lineExplanations: updatedOutput.lineExplanations,
+          generatedPrompt: updatedOutput.generatedPrompt,
         },
       });
 
@@ -558,6 +604,10 @@ export default function HomePage() {
       dispatch({ type: 'SET_GENERATING_PROMPT', payload: false });
     }
   }, [code, language, mode, outputs, dispatch, clearError]);
+
+  // ============================================================
+  // Other handlers (Convert, Clear)
+  // ============================================================
 
   const handleConvert = useCallback(async (targetLang: string) => {
     if (!code.trim()) {
