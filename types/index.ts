@@ -91,6 +91,7 @@ export interface PromptInfo {
 // ============================================================
 
 export const SnippetSchema = z.object({
+  // ===== شناسه و پاکت‌نامه =====
   id: z.string().uuid(),
   slug: z.string().min(1),
   raw_code: z.string(),
@@ -98,35 +99,47 @@ export const SnippetSchema = z.object({
   is_public: z.boolean(),
   created_at: z.string().datetime(),
 
+  // ===== اطلاعات کاربر =====
   username: z.string().optional(),
   github_username: z.string().optional(),
   avatar_url: z.string().url().optional(),
   card_image_url: z.string().url().optional(),
 
+  // ===== داده‌های تحلیلی (فقط در اینجا) =====
   audit_result: AdvancedAuditResultSchema,
 
+  // ===== فیلدهای کمکی (برای نمایش Legacy) =====
   card_title: z.string().optional(),
   key_concept: z.string().optional(),
   what_this_code_does: z.string().optional(),
   linkedin_post: z.string().optional(),
 
+  // ===== Line-by-line و Prompt (در Root ذخیره می‌شوند) =====
   line_explanations: z.any().optional(),
   generated_prompt: z.string().optional(),
-});
+}).catchall(z.any()); // 🔥 فیلدهای اضافی را نادیده بگیر (برای سازگاری با داده‌های قدیمی)
+
+// ============================================================
+// 🔥 استخراج تایپ از شِما
+// ============================================================
 
 export type Snippet = z.infer<typeof SnippetSchema>;
-export const SnippetDataSchema = SnippetSchema;
 
 // ============================================================
 // 🔥 SnippetData (Alias برای Snippet – برای سازگاری با کدهای قدیمی)
 // ============================================================
+
 export type SnippetData = Snippet;
+
+// ============================================================
+// 🔥 SnippetDataSchema (برای اعتبارسنجی در صفحه اسنیپت)
+// ============================================================
+
+export const SnippetDataSchema = SnippetSchema;
 
 // ============================================================
 // Legacy types (برای سازگاری با کدهای قدیمی)
 // ============================================================
-
-// ... (بقیه تایپ‌های Legacy و شِمای‌ها مانند قبل) ...
 
 const LegacyCodeWalkthroughItemSchema = z.object({
   section: z.string(),
@@ -147,16 +160,20 @@ const LegacyEdgeCaseSchema = z.object({
 });
 
 const LegacyPerformanceAnalysisSchema = z.object({
-  timeComplexity: z.array(z.object({
-    target: z.string(),
-    complexity: z.string(),
-    explanation: z.string(),
-  })),
-  spaceComplexity: z.array(z.object({
-    target: z.string(),
-    complexity: z.string(),
-    explanation: z.string(),
-  })),
+  timeComplexity: z.array(
+    z.object({
+      target: z.string(),
+      complexity: z.string(),
+      explanation: z.string(),
+    })
+  ),
+  spaceComplexity: z.array(
+    z.object({
+      target: z.string(),
+      complexity: z.string(),
+      explanation: z.string(),
+    })
+  ),
   scalabilityNotes: z.array(z.string()),
 });
 
@@ -214,21 +231,26 @@ export const LegacyGenerateResponseSchema = z.object({
   securityAnalysis: LegacySecurityAnalysisSchema.optional(),
   productionReadiness: LegacyProductionReadinessSchema.optional(),
   recommendedImprovements: z.array(LegacyRecommendedImprovementSchema).optional(),
-  improvedCode: z.object({
-    available: z.boolean(),
-    code: z.string(),
-    notes: z.string(),
-  }).optional(),
+  improvedCode: z
+    .object({
+      available: z.boolean(),
+      code: z.string(),
+      notes: z.string(),
+    })
+    .optional(),
   suggestedTests: z.array(LegacySuggestedTestSchema).optional(),
   scorecard: LegacyScorecardSchema.optional(),
-  finalVerdict: z.object({
-    summary: z.string(),
-    approved: z.boolean(),
-    nextSteps: z.string().optional(),
-  }).optional(),
+  finalVerdict: z
+    .object({
+      summary: z.string(),
+      approved: z.boolean(),
+      nextSteps: z.string().optional(),
+    })
+    .optional(),
   linkedin_post: z.string().optional(),
   error: z.string().optional(),
-  // فیلدهای تحلیلی اضافی (برای Backward Compatibility)
+
+  // 🔥 فیلدهای تحلیلی اضافی (برای Backward Compatibility)
   findings: z.any().optional(),
   executionOverview: z.any().optional(),
   architecturalObservations: z.any().optional(),
@@ -245,6 +267,7 @@ export const LegacyGenerateResponseSchema = z.object({
   debug_trace: z.any().optional(),
   audit_result: z.any().optional(),
 });
+
 export type LegacyGenerateResponse = z.infer<typeof LegacyGenerateResponseSchema>;
 
 // ============================================================
