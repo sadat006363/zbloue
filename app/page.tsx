@@ -386,26 +386,41 @@ export default function HomePage() {
         throw new Error(saveResult.error || 'Failed to save snippet');
       }
 
+      // ============================================================
+      // 🔥 ساخت SnippetData با ساختار Canonical: فقط فیلدهای شناسه و پاکت‌نامه
+      // ============================================================
       const snippetData: Snippet = {
         id: saveResult.id,
         slug: saveResult.slug,
         raw_code: cleanedCode,
         language,
-        card_title: auditResult.title || 'Code Analysis',
-        key_concept: auditResult.summary || '',
-        what_this_code_does: auditResult.summary || '',
-        debug_analysis: auditResult.findings?.length ? `${auditResult.findings.length} findings` : 
-                       (genData.debug_analysis || '-'),
-        optimization: auditResult.recommendedActions?.length
-          ? auditResult.recommendedActions.map((a: any) => a.title).join('; ')
-          : (genData.optimization || '-'),
-        linkedin_post: auditResult.linkedinPost || genData.linkedin_post || '',
         is_public: true,
         created_at: new Date().toISOString(),
         username: saveResult.username || normalizedUsername,
         github_username: saveResult.github_username ?? normalizedGithubUsername,
         avatar_url: normalizedAvatarUrl,
         card_image_url: undefined,
+        // 🔥 همه داده‌های تحلیلی فقط در audit_result
+        audit_result: auditResult,
+        // فیلدهای زیر برای سازگاری با کامپوننت‌ها (از طریق Adapter در OutputPanel پر می‌شوند)
+        card_title: undefined,
+        key_concept: undefined,
+        what_this_code_does: undefined,
+        debug_analysis: undefined,
+        optimization: undefined,
+        linkedin_post: undefined,
+        summary: undefined,
+        findings: undefined,
+        scorecard_new: undefined,
+        verdict: undefined,
+        execution_overview: undefined,
+        architectural_observations: undefined,
+        recommended_actions: undefined,
+        suggested_tests_new: undefined,
+        complexity: undefined,
+        limitations: undefined,
+        improved_code: undefined,
+        debug_trace: undefined,
         code_walkthrough: undefined,
         what_works_well: undefined,
         bugs_and_risky_cases: undefined,
@@ -414,24 +429,11 @@ export default function HomePage() {
         security_analysis: undefined,
         production_readiness: undefined,
         recommended_improvements: undefined,
-        improved_code: undefined,
         suggested_tests: undefined,
         scorecard: undefined,
-        final_verdict_summary: auditResult.verdict?.explanation || null,
-        final_verdict_approved: auditResult.verdict?.status === 'approved' || 
-                               auditResult.verdict?.status === 'approved-with-suggestions',
+        final_verdict_summary: undefined,
+        final_verdict_approved: undefined,
         final_verdict_next_steps: undefined,
-        findings: auditResult.findings || [],
-        execution_overview: auditResult.executionOverview || null,
-        architectural_observations: auditResult.architecturalObservations || [],
-        recommended_actions: auditResult.recommendedActions || [],
-        suggested_tests_new: auditResult.suggestedTests || [],
-        complexity: auditResult.complexity || null,
-        scorecard_new: auditResult.scorecard || null,
-        verdict: auditResult.verdict || null,
-        limitations: auditResult.limitations || [],
-        audit_result: auditResult,
-        debug_trace: genData.debug_trace,
         line_explanations: undefined,
         generated_prompt: undefined,
       };
@@ -461,7 +463,6 @@ export default function HomePage() {
     } catch (error) {
       let message = error instanceof Error ? error.message : 'Analysis failed. Please try again.';
       
-      // مدیریت خطای Timeout یا Connection Closed
       if (message.includes('ERR_CONNECTION_CLOSED') || 
           message.includes('timed out') || 
           message.includes('AbortError')) {
@@ -489,14 +490,12 @@ export default function HomePage() {
     dispatch({ type: 'SET_EXPLAINING', payload: true });
 
     try {
-      // 🔥 ارسال mode به سرویس
       const explanations = await analysisService.explainLineByLine(code, language, mode);
       const modeKey = mode as 'simple' | 'medium' | 'advanced';
 
       const currentOutput = outputs[modeKey];
       const currentSnippet = currentOutput?.snippet;
 
-      // 🔥 ذخیره در دیتابیس
       if (currentSnippet?.slug) {
         await snippetService.update(currentSnippet.slug, {
           line_explanations: explanations,
@@ -550,14 +549,12 @@ export default function HomePage() {
     dispatch({ type: 'SET_GENERATING_PROMPT', payload: true });
 
     try {
-      // 🔥 ارسال mode به سرویس
       const prompt = await analysisService.generatePrompt(code, language, mode);
       const modeKey = mode as 'simple' | 'medium' | 'advanced';
 
       const currentOutput = outputs[modeKey];
       const currentSnippet = currentOutput?.snippet;
 
-      // 🔥 ذخیره در دیتابیس
       if (currentSnippet?.slug) {
         await snippetService.update(currentSnippet.slug, {
           generated_prompt: prompt,

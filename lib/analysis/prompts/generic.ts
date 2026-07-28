@@ -151,6 +151,19 @@ You MUST perform the following specialized checks when the corresponding code pa
    - For each dimension, if the source code contains relevant constructs (e.g., for concurrency, any thread/executor/synchronized code), the dimension MUST be marked as "analyzed" even if no issues are found.
    - Do NOT mark a dimension as "limited" when the code contains relevant elements but no bugs were found. Use "limited" only when the dimension is genuinely not applicable (e.g., no concurrency in a single-threaded script) or when there is insufficient evidence to analyze.
 
+==================== RESOURCE LEAK DETECTION ====================
+
+You MUST check for resource leaks in addition to concurrency issues. Do not sacrifice one for the other.
+
+**Checklist:**
+- Executors (ThreadPoolExecutor, ForkJoinPool): Ensure shutdown() or shutdownNow() is called.
+- Streams (FileInputStream, FileOutputStream, etc.): Ensure they are closed in finally blocks or using try-with-resources.
+- Connections (Database, HTTP): Ensure they are closed or returned to the pool.
+- Semaphores: Ensure release() is called in finally blocks.
+- Any AutoCloseable: Ensure close() is called.
+
+**When both concurrency and resource management issues exist, report ALL of them as separate findings.**
+
 ==================== FINDINGS GENERATION (CRITICAL - HIGHEST PRIORITY) ====================
 
 🔥 THIS IS THE MOST IMPORTANT SECTION. FOLLOW IT EXACTLY.

@@ -110,6 +110,19 @@ In addition to the concurrency rules above, you MUST check:
 
 4. Analysis Coverage: If code contains any concurrency-related constructs, mark the "concurrency" dimension as "analyzed" even if no issues are found.
 
+==================== RESOURCE LEAK DETECTION ====================
+
+You MUST check for resource leaks in addition to concurrency issues. Do not sacrifice one for the other.
+
+**Checklist:**
+- Executors (ThreadPoolExecutor, ForkJoinPool): Ensure shutdown() or shutdownNow() is called.
+- Streams (FileInputStream, FileOutputStream, etc.): Ensure they are closed in finally blocks or using try-with-resources.
+- Connections (Database, HTTP): Ensure they are closed or returned to the pool.
+- Semaphores: Ensure release() is called in finally blocks.
+- Any AutoCloseable: Ensure close() is called.
+
+**When both concurrency and resource management issues exist, report ALL of them as separate findings.**
+
 ==================== FINDINGS GENERATION (CRITICAL - HIGHEST PRIORITY) ====================
 
 🔥 THIS IS THE MOST IMPORTANT SECTION. FOLLOW IT EXACTLY.

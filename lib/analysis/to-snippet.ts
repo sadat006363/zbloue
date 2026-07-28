@@ -26,11 +26,7 @@ export function toSnippetInsert(
 ): SnippetInsert {
   const now = new Date().toISOString();
 
-  // 🔥 از audit.summary برای پر کردن what_this_code_does استفاده می‌کنیم
-  const whatThisCodeDoes = audit.summary || 
-                           audit.title || 
-                           '';
-
+  // 🔥 فقط فیلدهای پاکت‌نامه (Envelope) در سطح Root ذخیره می‌شوند
   const row = {
     // ===== Primary keys =====
     slug: context.slug,
@@ -45,18 +41,18 @@ export function toSnippetInsert(
     is_public: context.isPublic ?? true,
     created_at: now,
 
-    // ===== 🔥 فقط audit_result =====
+    // ===== 🔥 فقط audit_result (همه داده‌های تحلیلی در اینجا) =====
     audit_result: audit as any,
 
-    // ===== 🔥 فیلدهای Legacy =====
-    what_this_code_does: whatThisCodeDoes,
-
+    // ============================================================
+    // 🔥 🔥 🔥 تمام فیلدهای Legacy و تحلیلی در سطح Root NULL هستند
+    // ============================================================
     card_title: null,
     key_concept: null,
+    what_this_code_does: null,
     debug_analysis: null,
     optimization: null,
     linkedin_post: null,
-
     code_walkthrough: null,
     what_works_well: null,
     bugs_and_risky_cases: null,
@@ -71,7 +67,6 @@ export function toSnippetInsert(
     final_verdict_summary: null,
     final_verdict_approved: null,
     final_verdict_next_steps: null,
-
     findings: null,
     execution_overview: null,
     architectural_observations: null,
@@ -82,6 +77,7 @@ export function toSnippetInsert(
     verdict: null,
     limitations: null,
     debug_trace: null,
+    summary: null,
   } as SnippetInsert;
 
   return row;
@@ -107,7 +103,7 @@ export function snippetRowToAudit(row: any): AdvancedAuditResult | null {
     }
   }
 
-  return legacyRowToAudit(row);
+  return null;
 }
 
 // ============================================================

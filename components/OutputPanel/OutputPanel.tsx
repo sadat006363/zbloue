@@ -619,8 +619,6 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
         let content = `Zbloue - Code Analysis Report\n`;
         content += `═══════════════════════════════════════\n\n`;
         content += `📌 Title: ${safeString(displaySnippet?.card_title || fullAnalysis.card_title)}\n\n`;
-        // Build similar content as copy
-        // (simplified for brevity; full implementation in real code)
         const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
