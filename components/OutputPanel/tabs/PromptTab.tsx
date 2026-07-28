@@ -33,12 +33,13 @@ export default function PromptTab({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // 🔥 اصلاح: استخراج عنوان از audit_result
+  const title = snippet?.audit_result?.title || 'Check out this code analysis on Zbloue!';
+
   const handleShare = (platform: string) => {
     setShowShareDropdown(false);
     const slug = snippet?.slug ?? '';
-    const cardTitle = snippet?.card_title ?? 'Check out this code analysis on Zbloue!';
     const url = `${appUrl}/snippet/${slug}`;
-    const title = cardTitle;
     const fullText = `${title} - Analyze your code with AI and share it with the world! #Zbloue #CodeReview #AI #Developer`;
 
     switch (platform) {
