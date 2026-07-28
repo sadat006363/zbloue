@@ -11,32 +11,42 @@ interface GenerateOptions {
 
 export const analysisService = {
   /**
-   * Generate code analysis
-   * Returns legacy response shape for now.
+   * Generate code analysis with increased timeout (120 seconds)
    */
   async generate({ code, language, mode, signal }: GenerateOptions): Promise<LegacyGenerateResponse> {
-    const response = await fetch('/api/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code, language, mode }),
-      signal,
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 120000);
 
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || 'AI generation failed');
+    try {
+      const response = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, language, mode }),
+        signal: signal || controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'AI generation failed');
+      }
+      return data as LegacyGenerateResponse;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      throw error;
     }
-    return data as LegacyGenerateResponse;
   },
 
   /**
    * Generate line-by-line explanations
+   * 🔥 پارامتر mode اضافه شد (3 آرگومان)
    */
-  async explainLineByLine(code: string, language: string): Promise<LineExplanation[]> {
+  async explainLineByLine(code: string, language: string, mode: AnalysisMode): Promise<LineExplanation[]> {
     const response = await fetch('/api/explain-line-by-line', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code, language }),
+      body: JSON.stringify({ code, language, mode }),
     });
 
     const data = await response.json();
@@ -48,8 +58,9 @@ export const analysisService = {
 
   /**
    * Generate prompt from code
+   * 🔥 پارامتر mode اضافه شد (3 آرگومان)
    */
-  async generatePrompt(code: string, language: string, mode: string): Promise<string> {
+  async generatePrompt(code: string, language: string, mode: AnalysisMode): Promise<string> {
     const response = await fetch('/api/generate-prompt', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
