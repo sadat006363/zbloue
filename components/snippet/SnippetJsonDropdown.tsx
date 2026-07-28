@@ -3,10 +3,10 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { SnippetData } from '@/types'; // تغییر تایپ
+import type { Snippet } from '@/types';
 
 interface SnippetJsonDropdownProps {
-  snippet: SnippetData | null; // تغییر تایپ
+  snippet: Snippet | null;
 }
 
 type JsonViewMode =
@@ -59,43 +59,21 @@ export default function SnippetJsonDropdown({ snippet }: SnippetJsonDropdownProp
   if (!snippet) return null;
 
   const getJsonData = (mode: JsonViewMode): { label: string; data: unknown } => {
+    const audit = snippet.audit_result;
     const dataMap: Record<JsonViewMode, { label: string; data: unknown }> = {
       full: { label: 'Full Snippet Data', data: snippet },
-      findings: { label: 'Findings', data: snippet.findings || [] },
-      scorecard: {
-        label: 'Scorecard',
-        data: snippet.scorecard || {}, // تغییر: scorecard_new → scorecard
-      },
-      verdict: { label: 'Verdict', data: snippet.verdict || {} },
-      complexity: { label: 'Complexity', data: snippet.complexity || {} },
-      recommendedActions: {
-        label: 'Recommended Actions',
-        data: snippet.recommendedActions || [], // تغییر: recommended_actions → recommendedActions
-      },
-      improvedCode: {
-        label: 'Improved Code',
-        data: snippet.improvedCode || null, // تغییر: improved_code → improvedCode
-      },
-      linkedinPost: {
-        label: 'LinkedIn Post',
-        data: snippet.linkedinPost || null, // تغییر: linkedin_post → linkedinPost
-      },
-      executionOverview: {
-        label: 'Execution Overview',
-        data: snippet.executionOverview || {}, // تغییر: execution_overview → executionOverview
-      },
-      architecturalObservations: {
-        label: 'Architectural Observations',
-        data: snippet.architecturalObservations || [], // تغییر: architectural_observations → architecturalObservations
-      },
-      limitations: {
-        label: 'Limitations',
-        data: snippet.limitations || [],
-      },
-      debugTrace: {
-        label: 'Pipeline Trace - Full Analysis Chain',
-        data: snippet.debugTrace || null, // تغییر: debug_trace → debugTrace
-      },
+      // 🔥 تمام فیلدهای تحلیلی از audit_result خوانده می‌شوند
+      findings: { label: 'Findings', data: audit?.findings || [] },
+      scorecard: { label: 'Scorecard', data: audit?.scorecard || {} },
+      verdict: { label: 'Verdict', data: audit?.verdict || {} },
+      complexity: { label: 'Complexity', data: audit?.complexity || {} },
+      recommendedActions: { label: 'Recommended Actions', data: audit?.recommendedActions || [] },
+      improvedCode: { label: 'Improved Code', data: audit?.improvedCode || null },
+      linkedinPost: { label: 'LinkedIn Post', data: audit?.linkedinPost || null },
+      executionOverview: { label: 'Execution Overview', data: audit?.executionOverview || {} },
+      architecturalObservations: { label: 'Architectural Observations', data: audit?.architecturalObservations || [] },
+      limitations: { label: 'Limitations', data: audit?.limitations || [] },
+      debugTrace: { label: 'Pipeline Trace - Full Analysis Chain', data: audit?.debug_trace || null },
     };
     return dataMap[mode];
   };
