@@ -104,20 +104,21 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
         const legacy = adaptCanonicalToLegacy(snippet.audit_result);
         return {
           ...snippet,
-          card_title: legacy.card_title || snippet.card_title,
-          key_concept: legacy.key_concept || snippet.key_concept,
-          what_this_code_does: legacy.what_this_code_does || snippet.what_this_code_does,
-          debug_analysis: legacy.debug_analysis || snippet.debug_analysis,
-          optimization: legacy.optimization || snippet.optimization,
-          linkedin_post: legacy.linkedin_post || snippet.linkedin_post,
-          summary: legacy.summary || snippet.summary,
-          findings: legacy.findings || snippet.findings,
-          scorecard_new: legacy.scorecard_new || snippet.scorecard_new,
-          verdict: legacy.verdict || snippet.verdict,
+          // 🔥 فیلدهای کمکی: فقط از legacy استفاده کن (چون snippet این فیلدها را ندارد)
+          card_title: legacy.card_title || 'Code Analysis',
+          key_concept: legacy.key_concept || '',
+          what_this_code_does: legacy.what_this_code_does || '',
+          debug_analysis: legacy.debug_analysis || '-',
+          optimization: legacy.optimization || '-',
+          linkedin_post: legacy.linkedin_post || '',
+          summary: legacy.summary || '',
+          findings: legacy.findings || [],
+          scorecard_new: legacy.scorecard_new || null,
+          verdict: legacy.verdict || null,
         };
       }
 
-      // Fallback به داده‌های Legacy
+      // Fallback به داده‌های Legacy (در صورت وجود)
       return snippet;
     }, [snippet]);
 
