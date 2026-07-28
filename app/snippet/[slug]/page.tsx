@@ -64,13 +64,16 @@ async function getSnippet(slug: string): Promise<Snippet> {
     return null as any;
   }
 
-  // 🔥 audit_result باید وجود داشته باشد (چون داده‌های قدیمی حذف شده‌اند)
+  // 🔥 audit_result باید وجود داشته باشد و شیء باشد
   const auditResult = data.audit_result;
-  if (!auditResult) {
-    throw new Error('Snippet has no audit_result');
+  if (!auditResult || typeof auditResult !== 'object' || Array.isArray(auditResult)) {
+    throw new Error('Snippet has invalid audit_result');
   }
 
-  // 🔥 ساخت candidate فقط با فیلدهای مجاز در SnippetSchema
+  // 🔥 استفاده از `as any` برای دسترسی به فیلدهای شیء
+  const typedAudit = auditResult as any;
+
+  // 🔥 ساخت candidate با فیلدهای مجاز
   const candidate = {
     id: data.id ?? '',
     slug: data.slug ?? '',
@@ -86,10 +89,10 @@ async function getSnippet(slug: string): Promise<Snippet> {
 
     audit_result: auditResult,
 
-    card_title: auditResult.title || 'Code Analysis',
-    key_concept: auditResult.summary || '',
-    what_this_code_does: auditResult.executionOverview?.entryPoints?.join(', ') || auditResult.summary || '',
-    linkedin_post: auditResult.linkedinPost || '',
+    card_title: typedAudit.title || 'Code Analysis',
+    key_concept: typedAudit.summary || '',
+    what_this_code_does: typedAudit.executionOverview?.entryPoints?.join(', ') || typedAudit.summary || '',
+    linkedin_post: typedAudit.linkedinPost || '',
 
     line_explanations: data.line_explanations ?? undefined,
     generated_prompt: data.generated_prompt ?? undefined,
@@ -133,7 +136,8 @@ export default async function SnippetPage({ params }: PageProps) {
     if (snippet) {
       normalizedAudit = normalizeSnippetAudit(snippet);
 
-      if (normalizedAudit && (normalizedAudit.status.type === 'valid' || normalizedAudit.status.type === 'legacy')) {
+      // 🔥 فقط وضعیت `'valid'` وجود دارد (چون داده‌های Legacy حذف شده‌اند)
+      if (normalizedAudit && normalizedAudit.status.type === 'valid') {
         const auditData = normalizedAudit.status.audit;
         if (auditData) {
           snippet = {
@@ -163,10 +167,13 @@ export default async function SnippetPage({ params }: PageProps) {
   const fullAnalysisExists = hasAudit && !!(snippet.audit_result?.findings?.length ||
     snippet.audit_result?.scorecard || snippet.audit_result?.verdict);
 
-  let fullAnalysisText: string = snippet.audit_result?.analysis || '';
+  // 🔥 استفاده از `as any` برای دسترسی به `analysis`
+  const fullAnalysisText = (snippet.audit_result as any)?.analysis || '';
 
-  if (fullAnalysisExists && !fullAnalysisText) {
-    fullAnalysisText = buildAnalysisTextForAdvanced(snippet.audit_result);
+  // 🔥 اگر Advanced است و analysis خالی است، از داده‌های ساختاریافته متن بساز
+  let finalFullAnalysisText = fullAnalysisText;
+  if (fullAnalysisExists && !finalFullAnalysisText) {
+    finalFullAnalysisText = buildAnalysisTextForAdvanced(snippet.audit_result);
   }
 
   const debugData = {
@@ -214,7 +221,7 @@ export default async function SnippetPage({ params }: PageProps) {
             <SnippetAnalysis
               keyConcept={snippet.key_concept}
               whatItDoes={snippet.what_this_code_does}
-              fullAnalysis={fullAnalysisText}
+              fullAnalysis={finalFullAnalysisText}
               auditResult={snippet.audit_result}
             />
           </div>

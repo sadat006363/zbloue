@@ -25,7 +25,7 @@ import {
   LegacySuggestedTest,
   LegacyScorecard,
 } from '@/types';
-import { canonicalToLegacyResponse } from '@/lib/snippetAdapter';
+import { canonicalToLegacyResponse } from '@/lib/auditToLegacy';
 
 export const dynamic = 'force-dynamic';
 

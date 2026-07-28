@@ -91,7 +91,6 @@ export interface PromptInfo {
 // ============================================================
 
 export const SnippetSchema = z.object({
-  // ===== شناسه و پاکت‌نامه =====
   id: z.string().uuid(),
   slug: z.string().min(1),
   raw_code: z.string(),
@@ -99,36 +98,114 @@ export const SnippetSchema = z.object({
   is_public: z.boolean(),
   created_at: z.string().datetime(),
 
-  // ===== اطلاعات کاربر =====
   username: z.string().optional(),
   github_username: z.string().optional(),
   avatar_url: z.string().url().optional(),
   card_image_url: z.string().url().optional(),
 
-  // ===== داده‌های تحلیلی (فقط در اینجا) =====
   audit_result: AdvancedAuditResultSchema,
 
-  // ===== فیلدهای کمکی (برای نمایش Legacy) =====
   card_title: z.string().optional(),
   key_concept: z.string().optional(),
   what_this_code_does: z.string().optional(),
   linkedin_post: z.string().optional(),
 
-  // ===== Line-by-line و Prompt =====
   line_explanations: z.any().optional(),
   generated_prompt: z.string().optional(),
 });
-// ❌ .catchall(z.any()) حذف شد – چون داده‌های قدیمی وجود ندارند
 
 export type Snippet = z.infer<typeof SnippetSchema>;
 export type SnippetData = Snippet;
 export const SnippetDataSchema = SnippetSchema;
 
 // ============================================================
-// Legacy types (برای سازگاری با کدهای قدیمی – در صورت نیاز)
+// 🔥 Legacy types (برای سازگاری با کدهای قدیمی)
 // ============================================================
 
-// ... (بقیه تایپ‌های Legacy در صورت لزوم) ...
+const LegacyCodeWalkthroughItemSchema = z.object({
+  section: z.string(),
+  explanation: z.string(),
+});
+
+const LegacyBugAndRiskyCaseSchema = z.object({
+  issue: z.string(),
+  impact: z.string(),
+  example: z.string().default(''),
+});
+
+const LegacyEdgeCaseSchema = z.object({
+  case: z.string(),
+  currentBehavior: z.string(),
+  expectedBehavior: z.string(),
+  risk: z.enum(['Low', 'Medium', 'High']),
+});
+
+const LegacyPerformanceAnalysisSchema = z.object({
+  timeComplexity: z.array(
+    z.object({
+      target: z.string(),
+      complexity: z.string(),
+      explanation: z.string(),
+    })
+  ),
+  spaceComplexity: z.array(
+    z.object({
+      target: z.string(),
+      complexity: z.string(),
+      explanation: z.string(),
+    })
+  ),
+  scalabilityNotes: z.array(z.string()),
+});
+
+const LegacySecurityAnalysisSchema = z.object({
+  issues: z.array(z.string()),
+  recommendations: z.array(z.string()),
+  severity: z.enum(['Low', 'Medium', 'High', 'Critical']),
+});
+
+const LegacyProductionReadinessSchema = z.object({
+  isProductionReady: z.boolean(),
+  reasons: z.array(z.string()),
+  requiredChanges: z.array(z.string()),
+});
+
+const LegacyRecommendedImprovementSchema = z.object({
+  priority: z.enum(['High', 'Medium', 'Low']),
+  improvement: z.string(),
+  reason: z.string(),
+});
+
+const LegacySuggestedTestSchema = z.object({
+  name: z.string(),
+  input: z.string(),
+  expectedOutput: z.string(),
+  type: z.enum(['Normal', 'Edge', 'Invalid']),
+});
+
+const LegacyScorecardSchema = z.object({
+  correctness: z.number().min(0).max(10),
+  readability: z.number().min(0).max(10),
+  performance: z.number().min(0).max(10),
+  maintainability: z.number().min(0).max(10),
+  productionReadiness: z.number().min(0).max(10),
+  security: z.number().min(0).max(10).optional(),
+  overall: z.number().min(0).max(10).optional(),
+});
+
+// ============================================================
+// 🔥 Export Legacy types
+// ============================================================
+
+export type LegacyCodeWalkthroughItem = z.infer<typeof LegacyCodeWalkthroughItemSchema>;
+export type LegacyBugAndRiskyCase = z.infer<typeof LegacyBugAndRiskyCaseSchema>;
+export type LegacyEdgeCase = z.infer<typeof LegacyEdgeCaseSchema>;
+export type LegacyPerformanceAnalysis = z.infer<typeof LegacyPerformanceAnalysisSchema>;
+export type LegacySecurityAnalysis = z.infer<typeof LegacySecurityAnalysisSchema>;
+export type LegacyProductionReadiness = z.infer<typeof LegacyProductionReadinessSchema>;
+export type LegacyRecommendedImprovement = z.infer<typeof LegacyRecommendedImprovementSchema>;
+export type LegacySuggestedTest = z.infer<typeof LegacySuggestedTestSchema>;
+export type LegacyScorecard = z.infer<typeof LegacyScorecardSchema>;
 
 // ============================================================
 // LegacyGenerateResponse
@@ -141,20 +218,33 @@ export const LegacyGenerateResponseSchema = z.object({
   what_this_code_does: z.string().optional(),
   debug_analysis: z.string().optional(),
   optimization: z.string().optional(),
-  codeWalkthrough: z.any().optional(),
-  whatWorksWell: z.any().optional(),
-  bugsAndRiskyCases: z.any().optional(),
-  edgeCases: z.any().optional(),
-  performanceAnalysis: z.any().optional(),
-  securityAnalysis: z.any().optional(),
-  productionReadiness: z.any().optional(),
-  recommendedImprovements: z.any().optional(),
-  improvedCode: z.any().optional(),
-  suggestedTests: z.any().optional(),
-  scorecard: z.any().optional(),
-  finalVerdict: z.any().optional(),
+  codeWalkthrough: z.array(LegacyCodeWalkthroughItemSchema).optional(),
+  whatWorksWell: z.array(z.string()).optional(),
+  bugsAndRiskyCases: z.array(LegacyBugAndRiskyCaseSchema).optional(),
+  edgeCases: z.array(LegacyEdgeCaseSchema).optional(),
+  performanceAnalysis: LegacyPerformanceAnalysisSchema.optional(),
+  securityAnalysis: LegacySecurityAnalysisSchema.optional(),
+  productionReadiness: LegacyProductionReadinessSchema.optional(),
+  recommendedImprovements: z.array(LegacyRecommendedImprovementSchema).optional(),
+  improvedCode: z
+    .object({
+      available: z.boolean(),
+      code: z.string(),
+      notes: z.string(),
+    })
+    .optional(),
+  suggestedTests: z.array(LegacySuggestedTestSchema).optional(),
+  scorecard: LegacyScorecardSchema.optional(),
+  finalVerdict: z
+    .object({
+      summary: z.string(),
+      approved: z.boolean(),
+      nextSteps: z.string().optional(),
+    })
+    .optional(),
   linkedin_post: z.string().optional(),
   error: z.string().optional(),
+  // فیلدهای تحلیلی اضافی (برای Backward Compatibility)
   findings: z.any().optional(),
   executionOverview: z.any().optional(),
   architecturalObservations: z.any().optional(),
@@ -171,6 +261,7 @@ export const LegacyGenerateResponseSchema = z.object({
   debug_trace: z.any().optional(),
   audit_result: z.any().optional(),
 });
+
 export type LegacyGenerateResponse = z.infer<typeof LegacyGenerateResponseSchema>;
 
 // ============================================================
