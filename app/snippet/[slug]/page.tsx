@@ -235,9 +235,6 @@ export default async function SnippetPage({ params }: PageProps) {
     fullAnalysisText = buildAnalysisTextForAdvanced(snippet.audit_result);
   }
 
-  // ============================================================
-  // 🔥 اصلاح debugData برای تطابق با نوع DebugLogger
-  // ============================================================
   const debugData = {
     fullAnalysisExists,
     hasAudit,
@@ -270,7 +267,7 @@ export default async function SnippetPage({ params }: PageProps) {
           />
 
           <SnippetStatusBar snippet={snippet} />
-          <SnippetShareButtons slug={snippet.slug} title={snippet.card_title} />
+          <SnippetShareButtons slug={snippet.slug} title={snippet.card_title || 'Code Snippet'} />
           <SnippetTabLinks shareUrl={shareUrl} />
 
           <div id="snippet-code">
