@@ -114,7 +114,6 @@ function detectRelevantCodeForDimension(code: string, dimension: string): boolea
   const dimensionPatterns = patterns[dimension] || [];
   if (dimensionPatterns.length === 0) return false;
 
-  // بررسی تطابق هر الگو با کد
   for (const pattern of dimensionPatterns) {
     if (pattern.test(code)) {
       return true;
@@ -807,10 +806,13 @@ function createMinimalAuditFromPartial(
     const title = normalizeTitle(input.title, summary);
     const language = normalizeLanguage(input.language);
 
+    // 🔥 استخراج rawCode از input
+    const rawCode = typeof (input as any).rawCode === 'string' ? (input as any).rawCode : '';
+
     let analysisCoverage = normalizeAnalysisCoverage(
       input.analysisCoverage ?? input.coverage ?? {},
       getSafeArray(input.findings, []),
-      input.rawCode || ''
+      rawCode
     );
     if (analysisCoverage.length === 0) {
       analysisCoverage = ALL_DIMENSIONS.map(dim => ({
@@ -974,11 +976,13 @@ export function normalizeAnalysisOutput(raw: unknown): AdvancedAuditResult {
     linkedinPost = DEFAULT_LINKEDIN_POST;
   }
 
-  // 🔥 اصلاح: ارسال rawCode به normalizeAnalysisCoverage
+  // 🔥 اصلاح: استخراج rawCode و ارسال به normalizeAnalysisCoverage
+  const rawCode = typeof (input as any).rawCode === 'string' ? (input as any).rawCode : '';
+
   let analysisCoverage = normalizeAnalysisCoverage(
     input.analysisCoverage ?? input.coverage ?? {},
     normalizedFindings,
-    input.rawCode || ''
+    rawCode
   );
   if (analysisCoverage.length === 0) {
     analysisCoverage = ALL_DIMENSIONS.map(dim => ({
