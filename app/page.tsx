@@ -387,10 +387,9 @@ export default function HomePage() {
       }
 
       // ============================================================
-      // 🔥 ساخت SnippetData با ساختار Canonical: فقط فیلدهای پاکت‌نامه
+      // 🔥 ساخت SnippetData با ساختار Canonical
       // ============================================================
       const snippetData: Snippet = {
-        // ===== شناسه و پاکت‌نامه =====
         id: saveResult.id,
         slug: saveResult.slug,
         raw_code: cleanedCode,
@@ -398,22 +397,18 @@ export default function HomePage() {
         is_public: true,
         created_at: new Date().toISOString(),
 
-        // ===== اطلاعات کاربر =====
         username: saveResult.username || normalizedUsername,
         github_username: saveResult.github_username ?? normalizedGithubUsername,
         avatar_url: normalizedAvatarUrl,
         card_image_url: undefined,
 
-        // ===== داده‌های تحلیلی (فقط در اینجا) =====
         audit_result: auditResult,
 
-        // ===== فیلدهای کمکی (برای نمایش Legacy) =====
         card_title: auditResult.title || 'Code Analysis',
         key_concept: auditResult.summary || '',
         what_this_code_does: auditResult.executionOverview?.entryPoints?.join(', ') || auditResult.summary || '',
         linkedin_post: auditResult.linkedinPost || '',
 
-        // ===== Line-by-line و Prompt =====
         line_explanations: undefined,
         generated_prompt: undefined,
       };
@@ -442,13 +437,13 @@ export default function HomePage() {
       }
     } catch (error) {
       let message = error instanceof Error ? error.message : 'Analysis failed. Please try again.';
-
-      if (message.includes('ERR_CONNECTION_CLOSED') ||
-          message.includes('timed out') ||
+      
+      if (message.includes('ERR_CONNECTION_CLOSED') || 
+          message.includes('timed out') || 
           message.includes('AbortError')) {
         message = '⏱️ The analysis is taking longer than expected. Please wait a moment and refresh the page, or try again with a simpler code.';
       }
-
+      
       setErrorMessage(message);
       dispatch({ type: 'SET_ERROR', payload: message });
     } finally {

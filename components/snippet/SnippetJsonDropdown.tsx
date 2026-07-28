@@ -62,7 +62,6 @@ export default function SnippetJsonDropdown({ snippet }: SnippetJsonDropdownProp
     const audit = snippet.audit_result;
     const dataMap: Record<JsonViewMode, { label: string; data: unknown }> = {
       full: { label: 'Full Snippet Data', data: snippet },
-      // 🔥 تمام فیلدهای تحلیلی از audit_result خوانده می‌شوند
       findings: { label: 'Findings', data: audit?.findings || [] },
       scorecard: { label: 'Scorecard', data: audit?.scorecard || {} },
       verdict: { label: 'Verdict', data: audit?.verdict || {} },
@@ -81,7 +80,6 @@ export default function SnippetJsonDropdown({ snippet }: SnippetJsonDropdownProp
   const handleSelect = async (mode: JsonViewMode) => {
     const { label, data } = getJsonData(mode);
     const jsonString = JSON.stringify(data, null, 2);
-
     const modeInfo = viewModes.find((m) => m.id === mode);
     setSelectedLabel(modeInfo?.label || label);
     setSelectedIcon(modeInfo?.icon || '📦');
@@ -117,43 +115,31 @@ export default function SnippetJsonDropdown({ snippet }: SnippetJsonDropdownProp
 
   return (
     <div className="relative flex items-center gap-2" ref={dropdownRef}>
-      {/* ===== دکمه کشویی ===== */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`
-          flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200
-          ${isOpen
+        className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${
+          isOpen
             ? 'bg-[#4a86f7] text-white border border-[#4a86f7]'
             : 'bg-[#4a86f7]/10 text-[#89b4fa] border border-[#4a86f7]/30 hover:bg-[#4a86f7]/20 hover:border-[#4a86f7]/50'
-          }
-        `}
+        }`}
         title="Select JSON view to copy"
       >
         <span>{selectedIcon}</span>
         <span className="hidden sm:inline">{selectedLabel}</span>
         <span className="sm:hidden">📋</span>
-        <svg
-          className={`w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
+        <svg className={`w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
         </svg>
       </button>
 
-      {/* ===== دکمه کپی کامل ===== */}
       <button
         onClick={handleCopyFull}
         disabled={isCopying}
-        className={`
-          flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-all duration-200
-          ${copied
+        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${
+          copied
             ? 'bg-green-500/20 text-green-400 border border-green-500/30'
             : 'bg-[#4a86f7]/10 text-[#89b4fa] border border-[#4a86f7]/30 hover:bg-[#4a86f7]/20 hover:border-[#4a86f7]/50'
-          }
-          ${isCopying && 'opacity-50 cursor-not-allowed'}
-        `}
+        } ${isCopying && 'opacity-50 cursor-not-allowed'}`}
         title="Copy full JSON to clipboard"
       >
         {isCopying ? (
@@ -167,18 +153,13 @@ export default function SnippetJsonDropdown({ snippet }: SnippetJsonDropdownProp
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
           </svg>
         )}
-        <span className="hidden sm:inline">
-          {copied ? '✅ Copied!' : isCopying ? 'Copying...' : 'Copy All'}
-        </span>
+        <span className="hidden sm:inline">{copied ? '✅ Copied!' : isCopying ? 'Copying...' : 'Copy All'}</span>
       </button>
 
-      {/* ===== منوی کشویی ===== */}
       {isOpen && (
         <div className="absolute right-0 top-full mt-2 w-72 bg-[#1e1e2e] rounded-xl border border-[#313244] shadow-2xl z-50 overflow-hidden">
           <div className="px-4 py-2 border-b border-[#313244] bg-[#11111b]">
-            <span className="text-xs font-medium text-[#6c7086] uppercase tracking-wider">
-              📊 JSON Views
-            </span>
+            <span className="text-xs font-medium text-[#6c7086] uppercase tracking-wider">📊 JSON Views</span>
           </div>
           <div className="max-h-64 overflow-y-auto custom-scrollbar">
             {viewModes.map((mode) => (
@@ -195,21 +176,11 @@ export default function SnippetJsonDropdown({ snippet }: SnippetJsonDropdownProp
         </div>
       )}
 
-      {/* ===== استایل اسکرول‌بار ===== */}
       <style jsx>{`
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 4px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: #1e1e2e;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: #4a86f7;
-          border-radius: 8px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: #3b6fd4;
-        }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #1e1e2e; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #4a86f7; border-radius: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #3b6fd4; }
       `}</style>
     </div>
   );

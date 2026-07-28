@@ -24,12 +24,9 @@ import {
   type NormalizedSnippetAudit,
 } from '@/lib/analysis/normalize-snippet-audit';
 import { type LineExplanation } from '@/types';
-import { adaptCanonicalToLegacy, hasCanonicalAudit } from '@/lib/snippetAdapter';
 
 export const revalidate = 0;
 export const dynamic = 'force-dynamic';
-
-type LegacyFields = ReturnType<typeof adaptCanonicalToLegacy>;
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -67,55 +64,14 @@ async function getSnippet(slug: string): Promise<Snippet> {
     return null as any;
   }
 
-  // 🔥 STEP 1: اگر audit_result وجود دارد، فیلدهای Legacy را از آن پر کن
-  let legacyFields: LegacyFields = {
-    card_title: '',
-    key_concept: '',
-    what_this_code_does: '',
-    debug_analysis: '',
-    optimization: '',
-    linkedin_post: '',
-    summary: '',
-    findings: [],
-    scorecard_new: null,
-    verdict: null,
-  };
-
-  if (hasCanonicalAudit(data)) {
-    legacyFields = adaptCanonicalToLegacy(data.audit_result);
-  }
-
-  // 🔥 STEP 2: ساخت audit_result از داده‌های Legacy (اگر وجود نداشت)
-  let auditResult = data.audit_result;
+  // 🔥 audit_result باید وجود داشته باشد (چون داده‌های قدیمی حذف شده‌اند)
+  const auditResult = data.audit_result;
   if (!auditResult) {
-    auditResult = {
-      schemaVersion: '1.0.0',
-      auditType: 'comprehensive',
-      appliedSpecializations: [],
-      completionStatus: 'complete',
-      repairApplied: false,
-      title: data.card_title || 'Code Analysis',
-      language: data.language || 'javascript',
-      summary: data.key_concept || '',
-      analysis: data.what_this_code_does || '',
-      executionOverview: data.execution_overview || { entryPoints: [], taskSubmissionPoints: [], blockingWaitPoints: [], sharedResources: [], resourceLifecycle: [] },
-      findings: data.findings || [],
-      architecturalObservations: data.architectural_observations || [],
-      recommendedActions: data.recommended_actions || [],
-      suggestedTests: data.suggested_tests_new || [],
-      complexity: data.complexity || { applicable: false, expression: null, explanation: null, variables: [], assumptions: [] },
-      scorecard: data.scorecard_new || data.scorecard || null,
-      verdict: data.verdict || null,
-      limitations: data.limitations || [],
-      improvedCode: data.improved_code ? { available: true, code: data.improved_code, notes: '' } : { available: false, code: null, notes: '' },
-      linkedinPost: data.linkedin_post || '',
-      analysisCoverage: [],
-    };
+    throw new Error('Snippet has no audit_result');
   }
 
-  // 🔥 STEP 3: ساخت candidate (فقط فیلدهای مجاز Root)
+  // 🔥 ساخت candidate فقط با فیلدهای مجاز در SnippetSchema
   const candidate = {
-    // ===== شناسه و پاکت‌نامه =====
     id: data.id ?? '',
     slug: data.slug ?? '',
     raw_code: data.raw_code ?? '',
@@ -123,22 +79,18 @@ async function getSnippet(slug: string): Promise<Snippet> {
     is_public: data.is_public ?? false,
     created_at: data.created_at ?? new Date().toISOString(),
 
-    // ===== اطلاعات کاربر =====
     username: data.username ?? undefined,
     github_username: data.github_username ?? undefined,
     avatar_url: data.avatar_url ?? undefined,
     card_image_url: data.card_image_url ?? undefined,
 
-    // ===== داده‌های تحلیلی (فقط از audit_result) =====
     audit_result: auditResult,
 
-    // ===== فیلدهای کمکی (از Adapter پر می‌شوند) =====
-    card_title: legacyFields.card_title || data.card_title || 'Code Analysis',
-    key_concept: legacyFields.key_concept || data.key_concept || '',
-    what_this_code_does: legacyFields.what_this_code_does || data.what_this_code_does || '',
-    linkedin_post: legacyFields.linkedin_post || data.linkedin_post || '',
+    card_title: auditResult.title || 'Code Analysis',
+    key_concept: auditResult.summary || '',
+    what_this_code_does: auditResult.executionOverview?.entryPoints?.join(', ') || auditResult.summary || '',
+    linkedin_post: auditResult.linkedinPost || '',
 
-    // ===== Line-by-line و Prompt =====
     line_explanations: data.line_explanations ?? undefined,
     generated_prompt: data.generated_prompt ?? undefined,
   };
