@@ -18,6 +18,7 @@ export interface SnippetCreationContext {
 
 // ============================================================
 // 🔥 تبدیل AdvancedAuditResult به SnippetInsert
+// فقط ستون‌های موجود در دیتابیس را شامل می‌شود
 // ============================================================
 
 export function toSnippetInsert(
@@ -26,7 +27,10 @@ export function toSnippetInsert(
 ): SnippetInsert {
   const now = new Date().toISOString();
 
-  return {
+  // ============================================================
+  // 🔥 فقط ستون‌هایی که در دیتابیس وجود دارند
+  // ============================================================
+  const row = {
     // ===== شناسه و پاکت‌نامه =====
     slug: context.slug,
     raw_code: context.rawCode,
@@ -40,39 +44,19 @@ export function toSnippetInsert(
     avatar_url: context.avatarUrl ?? null,
     user_id: context.userId ?? null,
 
-    // ===== فقط audit_result =====
+    // ===== داده‌های تحلیلی =====
     audit_result: audit as any,
 
-    // ===== فیلدهای کمکی (برای نمایش) =====
-    card_title: null,
-    key_concept: null,
-    what_this_code_does: null,
-    linkedin_post: null,
-
-    // ===== Line-by-line و Prompt =====
+    // ===== فیلدهای جانبی (غیرتحلیلی) =====
     line_explanations: null,
     generated_prompt: null,
-
-    // ===== Legacy fields (همه null هستند) =====
-    code_walkthrough: null,
-    what_works_well: null,
-    bugs_and_risky_cases: null,
-    edge_cases: null,
-    performance_analysis: null,
-    security_analysis: null,
-    production_readiness: null,
-    recommended_improvements: null,
-    improved_code: null,
-    improved_code_jsonb: null,
-    suggested_tests: null,
-    scorecard: null,
-    final_verdict_summary: null,
-    final_verdict_approved: null,
-    final_verdict_next_steps: null,
-
-    schema_version: '1.0',
     card_image_url: null,
+
+    // ⚠️ تمام ستون‌های Legacy دیگر حذف شدند
+    // چون در دیتابیس وجود ندارند
   } as SnippetInsert;
+
+  return row;
 }
 
 // ============================================================
