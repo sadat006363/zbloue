@@ -38,6 +38,9 @@ export default function LineByLineTab({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // 🔥 اصلاح: استخراج عنوان از audit_result
+  const title = snippet?.audit_result?.title || 'Check out this code analysis on Zbloue!';
+
   const correctedExplanations = useMemo(() => {
     if (!snippet?.raw_code || !lineExplanations || lineExplanations.length === 0) {
       return lineExplanations || [];
@@ -77,7 +80,6 @@ export default function LineByLineTab({
   const handleShare = (platform: string) => {
     setShowShareDropdown(false);
     const url = `${appUrl}/snippet/${snippet?.slug}`;
-    const title = snippet?.card_title || 'Check out this code analysis on Zbloue!';
     const fullText = `${title} - Analyze your code with AI and share it with the world! #Zbloue #CodeReview #AI #Developer`;
 
     switch (platform) {
@@ -99,8 +101,9 @@ export default function LineByLineTab({
   const handleCopy = () => {
     const content = correctedExplanations
       .filter((item: any) => item.explanation)
-      .map((item: any) => `Line ${item.lineNumber}:\n${item.code}\nExplanation: ${item.explanation}\n---`)
-      .join('\n');
+      .map((item: any) => 
+        `Line ${item.lineNumber}:\n${item.code}\nExplanation: ${item.explanation}\n---`
+      ).join('\n');
     navigator.clipboard.writeText(content);
     showToast('✅ Explanations copied!');
   };
