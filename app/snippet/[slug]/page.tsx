@@ -152,7 +152,12 @@ async function getSnippet(slug: string): Promise<Snippet> {
     console.error(`❌ [SnippetPage] Schema validation FAILED for slug "${normalizedSlug}"`);
     console.error(`❌ [SnippetPage] Validation errors:`, JSON.stringify(validation.error.flatten(), null, 2));
     console.error(`❌ [SnippetPage] Candidate data:`, JSON.stringify(candidate, null, 2));
-    throw new Error('Snippet data is invalid');
+
+    // 🔥 ذخیره خطاهای اعتبارسنجی در error object
+    const error = new Error('Snippet data is invalid');
+    (error as any).details = validation.error.flatten();
+    (error as any).candidate = candidate;
+    throw error;
   }
 
   console.log(`✅ [SnippetPage] Schema validation PASSED for slug "${normalizedSlug}"`);
@@ -183,6 +188,7 @@ export default async function SnippetPage({ params }: PageProps) {
   let snippet: Snippet | null = null;
   let error: Error | null = null;
   let normalizedAudit: NormalizedSnippetAudit | null = null;
+  let validationErrors: any = null;
 
   try {
     snippet = await getSnippet(slug);
@@ -219,14 +225,58 @@ export default async function SnippetPage({ params }: PageProps) {
     error = err as Error;
     console.error(`❌ [SnippetPage] Error in getSnippet:`, error.message);
     console.error(`❌ [SnippetPage] Stack:`, error.stack);
+
+    // 🔥 ذخیره خطاهای اعتبارسنجی
+    if (err instanceof Error && err.message.includes('Snippet data is invalid')) {
+      validationErrors = (err as any).details || err.message;
+    }
   }
 
+  // ============================================================
+  // 🔥 نمایش خطا به‌جای 404 (برای دیباگ)
+  // ============================================================
   if (error || !snippet) {
-    console.warn(`⚠️ [SnippetPage] Returning 404 - error or no snippet`);
-    console.warn(`⚠️ [SnippetPage] error:`, error?.message);
-    console.warn(`⚠️ [SnippetPage] snippet:`, !!snippet);
-    notFound();
-    return null;
+    console.warn(`⚠️ [SnippetPage] Returning error page with details:`, error?.message);
+
+    return (
+      <main className="min-h-screen bg-[#f8f9fa] flex items-center justify-center p-4">
+        <div className="bg-red-50 border-2 border-red-200 rounded-xl p-8 max-w-2xl w-full">
+          <h2 className="text-2xl font-bold text-red-700 mb-4">❌ خطا در بارگذاری اسنیپت</h2>
+          <div className="bg-white p-4 rounded-lg border border-red-100 mb-4 overflow-auto max-h-[300px]">
+            <p className="text-sm font-mono text-red-600 whitespace-pre-wrap">
+              {error?.message || 'Unknown error'}
+            </p>
+            {validationErrors && (
+              <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap bg-gray-50 p-2 rounded">
+                {typeof validationErrors === 'string'
+                  ? validationErrors
+                  : JSON.stringify(validationErrors, null, 2)}
+              </pre>
+            )}
+          </div>
+          <div className="flex gap-4">
+            <a
+              href="/"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md transition"
+            >
+              بازگشت به خانه
+            </a>
+            <button
+              onClick={() => window.location.reload()}
+              className="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded-md transition"
+            >
+              تلاش مجدد
+            </button>
+          </div>
+          <p className="text-xs text-gray-500 mt-4">
+            <span className="font-semibold">Slug:</span> {slug}
+          </p>
+          <p className="text-xs text-gray-500 mt-1">
+            <span className="font-semibold">Error:</span> {error?.message}
+          </p>
+        </div>
+      </main>
+    );
   }
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || '';

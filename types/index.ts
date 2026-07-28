@@ -91,6 +91,7 @@ export interface PromptInfo {
 // ============================================================
 
 export const SnippetSchema = z.object({
+  // ===== شناسه و پاکت‌نامه =====
   id: z.string().uuid(),
   slug: z.string().min(1),
   raw_code: z.string(),
@@ -98,28 +99,32 @@ export const SnippetSchema = z.object({
   is_public: z.boolean(),
   created_at: z.string().datetime(),
 
+  // ===== اطلاعات کاربر =====
   username: z.string().optional(),
   github_username: z.string().optional(),
   avatar_url: z.string().url().optional(),
   card_image_url: z.string().url().optional(),
 
+  // ===== داده‌های تحلیلی (فقط در اینجا) =====
   audit_result: AdvancedAuditResultSchema,
 
+  // ===== فیلدهای کمکی (برای نمایش Legacy) =====
   card_title: z.string().optional(),
   key_concept: z.string().optional(),
   what_this_code_does: z.string().optional(),
   linkedin_post: z.string().optional(),
 
+  // ===== Line-by-line و Prompt =====
   line_explanations: z.any().optional(),
   generated_prompt: z.string().optional(),
-});
+}).catchall(z.any()); // 🔥 فیلدهای اضافی را نادیده بگیر (برای سازگاری)
 
 export type Snippet = z.infer<typeof SnippetSchema>;
 export type SnippetData = Snippet;
 export const SnippetDataSchema = SnippetSchema;
 
 // ============================================================
-// 🔥 Legacy types (برای سازگاری با کدهای قدیمی)
+// Legacy types (برای سازگاری با کدهای قدیمی)
 // ============================================================
 
 const LegacyCodeWalkthroughItemSchema = z.object({
