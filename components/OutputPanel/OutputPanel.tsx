@@ -94,31 +94,34 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
     const isAdvanced = mode === 'advanced';
 
     // ============================================================
-    // 🔥 STEP 1: ایجاد displaySnippet با اولویت audit_result
+    // 🔥 STEP 1: استخراج فیلدهای Legacy از audit_result با استفاده از Adapter
+    // ============================================================
+    const legacyData = useMemo(() => {
+      if (!snippet) return null;
+      if (hasCanonicalAudit(snippet)) {
+        return adaptCanonicalToLegacy(snippet.audit_result);
+      }
+      // Fallback: اگر داده‌های Legacy در خود snippet وجود دارند (برای سازگاری)
+      return {
+        card_title: (snippet as any).card_title || '',
+        key_concept: (snippet as any).key_concept || '',
+        what_this_code_does: (snippet as any).what_this_code_does || '',
+        debug_analysis: (snippet as any).debug_analysis || '',
+        optimization: (snippet as any).optimization || '',
+        linkedin_post: (snippet as any).linkedin_post || '',
+        summary: (snippet as any).summary || '',
+        findings: (snippet as any).findings || [],
+        scorecard_new: (snippet as any).scorecard_new || null,
+        verdict: (snippet as any).verdict || null,
+      };
+    }, [snippet]);
+
+    // ============================================================
+    // 🔥 STEP 2: displaySnippet برای کارت و سایر قسمت‌ها (فقط فیلدهای پاکت‌نامه)
     // ============================================================
     const displaySnippet = useMemo(() => {
       if (!snippet) return null;
-
-      // اگر audit_result وجود دارد، فیلدهای Legacy را از آن پر کن
-      if (hasCanonicalAudit(snippet)) {
-        const legacy = adaptCanonicalToLegacy(snippet.audit_result);
-        return {
-          ...snippet,
-          // 🔥 فیلدهای کمکی: فقط از legacy استفاده کن (چون snippet این فیلدها را ندارد)
-          card_title: legacy.card_title || 'Code Analysis',
-          key_concept: legacy.key_concept || '',
-          what_this_code_does: legacy.what_this_code_does || '',
-          debug_analysis: legacy.debug_analysis || '-',
-          optimization: legacy.optimization || '-',
-          linkedin_post: legacy.linkedin_post || '',
-          summary: legacy.summary || '',
-          findings: legacy.findings || [],
-          scorecard_new: legacy.scorecard_new || null,
-          verdict: legacy.verdict || null,
-        };
-      }
-
-      // Fallback به داده‌های Legacy (در صورت وجود)
+      // برای کارت و موارد دیگر، فقط از snippet اصلی استفاده کن
       return snippet;
     }, [snippet]);
 
@@ -457,7 +460,7 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
       try {
         let content = `📊 Code Analysis Report\n`;
         content += `═══════════════════════════════════════\n\n`;
-        content += `📌 Title: ${safeString(displaySnippet?.card_title || fullAnalysis.card_title)}\n\n`;
+        content += `📌 Title: ${safeString(legacyData?.card_title || fullAnalysis.card_title)}\n\n`;
         if (fullAnalysis.key_concept) {
           content += `💡 Key Concept:\n${safeString(fullAnalysis.key_concept)}\n\n`;
         }
@@ -608,7 +611,7 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
         }
         internalShowToast('❌ Failed to copy analysis');
       }
-    }, [fullAnalysis, isAdvanced, displaySnippet, internalShowToast]);
+    }, [fullAnalysis, isAdvanced, legacyData, internalShowToast]);
 
     const downloadAnalysisNew = useCallback(() => {
       if (!fullAnalysis || !isAdvanced) {
@@ -619,7 +622,7 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
       try {
         let content = `Zbloue - Code Analysis Report\n`;
         content += `═══════════════════════════════════════\n\n`;
-        content += `📌 Title: ${safeString(displaySnippet?.card_title || fullAnalysis.card_title)}\n\n`;
+        content += `📌 Title: ${safeString(legacyData?.card_title || fullAnalysis.card_title)}\n\n`;
         const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -636,7 +639,7 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
         }
         internalShowToast('❌ Failed to download');
       }
-    }, [fullAnalysis, isAdvanced, displaySnippet, internalShowToast]);
+    }, [fullAnalysis, isAdvanced, legacyData, displaySnippet, internalShowToast]);
 
     const publicUrl = `${appUrl}/snippet/${displaySnippet?.slug || ''}`;
     const cardPageUrl = displaySnippet?.slug ? `${appUrl}/snippet/${displaySnippet.slug}/card?theme=${selectedTheme}` : '';
@@ -647,7 +650,7 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
       return <SkeletonLoader />;
     }
 
-    if (!displaySnippet) {
+    if (!displaySnippet || !legacyData) {
       return <EmptyState />;
     }
 
@@ -662,15 +665,15 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
         <div className="absolute left-[-9999px] top-[-9999px]">
           <CardPreview
             ref={cardRef}
-            title={displaySnippet?.card_title || 'Code Analysis'}
-            summary={displaySnippet?.key_concept || 'Analysis of the provided code snippet.'}
+            title={legacyData.card_title || 'Code Analysis'}
+            summary={legacyData.key_concept || 'Analysis of the provided code snippet.'}
             username={displayUsername || 'Developer'}
-            slug={displaySnippet?.slug || ''}
-            language={displaySnippet?.language || 'javascript'}
+            slug={displaySnippet.slug || ''}
+            language={displaySnippet.language || 'javascript'}
             theme={selectedTheme}
             showCode={true}
-            codeSnippet={displaySnippet?.raw_code || ''}
-            createdAt={displaySnippet?.created_at}
+            codeSnippet={displaySnippet.raw_code || ''}
+            createdAt={displaySnippet.created_at}
             githubUsername={displayGithubUsername || undefined}
             avatarUrl={localAvatarUrl}
           />
@@ -684,18 +687,18 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
               snippet={displaySnippet}
               isAdvanced={isAdvanced}
               quickAnalysisText={quickAnalysisText}
-              analysisText={displaySnippet.what_this_code_does || ''}
-              debugAnalysis={displaySnippet.debug_analysis || ''}
-              optimization={displaySnippet.optimization || ''}
-              keyConcept={displaySnippet.key_concept || ''}
-              cardTitle={displaySnippet.card_title || ''}
+              analysisText={legacyData.what_this_code_does || ''}
+              debugAnalysis={legacyData.debug_analysis || ''}
+              optimization={legacyData.optimization || ''}
+              keyConcept={legacyData.key_concept || ''}
+              cardTitle={legacyData.card_title || ''}
               fullAnalysis={fullAnalysis}
             />
           )}
 
           {activeTab === 'linkedin' && (
             <LinkedInTab
-              linkedinPost={displaySnippet.linkedin_post || ''}
+              linkedinPost={legacyData.linkedin_post || ''}
               shareUrl={publicUrl}
               showToast={internalShowToast}
             />
