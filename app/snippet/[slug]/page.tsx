@@ -228,7 +228,7 @@ export default async function SnippetPage({ params }: PageProps) {
     snippet.audit_result?.scorecard || snippet.audit_result?.verdict);
 
   // 🔥 استخراج متن کامل تحلیل از audit_result
-  let fullAnalysisText = snippet.audit_result?.analysis || '';
+  let fullAnalysisText: string = snippet.audit_result?.analysis || '';
 
   // 🔥 اگر Advanced است و analysis خالی است، از داده‌های ساختاریافته متن بساز
   if (fullAnalysisExists && !fullAnalysisText) {
