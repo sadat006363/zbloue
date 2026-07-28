@@ -14,18 +14,6 @@ import {
   type AnalysisMode,
   type PromptInfo,
 } from '@/types';
-import {
-  LegacyCodeWalkthroughItem,
-  LegacyBugAndRiskyCase,
-  LegacyEdgeCase,
-  LegacyPerformanceAnalysis,
-  LegacySecurityAnalysis,
-  LegacyProductionReadiness,
-  LegacyRecommendedImprovement,
-  LegacySuggestedTest,
-  LegacyScorecard,
-} from '@/types';
-import { canonicalToLegacyResponse } from '@/lib/auditToLegacy';
 
 export const dynamic = 'force-dynamic';
 
@@ -81,17 +69,17 @@ function normalizeLegacyResponse(data: LegacyGenerateResponse): {
   debug_analysis: string;
   optimization: string;
   linkedin_post: string;
-  codeWalkthrough?: LegacyCodeWalkthroughItem[];
+  codeWalkthrough?: any[];
   whatWorksWell?: string[];
-  bugsAndRiskyCases?: LegacyBugAndRiskyCase[];
-  edgeCases?: LegacyEdgeCase[];
-  performanceAnalysis?: LegacyPerformanceAnalysis;
-  securityAnalysis?: LegacySecurityAnalysis;
-  productionReadiness?: LegacyProductionReadiness;
-  recommendedImprovements?: LegacyRecommendedImprovement[];
+  bugsAndRiskyCases?: any[];
+  edgeCases?: any[];
+  performanceAnalysis?: any;
+  securityAnalysis?: any;
+  productionReadiness?: any;
+  recommendedImprovements?: any[];
   improvedCode?: any;
-  suggestedTests?: LegacySuggestedTest[];
-  scorecard?: LegacyScorecard;
+  suggestedTests?: any[];
+  scorecard?: any;
   finalVerdict?: { summary: string; approved: boolean; nextSteps?: string };
 } {
   let analysisText = data.analysis || '';
@@ -144,8 +132,70 @@ function buildPromptInfo(
 }
 
 // ============================================================
-// 🔥 تابع تولید متن تحلیل برای حالت Advanced
+// 🔥 تابع تبدیل audit_result به LegacyGenerateResponse (بدون Adapter)
 // ============================================================
+
+function auditToLegacyResponse(audit: any): LegacyGenerateResponse {
+  if (!audit || typeof audit !== 'object') {
+    return {
+      analysis: '',
+      card_title: 'Code Analysis',
+      key_concept: '',
+      what_this_code_does: '',
+      debug_analysis: '-',
+      optimization: '-',
+      linkedin_post: 'Check out this code analysis! #Zbloue',
+      findings: [],
+      scorecard: undefined,
+      verdict: undefined,
+      executionOverview: undefined,
+      architecturalObservations: [],
+      recommendedActions: [],
+      suggestedTests: [],
+      complexity: undefined,
+      limitations: [],
+      improvedCode: undefined,
+      finalVerdict: undefined,
+      error: undefined,
+    };
+  }
+
+  return {
+    analysis: audit.summary || '',
+    card_title: audit.title || 'Code Analysis',
+    key_concept: audit.summary?.slice(0, 2000) || '',
+    what_this_code_does: audit.executionOverview?.entryPoints?.join(', ') || audit.summary || '',
+    debug_analysis: audit.findings?.length ? `${audit.findings.length} findings` : '-',
+    optimization: audit.recommendedActions?.length
+      ? audit.recommendedActions.map((a: any) => a.title).join('; ')
+      : '-',
+    linkedin_post: audit.linkedinPost || 'Check out this code analysis! #Zbloue',
+    findings: audit.findings || [],
+    scorecard: audit.scorecard || undefined,
+    verdict: audit.verdict || undefined,
+    executionOverview: audit.executionOverview || undefined,
+    architecturalObservations: audit.architecturalObservations || [],
+    recommendedActions: audit.recommendedActions || [],
+    suggestedTests: audit.suggestedTests || [],
+    complexity: audit.complexity || undefined,
+    limitations: audit.limitations || [],
+    improvedCode: audit.improvedCode?.available
+      ? {
+          available: audit.improvedCode.available,
+          code: audit.improvedCode.code || '',
+          notes: audit.improvedCode.notes || '',
+        }
+      : undefined,
+    finalVerdict: audit.verdict
+      ? {
+          summary: audit.verdict.explanation,
+          approved: audit.verdict.status === 'approved' || audit.verdict.status === 'approved-with-suggestions',
+          nextSteps: '',
+        }
+      : undefined,
+    error: undefined,
+  };
+}
 
 function generateAdvancedAnalysisText(audit: any): string {
   const lines: string[] = [];
@@ -196,10 +246,6 @@ function generateAdvancedAnalysisText(audit: any): string {
 
   return lines.join('\n');
 }
-
-// ============================================================
-// 🔥 تابع ساخت audit_result برای Simple/Medium (با analysis)
-// ============================================================
 
 function buildMinimalAuditResult(
   genData: LegacyGenerateResponse,
@@ -319,10 +365,6 @@ export default function HomePage() {
     dispatch({ type: 'SET_ERROR', payload: null });
   }, [dispatch]);
 
-  // ============================================================
-  // 🔥 handleGenerate
-  // ============================================================
-
   const handleGenerate = useCallback(async () => {
     if (!code.trim()) {
       setErrorMessage('Please enter some code to analyze.');
@@ -363,9 +405,8 @@ export default function HomePage() {
       }
 
       let fullAnalysisForOutput = genData;
-
       if (mode === 'advanced' && auditResult) {
-        fullAnalysisForOutput = canonicalToLegacyResponse(auditResult);
+        fullAnalysisForOutput = auditToLegacyResponse(auditResult);
         if (!fullAnalysisForOutput.analysis) {
           fullAnalysisForOutput.analysis = generateAdvancedAnalysisText(auditResult);
         }
@@ -386,9 +427,6 @@ export default function HomePage() {
         throw new Error(saveResult.error || 'Failed to save snippet');
       }
 
-      // ============================================================
-      // 🔥 ساخت SnippetData با ساختار Canonical
-      // ============================================================
       const snippetData: Snippet = {
         id: saveResult.id,
         slug: saveResult.slug,
@@ -396,21 +434,10 @@ export default function HomePage() {
         language,
         is_public: true,
         created_at: new Date().toISOString(),
-
         username: saveResult.username || normalizedUsername,
         github_username: saveResult.github_username ?? normalizedGithubUsername,
         avatar_url: normalizedAvatarUrl,
-        card_image_url: undefined,
-
         audit_result: auditResult,
-
-        card_title: auditResult.title || 'Code Analysis',
-        key_concept: auditResult.summary || '',
-        what_this_code_does: auditResult.executionOverview?.entryPoints?.join(', ') || auditResult.summary || '',
-        linkedin_post: auditResult.linkedinPost || '',
-
-        line_explanations: undefined,
-        generated_prompt: undefined,
       };
 
       const modeKey = mode as 'simple' | 'medium' | 'advanced';
@@ -450,10 +477,6 @@ export default function HomePage() {
       dispatch({ type: 'SET_LOADING', payload: false });
     }
   }, [code, language, mode, username, githubUsername, avatarUrl, dispatch, clearError]);
-
-  // ============================================================
-  // 🔥 handleExplain (با ارسال mode و ذخیره در دیتابیس)
-  // ============================================================
 
   const handleExplain = useCallback(async () => {
     if (!code.trim()) {
@@ -510,10 +533,6 @@ export default function HomePage() {
     }
   }, [code, language, mode, outputs, dispatch, clearError]);
 
-  // ============================================================
-  // 🔥 handleGeneratePrompt (با ارسال mode و ذخیره در دیتابیس)
-  // ============================================================
-
   const handleGeneratePrompt = useCallback(async () => {
     if (!code.trim()) {
       setErrorMessage('Please enter some code to generate a prompt.');
@@ -568,10 +587,6 @@ export default function HomePage() {
       dispatch({ type: 'SET_GENERATING_PROMPT', payload: false });
     }
   }, [code, language, mode, outputs, dispatch, clearError]);
-
-  // ============================================================
-  // Other handlers (Convert, Clear)
-  // ============================================================
 
   const handleConvert = useCallback(async (targetLang: string) => {
     if (!code.trim()) {

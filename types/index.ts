@@ -87,39 +87,37 @@ export interface PromptInfo {
 }
 
 // ============================================================
-// 🔥 Canonical Envelope – فقط فیلدهای پاکت‌نامه در Root
+// 🔥 Canonical-only Envelope (بدون .catchall)
 // ============================================================
 
 export const SnippetSchema = z.object({
+  // ===== شناسه و پاکت‌نامه =====
   id: z.string().uuid(),
   slug: z.string().min(1),
   raw_code: z.string(),
   language: z.string().min(1),
   is_public: z.boolean(),
-  created_at: z.string(), // 🔥 از datetime() به string() تغییر یافت
+  created_at: z.string(),
 
+  // ===== اطلاعات کاربر =====
   username: z.string().optional(),
   github_username: z.string().optional(),
   avatar_url: z.string().url().optional(),
-  card_image_url: z.string().url().optional(),
 
+  // ===== داده‌های تحلیلی (فقط در اینجا) =====
   audit_result: AdvancedAuditResultSchema,
+});
 
-  card_title: z.string().optional(),
-  key_concept: z.string().optional(),
-  what_this_code_does: z.string().optional(),
-  linkedin_post: z.string().optional(),
-
-  line_explanations: z.any().optional(),
-  generated_prompt: z.string().optional(),
-}).catchall(z.any());
+// ============================================================
+// 🔥 استخراج تایپ از شِما
+// ============================================================
 
 export type Snippet = z.infer<typeof SnippetSchema>;
 export type SnippetData = Snippet;
 export const SnippetDataSchema = SnippetSchema;
 
 // ============================================================
-// Legacy types (برای سازگاری با کدهای قدیمی)
+// Legacy types (برای سازگاری با کدهای قدیمی – در صورت لزوم)
 // ============================================================
 
 const LegacyCodeWalkthroughItemSchema = z.object({
@@ -244,6 +242,7 @@ export const LegacyGenerateResponseSchema = z.object({
     .optional(),
   linkedin_post: z.string().optional(),
   error: z.string().optional(),
+
   // فیلدهای تحلیلی اضافی (برای Backward Compatibility)
   findings: z.any().optional(),
   executionOverview: z.any().optional(),

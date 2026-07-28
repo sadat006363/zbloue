@@ -92,8 +92,19 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
     const generatedPrompt = currentOutput?.generatedPrompt ?? '';
     const isAdvanced = mode === 'advanced';
 
-    // 🔥 استخراج audit_result
+    // ============================================================
+    // 🔥 استخراج فیلدها از audit_result به‌صورت مستقیم
+    // ============================================================
     const audit = useMemo(() => snippet?.audit_result || null, [snippet]);
+
+    const cardTitle = useMemo(() => audit?.title || 'Code Analysis', [audit]);
+    const keyConcept = useMemo(() => audit?.summary || '', [audit]);
+    const whatItDoes = useMemo(() => audit?.executionOverview?.entryPoints?.join(', ') || audit?.summary || '', [audit]);
+    const debugAnalysis = useMemo(() => audit?.findings?.length ? `${audit.findings.length} findings` : '-', [audit]);
+    const optimization = useMemo(() => audit?.recommendedActions?.length
+      ? audit.recommendedActions.map((a: any) => a.title).join('; ')
+      : '-', [audit]);
+    const linkedinPost = useMemo(() => audit?.linkedinPost || '', [audit]);
 
     const [activeTab, setActiveTab] = useState<TabType>('explanation');
     const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -421,26 +432,186 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
       try {
         let content = `📊 Code Analysis Report\n`;
         content += `═══════════════════════════════════════\n\n`;
-        content += `📌 Title: ${safeString(audit?.title || fullAnalysis.card_title)}\n\n`;
-        // ... بقیه کد مانند قبل ...
-        // (برای اختصار، بخش‌های قبلی را تکرار نمی‌کنم)
+        content += `📌 Title: ${safeString(cardTitle || fullAnalysis.card_title)}\n\n`;
+        if (fullAnalysis.key_concept) {
+          content += `💡 Key Concept:\n${safeString(fullAnalysis.key_concept)}\n\n`;
+        }
+        if (fullAnalysis.analysis) {
+          content += `📝 Analysis:\n${safeString(fullAnalysis.analysis)}\n\n`;
+        }
+        if (fullAnalysis.codeWalkthrough && fullAnalysis.codeWalkthrough.length > 0) {
+          content += `🧩 Code Walkthrough:\n`;
+          fullAnalysis.codeWalkthrough.forEach((item: LegacyCodeWalkthroughItem) => {
+            content += `  • ${safeString(item.section)}: ${safeString(item.explanation)}\n`;
+          });
+          content += `\n`;
+        }
+        if (fullAnalysis.whatWorksWell && fullAnalysis.whatWorksWell.length > 0) {
+          content += `✅ What Works Well:\n`;
+          fullAnalysis.whatWorksWell.forEach((item: string) => {
+            content += `  • ${safeString(item)}\n`;
+          });
+          content += `\n`;
+        }
+        if (fullAnalysis.bugsAndRiskyCases && fullAnalysis.bugsAndRiskyCases.length > 0) {
+          content += `🐛 Bugs and Risky Cases:\n`;
+          fullAnalysis.bugsAndRiskyCases.forEach((item: LegacyBugAndRiskyCase) => {
+            content += `  • ${safeString(item.issue)}\n`;
+            content += `    Impact: ${safeString(item.impact)}\n`;
+            if (item.example) content += `    Example: ${safeString(item.example)}\n`;
+          });
+          content += `\n`;
+        }
+        if (fullAnalysis.edgeCases && fullAnalysis.edgeCases.length > 0) {
+          content += `🧪 Edge Cases:\n`;
+          fullAnalysis.edgeCases.forEach((item: LegacyEdgeCase) => {
+            content += `  • ${safeString(item.case)}\n`;
+            content += `    Current: ${safeString(item.currentBehavior)}\n`;
+            content += `    Expected: ${safeString(item.expectedBehavior)}\n`;
+            content += `    Risk: ${safeString(item.risk)}\n`;
+          });
+          content += `\n`;
+        }
+        if (fullAnalysis.performanceAnalysis) {
+          content += `⚡ Performance Analysis:\n`;
+          const pa = fullAnalysis.performanceAnalysis;
+          if (pa.timeComplexity && pa.timeComplexity.length > 0) {
+            content += `  Time Complexity:\n`;
+            pa.timeComplexity.forEach((item) => {
+              content += `    • ${safeString(item.target)}: ${safeString(item.complexity)} (${safeString(item.explanation)})\n`;
+            });
+          }
+          if (pa.spaceComplexity && pa.spaceComplexity.length > 0) {
+            content += `  Space Complexity:\n`;
+            pa.spaceComplexity.forEach((item) => {
+              content += `    • ${safeString(item.target)}: ${safeString(item.complexity)} (${safeString(item.explanation)})\n`;
+            });
+          }
+          if (pa.scalabilityNotes && pa.scalabilityNotes.length > 0) {
+            content += `  Scalability Notes:\n`;
+            pa.scalabilityNotes.forEach((item) => {
+              content += `    • ${safeString(item)}\n`;
+            });
+          }
+          content += `\n`;
+        }
+        if (fullAnalysis.securityAnalysis) {
+          content += `🔒 Security Analysis:\n`;
+          content += `  Severity: ${safeString(fullAnalysis.securityAnalysis.severity)}\n`;
+          if (fullAnalysis.securityAnalysis.issues && fullAnalysis.securityAnalysis.issues.length > 0) {
+            content += `  Issues:\n`;
+            fullAnalysis.securityAnalysis.issues.forEach((issue) => {
+              content += `    • ${safeString(issue)}\n`;
+            });
+          }
+          if (fullAnalysis.securityAnalysis.recommendations && fullAnalysis.securityAnalysis.recommendations.length > 0) {
+            content += `  Recommendations:\n`;
+            fullAnalysis.securityAnalysis.recommendations.forEach((rec) => {
+              content += `    • ${safeString(rec)}\n`;
+            });
+          }
+          content += `\n`;
+        }
+        if (fullAnalysis.productionReadiness) {
+          content += `🛡️ Production Readiness:\n`;
+          content += `  Ready: ${fullAnalysis.productionReadiness.isProductionReady ? 'Yes' : 'No'}\n`;
+          if (fullAnalysis.productionReadiness.reasons && fullAnalysis.productionReadiness.reasons.length > 0) {
+            fullAnalysis.productionReadiness.reasons.forEach((reason) => {
+              content += `    • ${safeString(reason)}\n`;
+            });
+          }
+          if (fullAnalysis.productionReadiness.requiredChanges && fullAnalysis.productionReadiness.requiredChanges.length > 0) {
+            content += `  Required Changes:\n`;
+            fullAnalysis.productionReadiness.requiredChanges.forEach((change) => {
+              content += `    • ${safeString(change)}\n`;
+            });
+          }
+          content += `\n`;
+        }
+        if (fullAnalysis.recommendedImprovements && fullAnalysis.recommendedImprovements.length > 0) {
+          content += `🔧 Recommended Improvements:\n`;
+          fullAnalysis.recommendedImprovements.forEach((item: LegacyRecommendedImprovement) => {
+            content += `  • [${safeString(item.priority)}] ${safeString(item.improvement)}\n`;
+            content += `    Reason: ${safeString(item.reason)}\n`;
+          });
+          content += `\n`;
+        }
+        if (fullAnalysis.suggestedTests && fullAnalysis.suggestedTests.length > 0) {
+          content += `🧪 Suggested Tests:\n`;
+          fullAnalysis.suggestedTests.forEach((test: LegacySuggestedTest) => {
+            content += `  • ${safeString(test.name)}\n`;
+            if (test.input) content += `    Input: ${safeString(test.input)}\n`;
+            if (test.expectedOutput) content += `    Expected: ${safeString(test.expectedOutput)}\n`;
+            if (test.type) content += `    Type: ${safeString(test.type)}\n`;
+          });
+          content += `\n`;
+        }
+        if (fullAnalysis.improvedCode && fullAnalysis.improvedCode.available) {
+          content += `✨ Improved Code:\n`;
+          content += `Notes: ${safeString(fullAnalysis.improvedCode.notes)}\n`;
+          content += `${safeString(fullAnalysis.improvedCode.code)}\n\n`;
+        }
+        if (fullAnalysis.scorecard) {
+          content += `📊 Scorecard:\n`;
+          const sc = fullAnalysis.scorecard;
+          content += `  Correctness: ${safeString(sc.correctness)}/10\n`;
+          content += `  Readability: ${safeString(sc.readability)}/10\n`;
+          content += `  Performance: ${safeString(sc.performance)}/10\n`;
+          content += `  Maintainability: ${safeString(sc.maintainability)}/10\n`;
+          content += `  Production Readiness: ${safeString(sc.productionReadiness)}/10\n`;
+          if (sc.security !== undefined) content += `  Security: ${safeString(sc.security)}/10\n`;
+          if (sc.overall !== undefined) content += `  Overall: ${safeString(sc.overall)}/10\n`;
+          content += `\n`;
+        }
+        if (fullAnalysis.finalVerdict) {
+          content += `🏁 Final Verdict:\n`;
+          content += `  Summary: ${safeString(fullAnalysis.finalVerdict.summary)}\n`;
+          content += `  Approved: ${fullAnalysis.finalVerdict.approved ? '✅ Yes' : '❌ No'}\n`;
+          if (fullAnalysis.finalVerdict.nextSteps) {
+            content += `  Next Steps: ${safeString(fullAnalysis.finalVerdict.nextSteps)}\n`;
+          }
+        }
+
         navigator.clipboard.writeText(content).then(() => {
           internalShowToast('✅ Full analysis copied!');
         }).catch(() => {
           internalShowToast('❌ Failed to copy');
         });
       } catch (error) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Copy error:', error);
+        }
         internalShowToast('❌ Failed to copy analysis');
       }
-    }, [fullAnalysis, isAdvanced, audit, internalShowToast]);
+    }, [fullAnalysis, isAdvanced, cardTitle, internalShowToast]);
 
     const downloadAnalysisNew = useCallback(() => {
       if (!fullAnalysis || !isAdvanced) {
         internalShowToast('❌ No analysis to download');
         return;
       }
-      // ... بقیه کد ...
-    }, [fullAnalysis, isAdvanced, internalShowToast]);
+
+      try {
+        let content = `Zbloue - Code Analysis Report\n`;
+        content += `═══════════════════════════════════════\n\n`;
+        content += `📌 Title: ${safeString(cardTitle || fullAnalysis.card_title)}\n\n`;
+        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `code-analysis-${snippet?.slug || Date.now()}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        internalShowToast('✅ Analysis downloaded!');
+      } catch (error) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Download error:', error);
+        }
+        internalShowToast('❌ Failed to download');
+      }
+    }, [fullAnalysis, isAdvanced, cardTitle, snippet, internalShowToast]);
 
     const publicUrl = `${appUrl}/snippet/${snippet?.slug || ''}`;
     const cardPageUrl = snippet?.slug ? `${appUrl}/snippet/${snippet.slug}/card?theme=${selectedTheme}` : '';
@@ -465,8 +636,8 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
         <div className="absolute left-[-9999px] top-[-9999px]">
           <CardPreview
             ref={cardRef}
-            title={audit?.title || 'Code Analysis'}
-            summary={audit?.summary || 'Analysis of the provided code snippet.'}
+            title={cardTitle}
+            summary={keyConcept}
             username={displayUsername || 'Developer'}
             slug={snippet.slug || ''}
             language={snippet.language || 'javascript'}
@@ -487,18 +658,18 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
               snippet={snippet}
               isAdvanced={isAdvanced}
               quickAnalysisText={quickAnalysisText}
-              analysisText={audit?.summary || ''}
-              debugAnalysis={audit?.findings?.length ? `${audit.findings.length} findings` : '-'}
-              optimization={audit?.recommendedActions?.map((a: any) => a.title).join('; ') || '-'}
-              keyConcept={audit?.summary || ''}
-              cardTitle={audit?.title || ''}
+              analysisText={whatItDoes}
+              debugAnalysis={debugAnalysis}
+              optimization={optimization}
+              keyConcept={keyConcept}
+              cardTitle={cardTitle}
               fullAnalysis={fullAnalysis}
             />
           )}
 
           {activeTab === 'linkedin' && (
             <LinkedInTab
-              linkedinPost={audit?.linkedinPost || ''}
+              linkedinPost={linkedinPost}
               shareUrl={publicUrl}
               showToast={internalShowToast}
             />

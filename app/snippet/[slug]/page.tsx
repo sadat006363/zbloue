@@ -24,6 +24,7 @@ import {
   type NormalizedSnippetAudit,
 } from '@/lib/analysis/normalize-snippet-audit';
 import { type LineExplanation } from '@/types';
+import { adaptCanonicalToLegacy } from '@/lib/snippetAdapter';
 
 export const revalidate = 0;
 export const dynamic = 'force-dynamic';
@@ -114,7 +115,7 @@ async function getSnippet(slug: string): Promise<Snippet> {
   });
 
   // ============================================================
-  // 🔥 ساخت candidate با فیلدهای مجاز
+  // 🔥 ساخت candidate با فیلدهای مجاز (فقط پاکت‌نامه)
   // ============================================================
   const candidate = {
     id: data.id ?? '',
@@ -127,17 +128,8 @@ async function getSnippet(slug: string): Promise<Snippet> {
     username: data.username ?? undefined,
     github_username: data.github_username ?? undefined,
     avatar_url: data.avatar_url ?? undefined,
-    card_image_url: data.card_image_url ?? undefined,
 
     audit_result: auditResult,
-
-    card_title: typedAudit.title || 'Code Analysis',
-    key_concept: typedAudit.summary || '',
-    what_this_code_does: typedAudit.executionOverview?.entryPoints?.join(', ') || typedAudit.summary || '',
-    linkedin_post: typedAudit.linkedinPost || '',
-
-    line_explanations: data.line_explanations ?? undefined,
-    generated_prompt: data.generated_prompt ?? undefined,
   };
 
   console.log(`🔍 [SnippetPage] Candidate built, fields:`, Object.keys(candidate));
@@ -187,7 +179,6 @@ export default async function SnippetPage({ params }: PageProps) {
   let snippet: Snippet | null = null;
   let error: Error | null = null;
   let normalizedAudit: NormalizedSnippetAudit | null = null;
-  let validationErrors: any = null;
 
   try {
     snippet = await getSnippet(slug);
@@ -211,10 +202,8 @@ export default async function SnippetPage({ params }: PageProps) {
         if (auditData) {
           snippet = {
             ...snippet,
-            card_title: auditData.title ?? snippet.card_title,
-            key_concept: auditData.summary ?? snippet.key_concept,
-            what_this_code_does: auditData.executionOverview?.entryPoints?.join(', ') ?? snippet.what_this_code_does,
-            linkedin_post: auditData.linkedinPost ?? snippet.linkedin_post,
+            // 🔥 فقط audit_result را نگه می‌داریم
+            audit_result: auditData,
           };
           console.log(`✅ [SnippetPage] Updated snippet with audit data`);
         }
@@ -224,237 +213,150 @@ export default async function SnippetPage({ params }: PageProps) {
     error = err as Error;
     console.error(`❌ [SnippetPage] Error in getSnippet:`, error.message);
     console.error(`❌ [SnippetPage] Stack:`, error.stack);
-
-    if (err instanceof Error && err.message.includes('Snippet data is invalid')) {
-      validationErrors = (err as any).details || err.message;
-    }
   }
 
-  // ============================================================
-  // 🔥 اگر خطایی در getSnippet رخ داده، نمایش خطا
-  // ============================================================
   if (error || !snippet) {
-    console.warn(`⚠️ [SnippetPage] Returning error page with details:`, error?.message);
-
-    return (
-      <main className="min-h-screen bg-[#f8f9fa] flex items-center justify-center p-4">
-        <div className="bg-red-50 border-2 border-red-200 rounded-xl p-8 max-w-2xl w-full">
-          <h2 className="text-2xl font-bold text-red-700 mb-4">❌ خطا در بارگذاری اسنیپت</h2>
-          <div className="bg-white p-4 rounded-lg border border-red-100 mb-4 overflow-auto max-h-[300px]">
-            <p className="text-sm font-mono text-red-600 whitespace-pre-wrap">
-              {error?.message || 'Unknown error'}
-            </p>
-            {validationErrors && (
-              <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap bg-gray-50 p-2 rounded">
-                {typeof validationErrors === 'string'
-                  ? validationErrors
-                  : JSON.stringify(validationErrors, null, 2)}
-              </pre>
-            )}
-          </div>
-          <div className="flex gap-4">
-            <a
-              href="/"
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md transition"
-            >
-              بازگشت به خانه
-            </a>
-            <button
-              onClick={() => window.location.reload()}
-              className="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded-md transition"
-            >
-              تلاش مجدد
-            </button>
-          </div>
-          <p className="text-xs text-gray-500 mt-4">
-            <span className="font-semibold">Slug:</span> {slug}
-          </p>
-          <p className="text-xs text-gray-500 mt-1">
-            <span className="font-semibold">Error:</span> {error?.message}
-          </p>
-        </div>
-      </main>
-    );
+    console.warn(`⚠️ [SnippetPage] Returning 404 - error or no snippet`);
+    notFound();
+    return null;
   }
 
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || '';
+  const shareUrl = `${baseUrl}/snippet/${snippet.slug}`;
+  const highlightedHtml = await highlightCode(snippet.raw_code, snippet.language);
+
   // ============================================================
-  // 🔥 رندر اصلی - با try-catch برای خطاهای رندرینگ
+  // 🔥 استخراج همه داده‌ها از audit_result
   // ============================================================
-  try {
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || '';
-    const shareUrl = `${baseUrl}/snippet/${snippet.slug}`;
-    const highlightedHtml = await highlightCode(snippet.raw_code, snippet.language);
+  const audit = snippet.audit_result as any;
+  const hasAudit = !!audit;
+  const fullAnalysisExists = hasAudit && !!(audit?.findings?.length ||
+    audit?.scorecard || audit?.verdict);
 
-    const hasAudit = !!(snippet.audit_result);
-    const fullAnalysisExists = hasAudit && !!(snippet.audit_result?.findings?.length ||
-      snippet.audit_result?.scorecard || snippet.audit_result?.verdict);
+  const fullAnalysisText = audit?.analysis || '';
+  let finalFullAnalysisText = fullAnalysisText;
+  if (fullAnalysisExists && !finalFullAnalysisText) {
+    finalFullAnalysisText = buildAnalysisTextForAdvanced(audit);
+  }
 
-    const fullAnalysisText = (snippet.audit_result as any)?.analysis || '';
-    let finalFullAnalysisText = fullAnalysisText;
-    if (fullAnalysisExists && !finalFullAnalysisText) {
-      finalFullAnalysisText = buildAnalysisTextForAdvanced(snippet.audit_result);
-    }
+  // 🔥 استخراج فیلدهای نمایشی از audit_result
+  const legacy = adaptCanonicalToLegacy(audit);
 
-    const debugData = {
-      fullAnalysisExists,
-      hasAudit,
-      findings: snippet.audit_result?.findings || [],
-      scorecard_new: snippet.audit_result?.scorecard || null,
-      verdict: snippet.audit_result?.verdict || null,
-      execution_overview: snippet.audit_result?.executionOverview || null,
-      normalizedAudit,
-    };
+  const debugData = {
+    fullAnalysisExists,
+    hasAudit,
+    findings: audit?.findings || [],
+    scorecard_new: audit?.scorecard || null,
+    verdict: audit?.verdict || null,
+    execution_overview: audit?.executionOverview || null,
+    normalizedAudit,
+  };
 
-    const lineExplanations = snippet.line_explanations && Array.isArray(snippet.line_explanations)
-      ? (snippet.line_explanations as LineExplanation[])
-      : [];
+  const lineExplanations = snippet.line_explanations && Array.isArray(snippet.line_explanations)
+    ? (snippet.line_explanations as LineExplanation[])
+    : [];
 
-    console.log(`✅ [SnippetPage] ===== PAGE RENDER SUCCESS =====`);
+  return (
+    <>
+      {process.env.NODE_ENV === 'development' && <DebugLogger data={debugData} />}
+      <main className="min-h-screen bg-[#f8f9fa]">
+        <div className="max-w-5xl mx-auto px-4 py-6 md:py-8">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <SnippetHeader shareUrl={shareUrl} title={legacy.card_title || 'Code Snippet'} />
+            <SnippetJsonDropdown snippet={snippet} />
+          </div>
 
-    return (
-      <>
-        {process.env.NODE_ENV === 'development' && <DebugLogger data={debugData} />}
-        <main className="min-h-screen bg-[#f8f9fa]">
-          <div className="max-w-5xl mx-auto px-4 py-6 md:py-8">
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-              <SnippetHeader shareUrl={shareUrl} title={snippet.card_title || 'Code Snippet'} />
-              <SnippetJsonDropdown snippet={snippet} />
-            </div>
+          <SnippetUserInfo
+            username={snippet.username || 'Anonymous'}
+            githubUsername={snippet.github_username || undefined}
+          />
 
-            <SnippetUserInfo
-              username={snippet.username || 'Anonymous'}
-              githubUsername={snippet.github_username || undefined}
+          <SnippetStatusBar snippet={snippet} />
+          <SnippetShareButtons slug={snippet.slug} title={legacy.card_title || 'Code Snippet'} />
+          <SnippetTabLinks shareUrl={shareUrl} />
+
+          <div id="snippet-code">
+            <SnippetCode
+              code={snippet.raw_code ?? ''}
+              language={snippet.language ?? 'text'}
+              highlightedHtml={highlightedHtml}
             />
+          </div>
 
-            <SnippetStatusBar snippet={snippet} />
-            <SnippetShareButtons slug={snippet.slug} title={snippet.card_title || 'Code Snippet'} />
-            <SnippetTabLinks shareUrl={shareUrl} />
+          <div id="snippet-analysis">
+            <SnippetAnalysis
+              keyConcept={legacy.key_concept}
+              whatItDoes={legacy.what_this_code_does}
+              fullAnalysis={finalFullAnalysisText}
+              auditResult={audit}
+            />
+          </div>
 
-            <div id="snippet-code">
-              <SnippetCode
-                code={snippet.raw_code ?? ''}
-                language={snippet.language ?? 'text'}
-                highlightedHtml={highlightedHtml}
-              />
-            </div>
+          <div id="snippet-debug">
+            <SnippetDebug
+              debugAnalysis={legacy.debug_analysis}
+              optimization={legacy.optimization}
+            />
+          </div>
 
-            <div id="snippet-analysis">
-              <SnippetAnalysis
-                keyConcept={snippet.key_concept}
-                whatItDoes={snippet.what_this_code_does}
-                fullAnalysis={finalFullAnalysisText}
-                auditResult={snippet.audit_result}
-              />
-            </div>
-
-            <div id="snippet-debug">
-              <SnippetDebug
-                debugAnalysis={snippet.audit_result?.findings?.length ? `${snippet.audit_result.findings.length} findings` : '-'}
-                optimization={snippet.audit_result?.recommendedActions?.length
-                  ? snippet.audit_result.recommendedActions.map((a: any) => a.title).join('; ')
-                  : '-'}
-              />
-            </div>
-
-            <div id="snippet-full-analysis">
-              {fullAnalysisExists ? (
-                <SnippetFullAnalysis snippet={snippet} />
-              ) : (
-                <div className="mt-8 pt-6 border-t border-[#313244]">
-                  <div className="bg-[#11111b] p-6 rounded-lg border border-[#313244] text-center">
-                    <p className="text-[#a6adc8] text-sm">
-                      📊 Full analysis is only available in <strong>Advanced</strong> mode.
-                    </p>
-                    <p className="text-[#6c7086] text-xs mt-2">
-                      Switch to Advanced mode to see detailed findings, scorecard, and recommendations.
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div id="snippet-line-by-line" className="mt-8 pt-6 border-t border-[#313244]">
-              {lineExplanations.length > 0 ? (
-                <SnippetLineByLine lineExplanations={lineExplanations} />
-              ) : (
+          <div id="snippet-full-analysis">
+            {fullAnalysisExists ? (
+              <SnippetFullAnalysis snippet={snippet} />
+            ) : (
+              <div className="mt-8 pt-6 border-t border-[#313244]">
                 <div className="bg-[#11111b] p-6 rounded-lg border border-[#313244] text-center">
                   <p className="text-[#a6adc8] text-sm">
-                    📝 No line-by-line explanation generated yet.
+                    📊 Full analysis is only available in <strong>Advanced</strong> mode.
                   </p>
                   <p className="text-[#6c7086] text-xs mt-2">
-                    Click the <span className="font-semibold text-[#89b4fa]">"Explain"</span> button in the editor toolbar to generate line-by-line explanations.
+                    Switch to Advanced mode to see detailed findings, scorecard, and recommendations.
                   </p>
                 </div>
-              )}
-            </div>
-
-            <div id="snippet-prompt" className="mt-8 pt-6 border-t border-[#313244]">
-              {snippet.generated_prompt ? (
-                <SnippetPrompt generatedPrompt={snippet.generated_prompt} />
-              ) : (
-                <div className="bg-[#11111b] p-6 rounded-lg border border-[#313244] text-center">
-                  <p className="text-[#a6adc8] text-sm">
-                    📝 No prompt generated yet.
-                  </p>
-                  <p className="text-[#6c7086] text-xs mt-2">
-                    Click the <span className="font-semibold text-[#89b4fa]">"Generate Prompt"</span> button in the editor toolbar to create a prompt from your code.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {snippet.linkedin_post && (
-              <div id="snippet-linkedin">
-                <SnippetLinkedIn linkedinPost={snippet.linkedin_post} />
               </div>
             )}
-
-            <SnippetFooter appUrl={baseUrl || 'https://zbloue.vercel.app'} />
           </div>
-        </main>
-      </>
-    );
-  } catch (renderError) {
-    // ============================================================
-    // 🔥 اگر خطا در رندرینگ رخ داد، نمایش خطا
-    // ============================================================
-    console.error(`❌ [SnippetPage] RENDER ERROR:`, renderError);
-    const err = renderError as Error;
-    return (
-      <main className="min-h-screen bg-[#f8f9fa] flex items-center justify-center p-4">
-        <div className="bg-red-50 border-2 border-red-200 rounded-xl p-8 max-w-2xl w-full">
-          <h2 className="text-2xl font-bold text-red-700 mb-4">❌ خطا در نمایش اسنیپت</h2>
-          <div className="bg-white p-4 rounded-lg border border-red-100 mb-4 overflow-auto max-h-[300px]">
-            <p className="text-sm font-mono text-red-600 whitespace-pre-wrap">
-              {err.message || 'Unknown render error'}
-            </p>
-            {err.stack && (
-              <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap bg-gray-50 p-2 rounded overflow-auto max-h-[200px]">
-                {err.stack}
-              </pre>
+
+          <div id="snippet-line-by-line" className="mt-8 pt-6 border-t border-[#313244]">
+            {lineExplanations.length > 0 ? (
+              <SnippetLineByLine lineExplanations={lineExplanations} />
+            ) : (
+              <div className="bg-[#11111b] p-6 rounded-lg border border-[#313244] text-center">
+                <p className="text-[#a6adc8] text-sm">
+                  📝 No line-by-line explanation generated yet.
+                </p>
+                <p className="text-[#6c7086] text-xs mt-2">
+                  Click the <span className="font-semibold text-[#89b4fa]">"Explain"</span> button in the editor toolbar to generate line-by-line explanations.
+                </p>
+              </div>
             )}
           </div>
-          <div className="flex gap-4">
-            <a
-              href="/"
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md transition"
-            >
-              بازگشت به خانه
-            </a>
-            <button
-              onClick={() => window.location.reload()}
-              className="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded-md transition"
-            >
-              تلاش مجدد
-            </button>
+
+          <div id="snippet-prompt" className="mt-8 pt-6 border-t border-[#313244]">
+            {snippet.generated_prompt ? (
+              <SnippetPrompt generatedPrompt={snippet.generated_prompt} />
+            ) : (
+              <div className="bg-[#11111b] p-6 rounded-lg border border-[#313244] text-center">
+                <p className="text-[#a6adc8] text-sm">
+                  📝 No prompt generated yet.
+                </p>
+                <p className="text-[#6c7086] text-xs mt-2">
+                  Click the <span className="font-semibold text-[#89b4fa]">"Generate Prompt"</span> button in the editor toolbar to create a prompt from your code.
+                </p>
+              </div>
+            )}
           </div>
-          <p className="text-xs text-gray-500 mt-4">
-            <span className="font-semibold">Slug:</span> {slug}
-          </p>
+
+          {legacy.linkedin_post && (
+            <div id="snippet-linkedin">
+              <SnippetLinkedIn linkedinPost={legacy.linkedin_post} />
+            </div>
+          )}
+
+          <SnippetFooter appUrl={baseUrl || 'https://zbloue.vercel.app'} />
         </div>
       </main>
-    );
-  }
+    </>
+  );
 }
 
 function buildAnalysisTextForAdvanced(audit: any): string {
