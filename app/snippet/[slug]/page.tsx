@@ -129,10 +129,6 @@ async function getSnippet(slug: string): Promise<Snippet> {
     line_explanations: data.line_explanations ?? undefined,
     generated_prompt: data.generated_prompt ?? undefined,
 
-    // ⚠️ تمام فیلدهای تحلیلی زیر حذف شدند (فقط در audit_result هستند):
-    // findings, scorecard_new, suggested_tests_new, execution_overview,
-    // recommended_actions, complexity, summary, debug_analysis, optimization
-
     // فیلدهای Legacy اضافی (برای backward compatibility – در صورت وجود)
     code_walkthrough: data.code_walkthrough ?? undefined,
     what_works_well: data.what_works_well ?? undefined,
@@ -239,9 +235,16 @@ export default async function SnippetPage({ params }: PageProps) {
     fullAnalysisText = buildAnalysisTextForAdvanced(snippet.audit_result);
   }
 
+  // ============================================================
+  // 🔥 اصلاح debugData برای تطابق با نوع DebugLogger
+  // ============================================================
   const debugData = {
     fullAnalysisExists,
     hasAudit,
+    findings: snippet.audit_result?.findings || [],
+    scorecard_new: snippet.audit_result?.scorecard || null,
+    verdict: snippet.audit_result?.verdict || null,
+    execution_overview: snippet.audit_result?.executionOverview || null,
     normalizedAudit,
   };
 
@@ -291,7 +294,6 @@ export default async function SnippetPage({ params }: PageProps) {
           </div>
 
           <div id="snippet-debug">
-            {/* debug_analysis از audit_result استخراج می‌شود */}
             <SnippetDebug
               debugAnalysis={snippet.audit_result?.findings?.length ? `${snippet.audit_result.findings.length} findings` : '-'}
               optimization={snippet.audit_result?.recommendedActions?.length
