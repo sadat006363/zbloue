@@ -90,43 +90,47 @@ export interface PromptInfo {
 // 🔥 Canonical Envelope: فقط فیلدهای پاکت‌نامه در Root
 // ============================================================
 
-export interface Snippet {
+// ---------- 1. تعریف شِمای دقیق برای Snippet ----------
+export const SnippetSchema = z.object({
   // ===== شناسه و پاکت‌نامه =====
-  id: string;
-  slug: string;
-  raw_code: string;
-  language: string;
-  is_public: boolean;
-  created_at: string;
+  id: z.string().uuid(),
+  slug: z.string().min(1),
+  raw_code: z.string(),
+  language: z.string().min(1),
+  is_public: z.boolean(),
+  created_at: z.string().datetime(),
 
   // ===== اطلاعات کاربر =====
-  username?: string;
-  github_username?: string;
-  avatar_url?: string;
-  card_image_url?: string;
+  username: z.string().optional(),
+  github_username: z.string().optional(),
+  avatar_url: z.string().url().optional(),
+  card_image_url: z.string().url().optional(),
 
   // ===== داده‌های تحلیلی (فقط در اینجا) =====
-  audit_result: AdvancedAuditResult;
+  audit_result: AdvancedAuditResultSchema,
 
-  // ===== فیلدهای کمکی (برای نمایش Legacy – از Adapter پر می‌شوند) =====
-  card_title?: string;
-  key_concept?: string;
-  what_this_code_does?: string;
-  linkedin_post?: string;
+  // ===== فیلدهای کمکی (برای نمایش Legacy) =====
+  card_title: z.string().optional(),
+  key_concept: z.string().optional(),
+  what_this_code_does: z.string().optional(),
+  linkedin_post: z.string().optional(),
 
-  // ===== Line-by-line و Prompt (در Root ذخیره می‌شوند) =====
-  line_explanations?: any;
-  generated_prompt?: string;
+  // ===== Line-by-line و Prompt (در Root) =====
+  line_explanations: z.any().optional(), // قابل بهبود با شِمای دقیق‌تر در آینده
+  generated_prompt: z.string().optional(),
+});
 
-  // ⚠️ فیلدهای زیر حذف شدند – فقط در audit_result وجود دارند:
-  // findings, scorecard_new, suggested_tests_new, execution_overview,
-  // recommended_actions, complexity, summary, debug_analysis, optimization
-}
+// ---------- 2. استخراج تایپ از شِما ----------
+export type Snippet = z.infer<typeof SnippetSchema>;
+
+// ---------- 3. استفاده از همان شِما برای اعتبارسنجی داده‌ها ----------
+export const SnippetDataSchema = SnippetSchema;
 
 // ============================================================
 // Legacy types (برای سازگاری با کدهای قدیمی)
 // ============================================================
 
+// ... (بقیه تایپ‌های Legacy و شِمای‌ها مانند قبل) ...
 const LegacyCodeWalkthroughItemSchema = z.object({
   section: z.string(),
   explanation: z.string(),
@@ -227,6 +231,7 @@ export const LegacyGenerateResponseSchema = z.object({
   }).optional(),
   linkedin_post: z.string().optional(),
   error: z.string().optional(),
+  // فیلدهای تحلیلی اضافی (برای Backward Compatibility)
   findings: z.any().optional(),
   executionOverview: z.any().optional(),
   architecturalObservations: z.any().optional(),
