@@ -28,7 +28,7 @@ const supabaseAdmin = createClient(
 
 type UpdateSnippetData = Partial<Pick<
   Snippet,
-  'username' | 'github_username' | 'avatar_url' | 'audit_result'
+  'username' | 'github_username' | 'avatar_url' | 'audit_result' | 'line_explanations' | 'generated_prompt'
 >>;
 
 export const PATCH = withErrorHandlerAndLog(
@@ -78,10 +78,9 @@ export const PATCH = withErrorHandlerAndLog(
     }
 
     // ============================================================
-    // 🔥 🔥 🔥 پشتیبانی از به‌روزرسانی audit_result
+    // 🔥 پشتیبانی از به‌روزرسانی audit_result
     // ============================================================
     if (body.audit_result !== undefined) {
-      // اعتبارسنجی audit_result قبل از ذخیره
       const validated = AdvancedAuditResultSchema.safeParse(body.audit_result);
       if (!validated.success) {
         logger.error('[update-snippet] Invalid audit_result:', validated.error.issues);
@@ -91,6 +90,20 @@ export const PATCH = withErrorHandlerAndLog(
         );
       }
       updateData.audit_result = validated.data;
+    }
+
+    // ============================================================
+    // 🔥 پشتیبانی از به‌روزرسانی line_explanations
+    // ============================================================
+    if (body.line_explanations !== undefined) {
+      updateData.line_explanations = body.line_explanations;
+    }
+
+    // ============================================================
+    // 🔥 پشتیبانی از به‌روزرسانی generated_prompt
+    // ============================================================
+    if (body.generated_prompt !== undefined) {
+      updateData.generated_prompt = body.generated_prompt;
     }
 
     // ============================================================

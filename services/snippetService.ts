@@ -16,6 +16,18 @@ export interface SaveSnippetData {
 }
 
 /**
+ * داده‌های قابل به‌روزرسانی برای Snippet
+ */
+export interface UpdateSnippetData {
+  username?: string | null;
+  github_username?: string | null;
+  avatar_url?: string | null;
+  audit_result?: any;
+  line_explanations?: any; // اضافه شد
+  generated_prompt?: string | null; // اضافه شد
+}
+
+/**
  * سرویس مدیریت Snippetها
  */
 export const snippetService = {
@@ -24,17 +36,11 @@ export const snippetService = {
    * 🔥 فقط audit_result ذخیره می‌شود
    */
   async save(data: SaveSnippetData): Promise<CreateSnippetResponse> {
-    // ============================================================
-    // 🔥 لاگ در سرویس (قبل از ارسال)
-    // ============================================================
     console.log('🔍 [snippetService.save] ===== START =====');
     console.log('🔍 [snippetService.save] audit_result keys:', Object.keys(data.audit_result || {}));
     console.log('🔍 [snippetService.save] Full data keys:', Object.keys(data));
     console.log('🔍 [snippetService.save] ===== END =====');
 
-    // ============================================================
-    // 🔥 فقط فیلدهای ضروری را ارسال می‌کنیم
-    // ============================================================
     const payload = {
       code: data.code,
       language: data.language,
@@ -59,17 +65,9 @@ export const snippetService = {
 
   /**
    * به‌روزرسانی یک Snippet موجود با استفاده از slug
-   * 🔥 پشتیبانی از به‌روزرسانی audit_result و فیلدهای کاربر
+   * 🔥 پشتیبانی از به‌روزرسانی audit_result، line_explanations، generated_prompt و فیلدهای کاربر
    */
-  async update(
-    slug: string,
-    data: {
-      username?: string | null;
-      github_username?: string | null;
-      avatar_url?: string | null;
-      audit_result?: any;
-    }
-  ): Promise<Snippet> {
+  async update(slug: string, data: UpdateSnippetData): Promise<Snippet> {
     const apiKey = process.env.NEXT_PUBLIC_API_KEY || '';
     const response = await fetch(`/api/update-snippet/${slug}`, {
       method: 'PATCH',
