@@ -18,7 +18,7 @@ export interface SnippetCreationContext {
 
 // ============================================================
 // 🔥 تبدیل AdvancedAuditResult به SnippetInsert
-// فقط ستون‌های موجود در دیتابیس را شامل می‌شود
+// فقط ستون‌هایی که در دیتابیس وجود دارند
 // ============================================================
 
 export function toSnippetInsert(
@@ -47,12 +47,9 @@ export function toSnippetInsert(
     // ===== داده‌های تحلیلی =====
     audit_result: audit as any,
 
-    // ===== فیلدهای جانبی (غیرتحلیلی) =====
-    line_explanations: null,
-    generated_prompt: null,
-
-    // ⚠️ card_image_url حذف شد چون در دیتابیس وجود ندارد
-    // ⚠️ تمام ستون‌های Legacy دیگر حذف شدند
+    // ===== فیلدهای جانبی =====
+    // 🔥 line_explanations و generated_prompt حذف شدند
+    // چون در دیتابیس وجود ندارند
   } as SnippetInsert;
 
   return row;
