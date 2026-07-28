@@ -90,7 +90,6 @@ export interface PromptInfo {
 // 🔥 Canonical Envelope: فقط فیلدهای پاکت‌نامه در Root
 // ============================================================
 
-// ---------- 1. تعریف شِمای دقیق برای Snippet ----------
 export const SnippetSchema = z.object({
   // ===== شناسه و پاکت‌نامه =====
   id: z.string().uuid(),
@@ -106,7 +105,7 @@ export const SnippetSchema = z.object({
   avatar_url: z.string().url().optional(),
   card_image_url: z.string().url().optional(),
 
-  // ===== داده‌های تحلیلی (فقط در اینجا) =====
+  // ===== داده‌های تحلیلی (فقط در اینجا) – استفاده از شمای کانونیکال =====
   audit_result: AdvancedAuditResultSchema,
 
   // ===== فیلدهای کمکی (برای نمایش Legacy) =====
@@ -116,21 +115,19 @@ export const SnippetSchema = z.object({
   linkedin_post: z.string().optional(),
 
   // ===== Line-by-line و Prompt (در Root) =====
-  line_explanations: z.any().optional(), // قابل بهبود با شِمای دقیق‌تر در آینده
+  line_explanations: z.any().optional(),
   generated_prompt: z.string().optional(),
 });
 
-// ---------- 2. استخراج تایپ از شِما ----------
 export type Snippet = z.infer<typeof SnippetSchema>;
 
-// ---------- 3. استفاده از همان شِما برای اعتبارسنجی داده‌ها ----------
+// 🔥 استفاده از همان شِمای دقیق برای اعتبارسنجی داده‌های اسنیپت
 export const SnippetDataSchema = SnippetSchema;
 
 // ============================================================
 // Legacy types (برای سازگاری با کدهای قدیمی)
 // ============================================================
 
-// ... (بقیه تایپ‌های Legacy و شِمای‌ها مانند قبل) ...
 const LegacyCodeWalkthroughItemSchema = z.object({
   section: z.string(),
   explanation: z.string(),

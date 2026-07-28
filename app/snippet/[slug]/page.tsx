@@ -177,6 +177,77 @@ async function highlightCode(code: string, language: string): Promise<string> {
 }
 
 // ============================================================
+// 🔥 تابع استخراج متن تحلیل از audit_result
+// ============================================================
+function getFullAnalysisText(audit: any): string {
+  if (!audit) return 'No detailed analysis available.';
+  if (typeof audit.analysis === 'string' && audit.analysis.length > 0) {
+    return audit.analysis;
+  }
+  return buildAnalysisTextForAdvanced(audit);
+}
+
+// ============================================================
+// 🔥 تابع تولید متن تحلیل برای Advanced
+// ============================================================
+function buildAnalysisTextForAdvanced(audit: any): string {
+  if (!audit) return 'No detailed analysis available.';
+
+  const parts: string[] = [];
+
+  if (audit.title) {
+    parts.push(`📌 Title: ${audit.title}`);
+  }
+
+  if (audit.summary) {
+    parts.push(`📝 Summary: ${audit.summary}`);
+    parts.push('');
+  }
+
+  if (audit.findings && audit.findings.length > 0) {
+    parts.push(`🔍 Findings (${audit.findings.length}):`);
+    audit.findings.slice(0, 5).forEach((f: any) => {
+      const confidence = f.confidence || 'unknown';
+      parts.push(`  - [${f.severity}] ${f.title} (${confidence})`);
+      if (f.remediation) {
+        parts.push(`    Fix: ${f.remediation}`);
+      }
+    });
+    if (audit.findings.length > 5) {
+      parts.push(`  ... and ${audit.findings.length - 5} more findings`);
+    }
+    parts.push('');
+  }
+
+  if (audit.scorecard) {
+    const scoreItems = Object.entries(audit.scorecard)
+      .filter(([_, v]: [string, any]) => v?.applicable === true && typeof v?.score === 'number')
+      .map(([k, v]: [string, any]) => `${k}: ${v.score}`);
+    if (scoreItems.length > 0) {
+      parts.push(`📊 Scorecard:\n  ${scoreItems.join('\n  ')}`);
+    }
+    parts.push('');
+  }
+
+  if (audit.verdict) {
+    parts.push(`🏁 Verdict: ${audit.verdict.status}`);
+    if (audit.verdict.explanation) {
+      parts.push(`  ${audit.verdict.explanation}`);
+    }
+    parts.push('');
+  }
+
+  if (audit.limitations && audit.limitations.length > 0) {
+    parts.push(`⚠️ Limitations:`);
+    audit.limitations.slice(0, 3).forEach((lim: string) => {
+      parts.push(`  - ${lim}`);
+    });
+  }
+
+  return parts.join('\n\n') || 'No detailed analysis available.';
+}
+
+// ============================================================
 // 🏠 صفحه اصلی
 // ============================================================
 export default async function SnippetPage({ params }: PageProps) {
@@ -227,13 +298,8 @@ export default async function SnippetPage({ params }: PageProps) {
   const fullAnalysisExists = hasAudit && !!(snippet.audit_result?.findings?.length ||
     snippet.audit_result?.scorecard || snippet.audit_result?.verdict);
 
-  // 🔥 استخراج متن کامل تحلیل از audit_result
-  let fullAnalysisText: string = snippet.audit_result?.analysis || '';
-
-  // 🔥 اگر Advanced است و analysis خالی است، از داده‌های ساختاریافته متن بساز
-  if (fullAnalysisExists && !fullAnalysisText) {
-    fullAnalysisText = buildAnalysisTextForAdvanced(snippet.audit_result);
-  }
+  // 🔥 استخراج متن کامل تحلیل از audit_result با استفاده از تابع کمکی
+  const fullAnalysisText = getFullAnalysisText(snippet.audit_result);
 
   const debugData = {
     fullAnalysisExists,
@@ -363,64 +429,4 @@ export default async function SnippetPage({ params }: PageProps) {
       </main>
     </>
   );
-}
-
-// ============================================================
-// 🔥 تابع تولید متن تحلیل برای Advanced
-// ============================================================
-function buildAnalysisTextForAdvanced(audit: any): string {
-  if (!audit) return 'No detailed analysis available.';
-
-  const parts: string[] = [];
-
-  if (audit.title) {
-    parts.push(`📌 Title: ${audit.title}`);
-  }
-
-  if (audit.summary) {
-    parts.push(`📝 Summary: ${audit.summary}`);
-    parts.push('');
-  }
-
-  if (audit.findings && audit.findings.length > 0) {
-    parts.push(`🔍 Findings (${audit.findings.length}):`);
-    audit.findings.slice(0, 5).forEach((f: any) => {
-      const confidence = f.confidence || 'unknown';
-      parts.push(`  - [${f.severity}] ${f.title} (${confidence})`);
-      if (f.remediation) {
-        parts.push(`    Fix: ${f.remediation}`);
-      }
-    });
-    if (audit.findings.length > 5) {
-      parts.push(`  ... and ${audit.findings.length - 5} more findings`);
-    }
-    parts.push('');
-  }
-
-  if (audit.scorecard) {
-    const scoreItems = Object.entries(audit.scorecard)
-      .filter(([_, v]: [string, any]) => v?.applicable === true && typeof v?.score === 'number')
-      .map(([k, v]: [string, any]) => `${k}: ${v.score}`);
-    if (scoreItems.length > 0) {
-      parts.push(`📊 Scorecard:\n  ${scoreItems.join('\n  ')}`);
-    }
-    parts.push('');
-  }
-
-  if (audit.verdict) {
-    parts.push(`🏁 Verdict: ${audit.verdict.status}`);
-    if (audit.verdict.explanation) {
-      parts.push(`  ${audit.verdict.explanation}`);
-    }
-    parts.push('');
-  }
-
-  if (audit.limitations && audit.limitations.length > 0) {
-    parts.push(`⚠️ Limitations:`);
-    audit.limitations.slice(0, 3).forEach((lim: string) => {
-      parts.push(`  - ${lim}`);
-    });
-  }
-
-  return parts.join('\n\n') || 'No detailed analysis available.';
 }
