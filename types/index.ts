@@ -87,7 +87,7 @@ export interface PromptInfo {
 }
 
 // ============================================================
-// 🔥 Canonical-only Envelope (بدون .catchall)
+// 🔥 Canonical-only Envelope (با فیلدهای جانبی)
 // ============================================================
 
 export const SnippetSchema = z.object({
@@ -106,6 +106,11 @@ export const SnippetSchema = z.object({
 
   // ===== داده‌های تحلیلی (فقط در اینجا) =====
   audit_result: AdvancedAuditResultSchema,
+
+  // ===== فیلدهای جانبی (غیرتحلیلی) =====
+  line_explanations: z.any().optional(),
+  generated_prompt: z.string().optional(),
+  card_image_url: z.string().url().optional(),
 });
 
 // ============================================================
@@ -117,7 +122,7 @@ export type SnippetData = Snippet;
 export const SnippetDataSchema = SnippetSchema;
 
 // ============================================================
-// Legacy types (برای سازگاری با کدهای قدیمی – در صورت لزوم)
+// Legacy types (برای سازگاری با کدهای قدیمی)
 // ============================================================
 
 const LegacyCodeWalkthroughItemSchema = z.object({
