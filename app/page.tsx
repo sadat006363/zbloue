@@ -2,7 +2,8 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import debounce from 'lodash/debounce'; // ← اضافه شده
+import { getCsrfToken } from '@/lib/csrf-client';
+import debounce from 'lodash/debounce';
 import Editor from '@/components/Editor';
 import OutputPanel from '@/components/OutputPanel/OutputPanel';
 import { useAppContext } from '@/context';
@@ -17,7 +18,7 @@ import {
 } from '@/types';
 
 // ============================================================
-// دریافت CSRF Token
+// 🔥 دریافت CSRF Token
 // ============================================================
 
 async function getCsrfToken(): Promise<string> {
@@ -535,6 +536,9 @@ export default function HomePage() {
     dispatch({ type: 'SET_EXPLAINING', payload: true });
 
     try {
+      // 🔥 دریافت CSRF Token
+      const csrfToken = await getCsrfToken();
+
       const explanations = await analysisService.explainLineByLine(code, language, mode);
       const modeKey = mode as 'simple' | 'medium' | 'advanced';
 
@@ -544,7 +548,11 @@ export default function HomePage() {
       if (currentSnippet?.slug) {
         await snippetService.update(currentSnippet.slug, {
           line_explanations: explanations,
+          csrfToken, // ← اضافه شد
         });
+        console.log('✅ Line-by-line explanations saved to database!');
+      } else {
+        console.warn('⚠️ No snippet found to save line-by-line explanations');
       }
 
       const updatedOutput = {
@@ -587,6 +595,9 @@ export default function HomePage() {
     dispatch({ type: 'SET_GENERATING_PROMPT', payload: true });
 
     try {
+      // 🔥 دریافت CSRF Token
+      const csrfToken = await getCsrfToken();
+
       const prompt = await analysisService.generatePrompt(code, language, mode);
       const modeKey = mode as 'simple' | 'medium' | 'advanced';
 
@@ -596,7 +607,11 @@ export default function HomePage() {
       if (currentSnippet?.slug) {
         await snippetService.update(currentSnippet.slug, {
           generated_prompt: prompt,
+          csrfToken, // ← اضافه شد
         });
+        console.log('✅ Generated prompt saved to database!');
+      } else {
+        console.warn('⚠️ No snippet found to save generated prompt');
       }
 
       const updatedOutput = {
@@ -654,7 +669,7 @@ export default function HomePage() {
   const handleClear = useCallback(() => {
     dispatch({ type: 'CLEAR_ALL' });
     clearError();
-    debouncedGenerate.cancel(); // ← لغو debounce در هنگام پاک کردن
+    debouncedGenerate.cancel();
   }, [dispatch, clearError, debouncedGenerate]);
 
   const handleUsernameChange = useCallback((name: string) => {
@@ -721,8 +736,7 @@ export default function HomePage() {
               onExplain={handleExplain}
               onClear={handleClear}
               onGeneratePrompt={handleGeneratePrompt}
-             isGenerating={isGenerating} // ← اضافه کنید
-
+              isGenerating={isGenerating}
             />
           </div>
 

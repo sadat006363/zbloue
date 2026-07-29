@@ -6,7 +6,6 @@ import type { NextRequest } from 'next/server';
 // تنظیمات CORS
 // ============================================================
 
-// لیست دامنه‌های مجاز
 const allowedOrigins = [
   'https://zbloue.vercel.app',
   'https://zbloue.vercel.com',
@@ -14,7 +13,6 @@ const allowedOrigins = [
   'http://localhost:3001',
 ];
 
-// دامنه‌های Wildcard
 const allowedWildcardPatterns = [
   /^https:\/\/.*\.vercel\.app$/,
   /^https:\/\/.*\.vercel\.com$/,
@@ -42,9 +40,11 @@ const securityHeaders = {
     "default-src 'self'",
     "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://vercel.live https://vercel.com",
     "style-src 'self' 'unsafe-inline'",
+    // 🔥 اضافه کردن ui-avatars.com به img-src و connect-src
     "img-src 'self' data: https://ui-avatars.com https://*.supabase.co https://*.vercel.app",
     "font-src 'self'",
-    "connect-src 'self' https://*.supabase.co https://api.openai.com https://api.anthropic.com https://api.groq.com https://*.upstash.com",
+    // 🔥 اضافه کردن ui-avatars.com به connect-src
+    "connect-src 'self' https://ui-avatars.com https://*.supabase.co https://api.openai.com https://api.anthropic.com https://api.groq.com https://*.upstash.com",
     "frame-src 'self'",
     "object-src 'none'",
     "base-uri 'self'",
@@ -52,17 +52,12 @@ const securityHeaders = {
   ].join('; '),
 };
 
-// ============================================================
-// Proxy اصلی (قبلاً middleware)
-// ============================================================
-
 export function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const origin = request.headers.get('origin') || '';
   
   const response = NextResponse.next();
 
-  // ===== CORS برای APIها =====
   if (pathname.startsWith('/api/')) {
     const isAllowed = isOriginAllowed(origin);
     
@@ -83,7 +78,6 @@ export function proxy(request: NextRequest) {
     }
   }
 
-  // ===== هدرهای امنیتی =====
   Object.entries(securityHeaders).forEach(([key, value]) => {
     response.headers.set(key, value);
   });
@@ -92,10 +86,6 @@ export function proxy(request: NextRequest) {
 
   return response;
 }
-
-// ============================================================
-// پیکربندی
-// ============================================================
 
 export const config = {
   matcher: [
