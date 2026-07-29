@@ -1,8 +1,18 @@
 // components/OutputPanel/OutputPanelHeader.tsx
 'use client';
 
-import { TabType } from './OutputPanel';
 import Tooltip from '../common/Tooltip';
+
+export type TabType =
+  | 'explanation'
+  | 'linkedin'
+  | 'preview'
+  | 'analysis'
+  | 'line-by-line'
+  | 'prompt'
+  | 'all-outputs'
+  | 'monitoring'
+  | 'carbon'; // 🔥 تب جدید Carbon
 
 interface OutputPanelHeaderProps {
   activeTab: TabType;
@@ -10,19 +20,65 @@ interface OutputPanelHeaderProps {
 }
 
 const tabs: { id: TabType; label: string; icon: string; tooltip: string }[] = [
-  { id: 'explanation', label: 'Explanation', icon: '📖', tooltip: 'High-level explanation of the code' },
-  { id: 'linkedin', label: 'LinkedIn', icon: '💼', tooltip: 'Ready-to-share LinkedIn post' },
-  { id: 'preview', label: 'Card', icon: '🖼️', tooltip: 'Shareable card preview' },
-  { id: 'analysis', label: 'Analysis', icon: '📊', tooltip: 'Detailed code analysis with findings' },
-  { id: 'line-by-line', label: 'Line by Line', icon: '📝', tooltip: 'Line-by-line code explanation' },
-  { id: 'prompt', label: 'Prompt', icon: '📝', tooltip: 'Generated learning prompt' },
-  { id: 'all-outputs', label: 'All Outputs', icon: '📊', tooltip: 'All outputs in one page' },
-  { id: 'monitoring', label: 'Monitoring', icon: '📊', tooltip: 'System metrics and monitoring dashboard' },
+  {
+    id: 'explanation',
+    label: 'Explanation',
+    icon: '📖',
+    tooltip: 'High-level explanation of the code',
+  },
+  {
+    id: 'linkedin',
+    label: 'LinkedIn',
+    icon: '💼',
+    tooltip: 'Ready-to-share LinkedIn post',
+  },
+  {
+    id: 'preview',
+    label: 'Card',
+    icon: '🖼️',
+    tooltip: 'Shareable card preview',
+  },
+  {
+    id: 'analysis',
+    label: 'Analysis',
+    icon: '📊',
+    tooltip: 'Detailed code analysis with findings',
+  },
+  {
+    id: 'line-by-line',
+    label: 'Line by Line',
+    icon: '📝',
+    tooltip: 'Line-by-line code explanation',
+  },
+  {
+    id: 'prompt',
+    label: 'Prompt',
+    icon: '📝',
+    tooltip: 'Generated learning prompt',
+  },
+  {
+    id: 'all-outputs',
+    label: 'All Outputs',
+    icon: '📊',
+    tooltip: 'All outputs in one page',
+  },
+  {
+    id: 'monitoring',
+    label: 'Monitoring',
+    icon: '📊',
+    tooltip: 'System metrics and monitoring dashboard',
+  },
+  {
+    id: 'carbon',
+    label: 'Carbon',
+    icon: '🎨',
+    tooltip: 'Create beautiful code snapshots',
+  },
 ];
 
-export default function OutputPanelHeader({ 
-  activeTab, 
-  setActiveTab 
+export default function OutputPanelHeader({
+  activeTab,
+  setActiveTab,
 }: OutputPanelHeaderProps) {
   return (
     <div className="flex items-center border-b-2 border-[#d0d0d8] flex-wrap bg-[#f1f3f5] px-2">
