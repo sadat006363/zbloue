@@ -27,7 +27,6 @@ import LineByLineTab from './tabs/LineByLineTab';
 import PromptTab from './tabs/PromptTab';
 import AllOutputsTab from './tabs/AllOutputsTab';
 import MonitoringTab from './tabs/MonitoringTab';
-import { CarbonTab } from '@/components/Carbon/CarbonTab';
 import { useAppContext } from '@/context';
 
 export interface OutputPanelProps {
@@ -48,8 +47,7 @@ export type TabType =
   | 'line-by-line'
   | 'prompt'
   | 'all-outputs'
-  | 'monitoring'
-  | 'carbon';
+  | 'monitoring';
 
 const safeString = (value: unknown): string => {
   if (value === null || value === undefined) return '';
@@ -750,15 +748,6 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
 
           {activeTab === 'monitoring' && (
             <MonitoringTab />
-          )}
-
-          {activeTab === 'carbon' && (
-            <div className="h-full">
-              <CarbonTab
-                initialCode={snippet.raw_code || ''}
-                initialLanguage={snippet.language || 'javascript'}
-              />
-            </div>
           )}
         </div>
       </div>
