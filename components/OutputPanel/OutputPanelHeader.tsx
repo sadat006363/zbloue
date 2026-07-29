@@ -11,77 +11,32 @@ export type TabType =
   | 'line-by-line'
   | 'prompt'
   | 'all-outputs'
-  | 'monitoring'
-  | 'carbon'; // 🔥 تب جدید Carbon
+  | 'monitoring';
 
 interface OutputPanelHeaderProps {
   activeTab: TabType;
   setActiveTab: (tab: TabType) => void;
+  onOpenCarbon?: () => void;
 }
 
 const tabs: { id: TabType; label: string; icon: string; tooltip: string }[] = [
-  {
-    id: 'explanation',
-    label: 'Explanation',
-    icon: '📖',
-    tooltip: 'High-level explanation of the code',
-  },
-  {
-    id: 'linkedin',
-    label: 'LinkedIn',
-    icon: '💼',
-    tooltip: 'Ready-to-share LinkedIn post',
-  },
-  {
-    id: 'preview',
-    label: 'Card',
-    icon: '🖼️',
-    tooltip: 'Shareable card preview',
-  },
-  {
-    id: 'analysis',
-    label: 'Analysis',
-    icon: '📊',
-    tooltip: 'Detailed code analysis with findings',
-  },
-  {
-    id: 'line-by-line',
-    label: 'Line by Line',
-    icon: '📝',
-    tooltip: 'Line-by-line code explanation',
-  },
-  {
-    id: 'prompt',
-    label: 'Prompt',
-    icon: '📝',
-    tooltip: 'Generated learning prompt',
-  },
-  {
-    id: 'all-outputs',
-    label: 'All Outputs',
-    icon: '📊',
-    tooltip: 'All outputs in one page',
-  },
-  {
-    id: 'monitoring',
-    label: 'Monitoring',
-    icon: '📊',
-    tooltip: 'System metrics and monitoring dashboard',
-  },
-  {
-    id: 'carbon',
-    label: 'Carbon',
-    icon: '🎨',
-    tooltip: 'Create beautiful code snapshots',
-  },
+  { id: 'explanation', label: 'Explanation', icon: '📖', tooltip: 'High-level explanation of the code' },
+  { id: 'linkedin', label: 'LinkedIn', icon: '💼', tooltip: 'Ready-to-share LinkedIn post' },
+  { id: 'preview', label: 'Card', icon: '🖼️', tooltip: 'Shareable card preview' },
+  { id: 'analysis', label: 'Analysis', icon: '📊', tooltip: 'Detailed code analysis with findings' },
+  { id: 'line-by-line', label: 'Line by Line', icon: '📝', tooltip: 'Line-by-line code explanation' },
+  { id: 'prompt', label: 'Prompt', icon: '📝', tooltip: 'Generated learning prompt' },
+  { id: 'all-outputs', label: 'All Outputs', icon: '📊', tooltip: 'All outputs in one page' },
+  { id: 'monitoring', label: 'Monitoring', icon: '📊', tooltip: 'System metrics and monitoring dashboard' },
 ];
 
 export default function OutputPanelHeader({
   activeTab,
   setActiveTab,
+  onOpenCarbon,
 }: OutputPanelHeaderProps) {
   return (
-    <div className="flex items-center border-b-2 border-[#d0d0d8] flex-wrap bg-[#f1f3f5] px-2">
+    <div className="flex items-center justify-between border-b-2 border-[#d0d0d8] flex-wrap bg-[#f1f3f5] px-2">
       <div className="flex flex-wrap">
         {tabs.map((tab) => (
           <Tooltip key={tab.id} text={tab.tooltip} position="top">
@@ -98,6 +53,17 @@ export default function OutputPanelHeader({
           </Tooltip>
         ))}
       </div>
+
+      {/* 🔥 دکمه باز کردن Carbon */}
+      <Tooltip text="باز کردن Carbon (ساخت تصویر از کد)" position="top">
+        <button
+          onClick={onOpenCarbon}
+          className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-[#4a86f7] to-[#a855f7] text-white text-sm rounded-md hover:opacity-90 transition"
+        >
+          <span>🎨</span>
+          <span className="hidden sm:inline">Carbon</span>
+        </button>
+      </Tooltip>
     </div>
   );
 }
