@@ -1,7 +1,7 @@
 // components/Carbon/PreviewPanel.tsx
 'use client';
 
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useState } from 'react';
 import { toPng } from 'html-to-image';
 
 interface PreviewPanelProps {
@@ -28,7 +28,6 @@ export function PreviewPanel({
   const previewRef = useRef<HTMLDivElement>(null);
   const [isDownloading, setIsDownloading] = useState(false);
 
-  // تابع دانلود تصویر
   const handleDownload = async () => {
     if (!previewRef.current) return;
     setIsDownloading(true);
@@ -39,7 +38,7 @@ export function PreviewPanel({
         backgroundColor: backgroundColor,
       });
       const link = document.createElement('a');
-      link.download = `code-snippet-${Date.now()}.png`;
+      link.download = `code-snapshot-${Date.now()}.png`;
       link.href = dataUrl;
       link.click();
     } catch (error) {
@@ -49,26 +48,23 @@ export function PreviewPanel({
     }
   };
 
-  // تعیین رنگ متن بر اساس پس‌زمینه
   const isDark = backgroundColor !== '#ffffff' && backgroundColor !== '#fafafa' && backgroundColor !== '#f5f5f5';
 
   return (
     <div className="flex flex-col h-full">
-      {/* نوار ابزار */}
+      {/* Toolbar */}
       <div className="flex items-center justify-between p-2 bg-[#1a1a2e] border-b border-[#313244] rounded-t-lg">
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-[#a6adc8]">📸 پیش‌نمایش</span>
-        </div>
+        <span className="text-xs text-[#a6adc8]">📸 Preview</span>
         <button
           onClick={handleDownload}
           disabled={isDownloading}
           className="px-3 py-1 text-xs bg-[#4a86f7] hover:bg-[#3b6fd4] text-white rounded-md transition disabled:opacity-50"
         >
-          {isDownloading ? '⏳ در حال دانلود...' : '⬇️ دانلود تصویر'}
+          {isDownloading ? '⏳ Downloading...' : '⬇️ Download Image'}
         </button>
       </div>
 
-      {/* پیش‌نمایش */}
+      {/* Preview Content */}
       <div
         ref={previewRef}
         className="flex-1 overflow-auto p-4"
@@ -77,7 +73,7 @@ export function PreviewPanel({
           padding: `${padding}px`,
         }}
       >
-        {/* دکمه‌های پنجره (مثل Carbon) */}
+        {/* Window Controls */}
         {showWindowControls && (
           <div className="flex gap-2 mb-4">
             <div className="w-3 h-3 rounded-full bg-[#ff5f56]" />
@@ -86,17 +82,17 @@ export function PreviewPanel({
           </div>
         )}
 
-        {/* نمایش کد با هایلایت */}
+        {/* Code Display */}
         <div
           className={`font-mono ${isDark ? 'text-[#cdd6f4]' : 'text-[#1a1a2e]'}`}
           style={{ fontSize: `${fontSize}px` }}
         >
           <pre className="whitespace-pre-wrap break-words">
-            {code || '// کد خود را وارد کنید...'}
+            {code || '// Enter your code here...'}
           </pre>
         </div>
 
-        {/* برچسب زبان */}
+        {/* Language Label */}
         <div className="mt-4 text-xs opacity-50" style={{ color: isDark ? '#a6adc8' : '#4a4a6a' }}>
           {language.toUpperCase()} · {code.split('\n').length} lines
         </div>

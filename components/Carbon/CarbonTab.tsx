@@ -13,7 +13,7 @@ interface CarbonTabProps {
 }
 
 export function CarbonTab({
-  initialCode = 'function hello() {\n  console.log("Hello, World!");\n}',
+  initialCode = '// Enter your code here...',
   initialLanguage = 'javascript',
 }: CarbonTabProps) {
   const [code, setCode] = useState(initialCode);
@@ -28,9 +28,9 @@ export function CarbonTab({
 
   return (
     <div className="flex h-full gap-4 p-4 bg-[#0f0f14] rounded-xl">
-      {/* پنل اصلی (ویرایشگر + پیش‌نمایش) */}
+      {/* Main Panel */}
       <div className="flex-1 flex flex-col gap-4">
-        {/* انتخاب زبان */}
+        {/* Language Selector */}
         <div className="flex items-center gap-4">
           <select
             value={language}
@@ -53,11 +53,11 @@ export function CarbonTab({
             onClick={() => setShowSettings(!showSettings)}
             className="px-3 py-1.5 text-sm bg-[#313244] hover:bg-[#45475a] text-[#cdd6f4] rounded-md transition"
           >
-            {showSettings ? '🔽 بستن تنظیمات' : '🔼 باز کردن تنظیمات'}
+            {showSettings ? '🔽 Hide Settings' : '🔼 Show Settings'}
           </button>
         </div>
 
-        {/* ویرایشگر و پیش‌نمایش */}
+        {/* Editor & Preview */}
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-[400px]">
           <div className="border border-[#313244] rounded-lg overflow-hidden">
             <CodeEditor
@@ -84,7 +84,7 @@ export function CarbonTab({
         </div>
       </div>
 
-      {/* پنل تنظیمات (در سمت راست) */}
+      {/* Settings Panel */}
       {showSettings && (
         <div className="w-[280px] flex-shrink-0">
           <SettingsPanel

@@ -1,7 +1,7 @@
 // components/Carbon/SettingsPanel.tsx
 'use client';
 
-import { ChromePicker } from 'react-color';
+import { HexColorPicker } from 'react-colorful';
 import { THEMES } from './themes';
 
 interface SettingsPanelProps {
@@ -35,11 +35,11 @@ export function SettingsPanel({
 }: SettingsPanelProps) {
   return (
     <div className="p-4 space-y-4 bg-[#1a1a2e] rounded-lg border border-[#313244] min-w-[220px] max-h-[500px] overflow-y-auto">
-      <h3 className="text-sm font-semibold text-white">⚙️ تنظیمات</h3>
+      <h3 className="text-sm font-semibold text-white">⚙️ Settings</h3>
 
-      {/* انتخاب تم */}
+      {/* Theme */}
       <div>
-        <label className="text-xs text-[#a6adc8]">تم</label>
+        <label className="text-xs text-[#a6adc8]">Theme</label>
         <select
           value={theme}
           onChange={(e) => setTheme(e.target.value)}
@@ -51,22 +51,21 @@ export function SettingsPanel({
         </select>
       </div>
 
-      {/* انتخاب رنگ پس‌زمینه */}
+      {/* Background Color */}
       <div>
-        <label className="text-xs text-[#a6adc8]">رنگ پس‌زمینه</label>
+        <label className="text-xs text-[#a6adc8]">Background Color</label>
         <div className="mt-1">
-          <ChromePicker
+          <HexColorPicker
             color={backgroundColor}
-            onChange={(color) => setBackgroundColor(color.hex)}
-            disableAlpha
+            onChange={setBackgroundColor}
             className="!w-full"
           />
         </div>
       </div>
 
-      {/* اندازه فونت */}
+      {/* Font Size */}
       <div>
-        <label className="text-xs text-[#a6adc8]">اندازه فونت: {fontSize}px</label>
+        <label className="text-xs text-[#a6adc8]">Font Size: {fontSize}px</label>
         <input
           type="range"
           min={10}
@@ -77,29 +76,29 @@ export function SettingsPanel({
         />
       </div>
 
-      {/* نمایش شماره خطوط */}
+      {/* Show Line Numbers */}
       <label className="flex items-center gap-2 text-xs text-[#a6adc8]">
         <input
           type="checkbox"
           checked={showLineNumbers}
           onChange={(e) => setShowLineNumbers(e.target.checked)}
         />
-        نمایش شماره خطوط
+        Show Line Numbers
       </label>
 
-      {/* نمایش دکمه‌های پنجره */}
+      {/* Show Window Controls */}
       <label className="flex items-center gap-2 text-xs text-[#a6adc8]">
         <input
           type="checkbox"
           checked={showWindowControls}
           onChange={(e) => setShowWindowControls(e.target.checked)}
         />
-        نمایش دکمه‌های پنجره (close, minimize, maximize)
+        Show Window Controls
       </label>
 
       {/* Padding */}
       <div>
-        <label className="text-xs text-[#a6adc8]">فاصله داخلی: {padding}px</label>
+        <label className="text-xs text-[#a6adc8]">Padding: {padding}px</label>
         <input
           type="range"
           min={10}

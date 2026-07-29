@@ -39,6 +39,7 @@ export function CarbonModal({
         className="relative w-full max-w-[95vw] h-[90vh] bg-[#0f0f14] rounded-2xl shadow-2xl overflow-hidden border border-[#313244]"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Close Button */}
         <button
           onClick={onClose}
           className="absolute top-3 right-3 z-10 p-2 rounded-full bg-[#1a1a2e] hover:bg-[#313244] text-[#a6adc8] hover:text-white transition-colors border border-[#313244]"
@@ -49,6 +50,7 @@ export function CarbonModal({
           </svg>
         </button>
 
+        {/* Carbon Editor */}
         <div className="w-full h-full p-4">
           <CarbonTab initialCode={initialCode} initialLanguage={initialLanguage} />
         </div>

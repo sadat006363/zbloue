@@ -95,7 +95,7 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
     const isAdvanced = mode === 'advanced';
 
     // ============================================================
-    // استخراج فیلدها از audit_result
+    // 🔥 استخراج فیلدها از audit_result به‌صورت مستقیم
     // ============================================================
     const audit = useMemo(() => snippet?.audit_result || null, [snippet]);
 
@@ -774,7 +774,7 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
           )}
         </div>
 
-        {/* 🔥 مودال Carbon */}
+        {/* 🔥 Carbon Modal */}
         <CarbonModal
           isOpen={isCarbonModalOpen}
           onClose={() => setIsCarbonModalOpen(false)}
