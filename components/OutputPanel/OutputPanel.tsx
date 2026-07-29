@@ -3,7 +3,6 @@
 
 import { forwardRef, useImperativeHandle, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { toPng } from 'html-to-image';
-import { getCsrfToken } from '@/lib/csrf-client';
 import CardPreview from '../card/CardPreview';
 import { CarbonModal } from '@/components/Carbon/CarbonModal';
 import OutputPanelTabs, { type TabType } from './OutputPanelTabs';
@@ -36,7 +35,7 @@ import {
 } from '@/types';
 
 // ============================================================
-// 🔥 دریافت CSRF Token
+// 🔥 تابع دریافت CSRF Token (محلی - در صورت نیاز)
 // ============================================================
 
 async function getCsrfToken(): Promise<string> {
@@ -164,15 +163,16 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
 
       setIsUpdating(true);
       try {
-        // 🔥 دریافت CSRF Token
-        const csrfToken = await getCsrfToken();
+        // 🔥 خط دریافت CSRF Token حذف شد
+        // const csrfToken = await getCsrfToken();
 
         const response = await fetch(`/api/update-snippet/${snippet.slug}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
             'x-api-key': process.env.NEXT_PUBLIC_API_KEY || '',
-            'x-csrf-token': csrfToken, // ← اضافه شد
+            // 🔥 هدر CSRF Token نیز حذف شد
+            // 'x-csrf-token': csrfToken,
           },
           body: JSON.stringify({
             username: username,

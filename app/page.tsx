@@ -2,7 +2,6 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { getCsrfToken } from '@/lib/csrf-client';
 import debounce from 'lodash/debounce';
 import Editor from '@/components/Editor';
 import OutputPanel from '@/components/OutputPanel/OutputPanel';
@@ -17,26 +16,11 @@ import {
   type PromptInfo,
 } from '@/types';
 
-// ============================================================
-// 🔥 دریافت CSRF Token
-// ============================================================
-
-async function getCsrfToken(): Promise<string> {
-  try {
-    const response = await fetch('/api/csrf-token');
-    if (!response.ok) {
-      throw new Error('Failed to fetch CSRF token');
-    }
-    const data = await response.json();
-    return data.token;
-  } catch (error) {
-    console.error('CSRF token fetch failed:', error);
-    return '';
-  }
-}
+// 🔥 ایمپورت تابع CSRF از فایل مرکزی
+import { getCsrfToken } from '@/lib/csrf-client';
 
 // ============================================================
-// Helper functions
+// Helper functions (بدون تغییر)
 // ============================================================
 
 function safeSlice(value: unknown, start: number, end?: number): string {
@@ -401,7 +385,7 @@ export default function HomePage() {
     dispatch({ type: 'SET_LOADING', payload: true });
 
     try {
-      const csrfToken = await getCsrfToken();
+      const csrfToken = await getCsrfToken(); // ← استفاده از تابع مرکزی
 
       const cleanedCode = cleanCodeForAnalysis(code, language);
 
@@ -536,7 +520,7 @@ export default function HomePage() {
     dispatch({ type: 'SET_EXPLAINING', payload: true });
 
     try {
-      // 🔥 دریافت CSRF Token
+      // 🔥 دریافت CSRF Token از فایل مرکزی
       const csrfToken = await getCsrfToken();
 
       const explanations = await analysisService.explainLineByLine(code, language, mode);
@@ -548,7 +532,7 @@ export default function HomePage() {
       if (currentSnippet?.slug) {
         await snippetService.update(currentSnippet.slug, {
           line_explanations: explanations,
-          csrfToken, // ← اضافه شد
+          csrfToken,
         });
         console.log('✅ Line-by-line explanations saved to database!');
       } else {
@@ -595,7 +579,7 @@ export default function HomePage() {
     dispatch({ type: 'SET_GENERATING_PROMPT', payload: true });
 
     try {
-      // 🔥 دریافت CSRF Token
+      // 🔥 دریافت CSRF Token از فایل مرکزی
       const csrfToken = await getCsrfToken();
 
       const prompt = await analysisService.generatePrompt(code, language, mode);
@@ -607,7 +591,7 @@ export default function HomePage() {
       if (currentSnippet?.slug) {
         await snippetService.update(currentSnippet.slug, {
           generated_prompt: prompt,
-          csrfToken, // ← اضافه شد
+          csrfToken,
         });
         console.log('✅ Generated prompt saved to database!');
       } else {
