@@ -112,12 +112,11 @@ async function getSnippet(slug: string): Promise<Snippet> {
     hasFindings: !!typedAudit.findings,
     hasScorecard: !!typedAudit.scorecard,
     hasVerdict: !!typedAudit.verdict,
-    hasLineExplanations: !!typedAudit.lineExplanations,
-    hasGeneratedPrompt: !!typedAudit.generatedPrompt,
+    hasLineExplanations: !!typedAudit.lineExplanations, // ← 🔥 اضافه شد
   });
 
   // ============================================================
-  // 🔥 ساخت candidate با فیلدهای مجاز (پاکت‌نامه)
+  // 🔥 ساخت candidate با فیلدهای مجاز
   // ============================================================
   const candidate = {
     id: data.id ?? '',
@@ -133,9 +132,8 @@ async function getSnippet(slug: string): Promise<Snippet> {
 
     audit_result: auditResult,
 
-    // 🔥 استخراج line_explanations و generated_prompt از audit_result
-    line_explanations: typedAudit.lineExplanations || [],
-    generated_prompt: typedAudit.generatedPrompt || null,
+    // 🔥 استخراج line_explanations از audit_result
+    line_explanations: auditResult?.lineExplanations || [],
   };
 
   console.log(`🔍 [SnippetPage] Candidate built, fields:`, Object.keys(candidate));
@@ -257,13 +255,12 @@ export default async function SnippetPage({ params }: PageProps) {
     normalizedAudit,
   };
 
-  // 🔥 lineExplanations از audit_result یا از فیلد جداگانه
-  const lineExplanations = (snippet.line_explanations && Array.isArray(snippet.line_explanations))
-    ? (snippet.line_explanations as LineExplanation[])
-    : (audit?.lineExplanations || []);
-
-  // 🔥 generatedPrompt از audit_result یا از فیلد جداگانه
-  const generatedPrompt = snippet.generated_prompt || audit?.generatedPrompt || '';
+  // ============================================================
+  // 🔥 استخراج line_explanations از audit_result (و نه از فیلد جداگانه)
+  // ============================================================
+  const lineExplanations = (audit?.lineExplanations && Array.isArray(audit.lineExplanations))
+    ? (audit.lineExplanations as LineExplanation[])
+    : [];
 
   return (
     <>
@@ -325,6 +322,9 @@ export default async function SnippetPage({ params }: PageProps) {
             )}
           </div>
 
+          {/* ============================================================
+              🔥 Line-by-Line با داده‌های استخراج‌شده از audit_result
+              ============================================================ */}
           <div id="snippet-line-by-line" className="mt-8 pt-6 border-t border-[#313244]">
             {lineExplanations.length > 0 ? (
               <SnippetLineByLine lineExplanations={lineExplanations} />
@@ -341,8 +341,8 @@ export default async function SnippetPage({ params }: PageProps) {
           </div>
 
           <div id="snippet-prompt" className="mt-8 pt-6 border-t border-[#313244]">
-            {generatedPrompt ? (
-              <SnippetPrompt generatedPrompt={generatedPrompt} />
+            {snippet.generated_prompt ? (
+              <SnippetPrompt generatedPrompt={snippet.generated_prompt} />
             ) : (
               <div className="bg-[#11111b] p-6 rounded-lg border border-[#313244] text-center">
                 <p className="text-[#a6adc8] text-sm">
