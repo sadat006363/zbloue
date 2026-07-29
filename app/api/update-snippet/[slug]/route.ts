@@ -17,7 +17,7 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
 type UpdateSnippetData = Partial<Pick<
   Snippet,
-  'username' | 'github_username' | 'avatar_url' | 'audit_result' | 'line_explanations' | 'generated_prompt'
+  'username' | 'github_username' | 'avatar_url' | 'audit_result' | 'generated_prompt'
 >>;
 
 export const PATCH = withCsrfProtection(
@@ -25,7 +25,6 @@ export const PATCH = withCsrfProtection(
     async (req: NextRequest, { params }: { params: Promise<{ slug: string }> }) => {
       const ip = getClientIP(req);
 
-      // ===== Rate Limiter =====
       const rateLimitResult = await rateLimiter(ip);
       if (!rateLimitResult.allowed) {
         logger.warn(`[update-snippet] Rate limit exceeded for IP ${ip}`);
@@ -68,7 +67,7 @@ export const PATCH = withCsrfProtection(
       }
 
       // ============================================================
-      // پشتیبانی از به‌روزرسانی audit_result
+      // 🔥 پشتیبانی از به‌روزرسانی audit_result
       // ============================================================
       if (body.audit_result !== undefined) {
         const validated = AdvancedAuditResultSchema.safeParse(body.audit_result);
@@ -83,17 +82,28 @@ export const PATCH = withCsrfProtection(
       }
 
       // ============================================================
-      // پشتیبانی از به‌روزرسانی line_explanations
-      // ============================================================
-      if (body.line_explanations !== undefined) {
-        updateData.line_explanations = body.line_explanations;
-      }
-
-      // ============================================================
-      // پشتیبانی از به‌روزرسانی generated_prompt
+      // 🔥 پشتیبانی از به‌روزرسانی generated_prompt
       // ============================================================
       if (body.generated_prompt !== undefined) {
         updateData.generated_prompt = body.generated_prompt;
+      }
+
+      // ============================================================
+      // ❌ line_explanations دیگر فیلد جداگانه نیست، در audit_result ذخیره می‌شود
+      // ============================================================
+      // اگر line_explanations به صورت جداگانه ارسال شده بود، آن را نادیده می‌گیریم
+      // و به کاربر پیام می‌دهیم که از audit_result استفاده کند
+      if (body.line_explanations !== undefined) {
+        logger.warn('[update-snippet] line_explanations field is deprecated. Please use audit_result.lineExplanations instead.');
+        // می‌توانیم به‌جای خطا، آن را داخل audit_result ذخیره کنیم
+        // اما برای جلوگیری از سردرگمی، یک خطا برمی‌گردانیم
+        return NextResponse.json(
+          { 
+            error: 'line_explanations field is deprecated. Please use audit_result with lineExplanations field instead.',
+            hint: 'Use: { "audit_result": { ...existingAudit, "lineExplanations": [...] } }'
+          },
+          { status: 400 }
+        );
       }
 
       // ============================================================

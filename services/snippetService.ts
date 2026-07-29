@@ -17,7 +17,7 @@ export interface UpdateSnippetData {
   github_username?: string | null;
   avatar_url?: string | null;
   audit_result?: any;
-  line_explanations?: any;
+  line_explanations?: any; // ← این فیلد دیگر به دیتابیس ارسال نمی‌شود، فقط برای پردازش داخلی
   generated_prompt?: string | null;
   csrfToken?: string;
 }
@@ -66,10 +66,42 @@ export const snippetService = {
       headers['x-csrf-token'] = data.csrfToken;
     }
 
+    // 🔥 آماده‌سازی payload برای ارسال به سرور
+    const payload: any = {};
+
+    // فیلدهای ساده
+    if (data.username !== undefined) payload.username = data.username;
+    if (data.github_username !== undefined) payload.github_username = data.github_username;
+    if (data.avatar_url !== undefined) payload.avatar_url = data.avatar_url;
+    if (data.generated_prompt !== undefined) payload.generated_prompt = data.generated_prompt;
+
+    // 🔥 line_explanations را داخل audit_result ذخیره می‌کنیم
+    if (data.line_explanations !== undefined) {
+      // ابتدا audit_result فعلی را دریافت می‌کنیم
+      const currentSnippet = await snippetService.getBySlug(slug);
+      if (currentSnippet) {
+        const currentAudit = currentSnippet.audit_result || {};
+        payload.audit_result = {
+          ...currentAudit,
+          lineExplanations: data.line_explanations, // ← ذخیره در audit_result
+        };
+      } else {
+        // اگر اسنیپت پیدا نشد، فقط خط‌توضیحات را ذخیره کن
+        payload.audit_result = {
+          lineExplanations: data.line_explanations,
+        };
+      }
+    }
+
+    // اگر audit_result مستقیم ارسال شده باشد
+    if (data.audit_result !== undefined) {
+      payload.audit_result = data.audit_result;
+    }
+
     const response = await fetch(`/api/update-snippet/${slug}`, {
       method: 'PATCH',
       headers,
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     });
 
     const result = await response.json();

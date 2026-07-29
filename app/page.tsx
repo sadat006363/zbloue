@@ -16,11 +16,14 @@ import {
   type PromptInfo,
 } from '@/types';
 
-// 🔥 ایمپورت تابع CSRF از فایل مرکزی
+// ============================================================
+// 🔥 دریافت CSRF Token از فایل مرکزی
+// ============================================================
+
 import { getCsrfToken } from '@/lib/csrf-client';
 
 // ============================================================
-// Helper functions (بدون تغییر)
+// Helper functions
 // ============================================================
 
 function safeSlice(value: unknown, start: number, end?: number): string {
@@ -385,7 +388,7 @@ export default function HomePage() {
     dispatch({ type: 'SET_LOADING', payload: true });
 
     try {
-      const csrfToken = await getCsrfToken(); // ← استفاده از تابع مرکزی
+      const csrfToken = await getCsrfToken();
 
       const cleanedCode = cleanCodeForAnalysis(code, language);
 
@@ -520,7 +523,6 @@ export default function HomePage() {
     dispatch({ type: 'SET_EXPLAINING', payload: true });
 
     try {
-      // 🔥 دریافت CSRF Token از فایل مرکزی
       const csrfToken = await getCsrfToken();
 
       const explanations = await analysisService.explainLineByLine(code, language, mode);
@@ -530,8 +532,15 @@ export default function HomePage() {
       const currentSnippet = currentOutput?.snippet;
 
       if (currentSnippet?.slug) {
+        // 🔥 دریافت audit_result فعلی
+        const currentAudit = currentSnippet.audit_result || {};
+
+        // 🔥 به‌روزرسانی audit_result با lineExplanations
         await snippetService.update(currentSnippet.slug, {
-          line_explanations: explanations,
+          audit_result: {
+            ...currentAudit,
+            lineExplanations: explanations,
+          },
           csrfToken,
         });
         console.log('✅ Line-by-line explanations saved to database!');
@@ -579,7 +588,6 @@ export default function HomePage() {
     dispatch({ type: 'SET_GENERATING_PROMPT', payload: true });
 
     try {
-      // 🔥 دریافت CSRF Token از فایل مرکزی
       const csrfToken = await getCsrfToken();
 
       const prompt = await analysisService.generatePrompt(code, language, mode);
@@ -589,8 +597,15 @@ export default function HomePage() {
       const currentSnippet = currentOutput?.snippet;
 
       if (currentSnippet?.slug) {
+        // 🔥 دریافت audit_result فعلی
+        const currentAudit = currentSnippet.audit_result || {};
+
+        // 🔥 به‌روزرسانی audit_result با generatedPrompt
         await snippetService.update(currentSnippet.slug, {
-          generated_prompt: prompt,
+          audit_result: {
+            ...currentAudit,
+            generatedPrompt: prompt,
+          },
           csrfToken,
         });
         console.log('✅ Generated prompt saved to database!');
