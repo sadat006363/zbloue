@@ -112,10 +112,12 @@ async function getSnippet(slug: string): Promise<Snippet> {
     hasFindings: !!typedAudit.findings,
     hasScorecard: !!typedAudit.scorecard,
     hasVerdict: !!typedAudit.verdict,
+    hasLineExplanations: !!typedAudit.lineExplanations,
+    hasGeneratedPrompt: !!typedAudit.generatedPrompt,
   });
 
   // ============================================================
-  // 🔥 ساخت candidate با فیلدهای مجاز (فقط پاکت‌نامه)
+  // 🔥 ساخت candidate با فیلدهای مجاز (پاکت‌نامه)
   // ============================================================
   const candidate = {
     id: data.id ?? '',
@@ -130,6 +132,10 @@ async function getSnippet(slug: string): Promise<Snippet> {
     avatar_url: data.avatar_url ?? undefined,
 
     audit_result: auditResult,
+
+    // 🔥 استخراج line_explanations و generated_prompt از audit_result
+    line_explanations: typedAudit.lineExplanations || [],
+    generated_prompt: typedAudit.generatedPrompt || null,
   };
 
   console.log(`🔍 [SnippetPage] Candidate built, fields:`, Object.keys(candidate));
@@ -202,7 +208,6 @@ export default async function SnippetPage({ params }: PageProps) {
         if (auditData) {
           snippet = {
             ...snippet,
-            // 🔥 فقط audit_result را نگه می‌داریم
             audit_result: auditData,
           };
           console.log(`✅ [SnippetPage] Updated snippet with audit data`);
@@ -252,9 +257,13 @@ export default async function SnippetPage({ params }: PageProps) {
     normalizedAudit,
   };
 
-  const lineExplanations = snippet.line_explanations && Array.isArray(snippet.line_explanations)
+  // 🔥 lineExplanations از audit_result یا از فیلد جداگانه
+  const lineExplanations = (snippet.line_explanations && Array.isArray(snippet.line_explanations))
     ? (snippet.line_explanations as LineExplanation[])
-    : [];
+    : (audit?.lineExplanations || []);
+
+  // 🔥 generatedPrompt از audit_result یا از فیلد جداگانه
+  const generatedPrompt = snippet.generated_prompt || audit?.generatedPrompt || '';
 
   return (
     <>
@@ -332,8 +341,8 @@ export default async function SnippetPage({ params }: PageProps) {
           </div>
 
           <div id="snippet-prompt" className="mt-8 pt-6 border-t border-[#313244]">
-            {snippet.generated_prompt ? (
-              <SnippetPrompt generatedPrompt={snippet.generated_prompt} />
+            {generatedPrompt ? (
+              <SnippetPrompt generatedPrompt={generatedPrompt} />
             ) : (
               <div className="bg-[#11111b] p-6 rounded-lg border border-[#313244] text-center">
                 <p className="text-[#a6adc8] text-sm">
