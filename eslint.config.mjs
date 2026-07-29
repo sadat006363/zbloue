@@ -1,17 +1,40 @@
+// eslint.config.mjs
 import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 
+// ============================================================
+// قوانین اضافی
+// ============================================================
+
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
-  // Override default ignores of eslint-config-next.
+  
+  // ============================================================
+  // ممنوعیت console.log در Production
+  // ============================================================
+  {
+    rules: {
+      'no-console': ['warn', { 
+        allow: ['warn', 'error']
+      }],
+    },
+  },
+  
+  // ============================================================
+  // نادیده گرفتن فایل‌های خاص
+  // ============================================================
   globalIgnores([
-    // Default ignores of eslint-config-next:
-    ".next/**",
-    "out/**",
-    "build/**",
-    "next-env.d.ts",
+    '.next/**',
+    'out/**',
+    'build/**',
+    'next-env.d.ts',
+    'node_modules/**',
+    '**/*.test.ts',
+    '**/*.test.tsx',
+    '**/*.spec.ts',
+    '**/*.spec.tsx',
   ]),
 ]);
 

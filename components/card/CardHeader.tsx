@@ -1,4 +1,7 @@
+// components/card/CardHeader.tsx
 'use client';
+
+import Image from 'next/image'; // ← اضافه شده
 import { themes, type CardTheme } from './themes';
 
 interface CardHeaderProps {
@@ -9,7 +12,7 @@ interface CardHeaderProps {
   userAvatar?: string;
   interactive?: boolean;
   appUrl?: string;
-  avatarUrl?: string | null; // NEW
+  avatarUrl?: string | null;
 }
 
 export default function CardHeader({
@@ -22,18 +25,21 @@ export default function CardHeader({
   appUrl = '',
   avatarUrl = null,
 }: CardHeaderProps) {
-  // Generate avatar URL: use uploaded avatar if available, otherwise use ui-avatars
+  // Generate avatar URL
   const avatarSrc = avatarUrl || userAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=${colors.accent.replace('#', '')}&color=fff&size=40&bold=true`;
 
   return (
     <div className="flex items-center justify-between z-10">
-      {/* Left: Avatar + Username + GitHub */}
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white/20 flex-shrink-0">
-          <img
+        <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white/20 flex-shrink-0 relative">
+          <Image
             src={avatarSrc}
             alt={username}
+            width={40}
+            height={40}
             className="w-full h-full object-cover"
+            priority={true}
+            unoptimized={avatarSrc.includes('ui-avatars.com')}
           />
         </div>
         <div className="flex flex-col leading-tight">
@@ -56,7 +62,6 @@ export default function CardHeader({
         </div>
       </div>
 
-      {/* Right: Zbloue logo (only in interactive mode) */}
       {interactive && (
         <div className="text-right">
           <span className="text-white/80 text-sm font-semibold">Zbloue</span>

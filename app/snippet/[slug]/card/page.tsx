@@ -1,33 +1,23 @@
+// app/snippet/[slug]/card/page.tsx
+
 import { createClient } from '@supabase/supabase-js';
 import { notFound } from 'next/navigation';
 import CardPreview from '@/components/card/CardPreview';
 import { CardTheme } from '@/components/card/themes';
 import { Metadata } from 'next';
 
-// ============================================================
-// 🔥 جلوگیری از Static Generation در زمان build
-// ============================================================
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-// ============================================================
-// 🔥 Supabase Client با fallback (برای build بدون خطا)
-// ============================================================
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder-url.supabase.co';
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-key';
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-// ============================================================
-// 🔥 Interface برای Props
-// ============================================================
 interface PageProps {
   params: Promise<{ slug: string }>;
   searchParams?: Promise<{ theme?: CardTheme }>;
 }
 
-// ============================================================
-// 🔥 متادیتا (با fallback برای خطا)
-// ============================================================
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
   try {
@@ -45,15 +35,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 }
 
-// ============================================================
-// 🔥 صفحه اصلی کارت (با استفاده از CardPreview)
-// ============================================================
 export default async function CardPage({ params, searchParams }: PageProps) {
   const { slug } = await params;
   const theme = (await searchParams)?.theme || 'blue';
 
   try {
-    // ===== 1. دریافت داده از Supabase (شامل avatar_url) =====
     const { data: snippet, error } = await supabaseAdmin
       .from('snippets')
       .select('*')
@@ -61,15 +47,9 @@ export default async function CardPage({ params, searchParams }: PageProps) {
       .single();
 
     if (error || !snippet) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error('Card fetch error:', error);
-      }
       notFound();
     }
 
-    // ============================================================
-    // 🔥 رندر کارت با کامپوننت CardPreview و ارسال avatarUrl
-    // ============================================================
     return (
       <div className="min-h-screen bg-[#0f0f14] flex items-center justify-center p-4">
         <div className="w-full max-w-[1200px]">
@@ -84,15 +64,12 @@ export default async function CardPage({ params, searchParams }: PageProps) {
             codeSnippet={snippet.raw_code}
             createdAt={snippet.created_at}
             githubUsername={snippet.github_username || undefined}
-            avatarUrl={snippet.avatar_url || null} // ← 🔥 ارسال avatar_url
+            avatarUrl={snippet.avatar_url || null}
           />
         </div>
       </div>
     );
   } catch (error) {
-    if (process.env.NODE_ENV === 'development') {
-      console.error('Error loading card:', error);
-    }
     notFound();
   }
 }

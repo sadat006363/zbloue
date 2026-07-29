@@ -1,9 +1,8 @@
 // components/OutputPanel/tabs/ExplanationTab.tsx
-
 'use client';
 
+import { memo, useMemo, useState, useCallback } from 'react';
 import { safeString } from '@/lib/utils';
-import { useState, useMemo } from 'react';
 import logger from '@/lib/logger';
 
 // ============================================================
@@ -43,7 +42,6 @@ interface Complexity {
   space: string;
   resourceGrowth?: string;
   assumptions?: string[];
-  // Canonical shape
   applicable?: boolean;
   expression?: string;
   explanation?: string;
@@ -71,10 +69,6 @@ interface FullAnalysis {
   [key: string]: unknown;
 }
 
-// ============================================================
-// Component Props
-// ============================================================
-
 interface ExplanationTabProps {
   snippet: any;
   isAdvanced: boolean;
@@ -91,33 +85,21 @@ interface ExplanationTabProps {
 // Helper Functions
 // ============================================================
 
-/**
- * تشخیص اینکه آیا fullAnalysis ساختار Canonical دارد یا Legacy
- */
 function isCanonicalAnalysis(analysis: FullAnalysis | null | undefined): boolean {
   if (!analysis) return false;
   return !!(analysis.findings || analysis.complexity || analysis.verdict);
 }
 
-/**
- * استخراج عنوان از fullAnalysis
- */
 function getTitle(analysis: FullAnalysis | null | undefined, fallback: string): string {
   if (!analysis) return fallback;
   return safeString(analysis.title || analysis.card_title || fallback);
 }
 
-/**
- * استخراج خلاصه از fullAnalysis
- */
 function getSummary(analysis: FullAnalysis | null | undefined): string | null {
   if (!analysis) return null;
   return safeString(analysis.summary || analysis.highLevelSummary || null);
 }
 
-/**
- * 🔥 نرمالایز کردن Findings (پذیرش any به جای unknown)
- */
 function normalizeFindings(findings: unknown): Finding[] {
   if (!Array.isArray(findings)) return [];
   return findings.filter((f): f is Finding => {
@@ -127,9 +109,6 @@ function normalizeFindings(findings: unknown): Finding[] {
   });
 }
 
-/**
- * نرمالایز کردن Complexity
- */
 function normalizeComplexity(complexity: unknown): Complexity | null {
   if (!complexity || typeof complexity !== 'object') return null;
   const c = complexity as Record<string, unknown>;
@@ -155,9 +134,6 @@ function normalizeComplexity(complexity: unknown): Complexity | null {
   return null;
 }
 
-/**
- * نرمالایز کردن Verdict
- */
 function normalizeVerdict(verdict: unknown): Verdict | null {
   if (!verdict || typeof verdict !== 'object') return null;
   const v = verdict as Record<string, unknown>;
@@ -168,10 +144,10 @@ function normalizeVerdict(verdict: unknown): Verdict | null {
 }
 
 // ============================================================
-// Main Component
+// 🔥 کامپوننت اصلی با memo
 // ============================================================
 
-export default function ExplanationTab({
+const ExplanationTab = memo(function ExplanationTab({
   snippet,
   isAdvanced,
   quickAnalysisText,
@@ -216,7 +192,7 @@ export default function ExplanationTab({
   // Get Full Content for Copy/Download
   // ============================================================
 
-  const getFullContent = (): string => {
+  const getFullContent = useCallback((): string => {
     let content = '';
 
     if (isAdvanced && fullAnalysis) {
@@ -274,7 +250,7 @@ export default function ExplanationTab({
     }
 
     return content;
-  };
+  }, [isAdvanced, fullAnalysis, title, summary, normalizedFindings, normalizedComplexity, normalizedVerdict, cardTitle, keyConcept, analysisText, debugAnalysis, optimization]);
 
   const fullContent = getFullContent();
 
@@ -282,7 +258,7 @@ export default function ExplanationTab({
   // Handlers
   // ============================================================
 
-  const handleCopy = async (): Promise<void> => {
+  const handleCopy = useCallback(async (): Promise<void> => {
     try {
       await navigator.clipboard.writeText(fullContent);
       setCopySuccess(true);
@@ -290,9 +266,9 @@ export default function ExplanationTab({
     } catch (error) {
       console.error('Copy failed:', error);
     }
-  };
+  }, [fullContent]);
 
-  const handleDownload = (): void => {
+  const handleDownload = useCallback((): void => {
     const blob = new Blob([fullContent], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -300,19 +276,19 @@ export default function ExplanationTab({
     a.download = `explanation-${snippet?.slug || Date.now()}.txt`;
     a.click();
     URL.revokeObjectURL(url);
-  };
+  }, [fullContent, snippet?.slug]);
 
   // ============================================================
   // Render Helpers
   // ============================================================
 
-  const cleanDuplicateIcons = (text: string): string => {
+  const cleanDuplicateIcons = useCallback((text: string): string => {
     if (!text) return '';
     const iconPattern = /^[📝🐛⚡💡🔍🔧✅🧪🔒💼🖼️📊📌⭐🔬🚨🛡️✨📈🧩🏗️🔧🧪⚠️🏁]\s*/;
     return text.replace(iconPattern, '');
-  };
+  }, []);
 
-  const formatText = (text: string): string => {
+  const formatText = useCallback((text: string): string => {
     if (!text) return '';
     let formatted = text.replace(/^###\s*/gm, '');
     const lines = formatted.split('\n');
@@ -321,9 +297,9 @@ export default function ExplanationTab({
     formatted = formatted.replace(/^-\s*/gm, '• ');
     formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     return formatted;
-  };
+  }, [cleanDuplicateIcons]);
 
-  const renderSection = (title: string, content: string) => {
+  const renderSection = useCallback((title: string, content: string) => {
     if (!content || content === '-') return null;
 
     const iconMap: Record<string, string> = {
@@ -362,9 +338,9 @@ export default function ExplanationTab({
         />
       </div>
     );
-  };
+  }, [cleanDuplicateIcons, formatText]);
 
-  const parseQuickAnalysis = (text: string) => {
+  const parseQuickAnalysis = useCallback((text: string) => {
     if (!text) return null;
     const lines = text.split('\n').filter((line) => line.trim().length > 0);
     const sections: { title: string; content: string }[] = [];
@@ -392,10 +368,22 @@ export default function ExplanationTab({
     }
 
     return sections.length > 0 ? sections : null;
-  };
+  }, []);
 
-  const renderFindings = (findings: Finding[]) => {
+  const renderFindings = useCallback((findings: Finding[]) => {
     if (!findings || findings.length === 0) return null;
+
+    const getBadgeClass = (severity: string) => {
+      const map: Record<string, string> = {
+        critical: 'bg-red-100 text-red-700',
+        high: 'bg-orange-100 text-orange-700',
+        medium: 'bg-yellow-100 text-yellow-700',
+        low: 'bg-blue-100 text-blue-700',
+        info: 'bg-gray-100 text-gray-700',
+      };
+      return map[severity] || map.info;
+    };
+
     return (
       <div className="mt-4 space-y-3">
         <h3 className="font-semibold text-[#4a86f7] flex items-center gap-2">🔍 Findings</h3>
@@ -403,12 +391,7 @@ export default function ExplanationTab({
           <div key={idx} className="bg-[#f8f9fa] p-3 rounded-lg border border-[#d0d0d8]">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-medium text-[#1a1a2e]">{safeString(f.title)}</span>
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                f.severity === 'critical' ? 'bg-red-100 text-red-700' :
-                f.severity === 'high' ? 'bg-orange-100 text-orange-700' :
-                f.severity === 'medium' ? 'bg-yellow-100 text-yellow-700' :
-                'bg-blue-100 text-blue-700'
-              }`}>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getBadgeClass(f.severity)}`}>
                 {safeString(f.severity)}
               </span>
               <span className="text-xs text-[#6c7086]">({safeString(f.confidence)})</span>
@@ -426,9 +409,9 @@ export default function ExplanationTab({
         ))}
       </div>
     );
-  };
+  }, []);
 
-  const renderComplexity = (complexity: Complexity | null) => {
+  const renderComplexity = useCallback((complexity: Complexity | null) => {
     if (!complexity) return null;
     return (
       <div className="mt-4 bg-[#f8f9fa] p-3 rounded-lg border border-[#d0d0d8]">
@@ -445,9 +428,9 @@ export default function ExplanationTab({
         </div>
       </div>
     );
-  };
+  }, []);
 
-  const renderVerdict = (verdict: Verdict | null) => {
+  const renderVerdict = useCallback((verdict: Verdict | null) => {
     if (!verdict) return null;
     const statusColors: Record<string, string> = {
       'not-production-ready': 'bg-red-100 text-red-700',
@@ -469,9 +452,9 @@ export default function ExplanationTab({
         <p className="text-sm text-[#4a4a6a] mt-1">{safeString(verdict.explanation)}</p>
       </div>
     );
-  };
+  }, []);
 
-  const renderLimitations = (limitations: string[] | undefined) => {
+  const renderLimitations = useCallback((limitations: string[] | undefined) => {
     if (!limitations || limitations.length === 0) return null;
     return (
       <div className="mt-4 bg-[#f8f9fa] p-3 rounded-lg border border-[#d0d0d8]">
@@ -483,7 +466,7 @@ export default function ExplanationTab({
         </ul>
       </div>
     );
-  };
+  }, []);
 
   // ============================================================
   // Render
@@ -564,4 +547,8 @@ export default function ExplanationTab({
       )}
     </div>
   );
-}
+});
+
+ExplanationTab.displayName = 'ExplanationTab';
+
+export default ExplanationTab;

@@ -1,7 +1,7 @@
 // components/Editor.tsx
 'use client';
 
-import { useEffect, useCallback, useState, useRef } from 'react';
+import { useEffect, useCallback, useState, useRef, memo } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 import { python } from '@codemirror/lang-python';
@@ -220,15 +220,21 @@ interface EditorProps {
   onClear: () => void;
   onGeneratePrompt: () => void;
   onStop?: () => void;
+  isGenerating?: boolean; // ← اضافه شده برای هماهنگی با Debounce
 }
 
-export default function Editor({
+// ============================================================
+// 🔥 کامپوننت اصلی با memo
+// ============================================================
+
+const Editor = memo(function Editor({
   onGenerate,
   onConvert,
   onExplain,
   onClear,
   onGeneratePrompt,
   onStop,
+  isGenerating = false, // ← مقدار پیش‌فرض
 }: EditorProps) {
   const { state, dispatch } = useAppContext();
   const {
@@ -250,7 +256,7 @@ export default function Editor({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ============================================================
-  // 🔥 توابع dispatch
+  // 🔥 توابع dispatch (پایدار با useCallback)
   // ============================================================
 
   const setCode = useCallback((newCode: string) => {
@@ -302,7 +308,7 @@ export default function Editor({
   }, []);
 
   // ============================================================
-  // 🔥 پردازش فایل آپلود شده
+  // 🔥 پردازش فایل آپلود شده (پایدار با useCallback)
   // ============================================================
 
   const processFile = useCallback((file: File) => {
@@ -341,7 +347,7 @@ export default function Editor({
   }, [setCode, dispatch, detectLanguageFromExtension]);
 
   // ============================================================
-  // 🔥 رویدادهای Drag & Drop
+  // 🔥 رویدادهای Drag & Drop (پایدار با useCallback)
   // ============================================================
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
@@ -419,7 +425,7 @@ export default function Editor({
   }, [code, setCode, onClear]);
 
   // ============================================================
-  // 🔥 دکمه‌های اکشن
+  // 🔥 دکمه‌های اکشن (پایدار با useCallback)
   // ============================================================
 
   const handleExplainClick = useCallback(() => {
@@ -474,10 +480,6 @@ export default function Editor({
     { value: 'advanced', label: 'Advanced', icon: '📕', color: 'bg-red-500', tooltip: 'Deep production-grade audit with concurrency checks' },
   ];
 
-  // ============================================================
-  // 🔥 رندر
-  // ============================================================
-
   return (
     <div
       className="h-full flex flex-col bg-white rounded-xl border border-[#d0d0d8] overflow-hidden shadow-sm relative"
@@ -494,7 +496,7 @@ export default function Editor({
         onChange={handleFileSelected}
       />
 
-      {/* ===== Progress Bar ===== */}
+      {/* Progress Bar */}
       {(isDragging || uploadProgress !== null) && (
         <div className="w-full h-1 bg-[#e8e8f0] relative overflow-hidden z-20">
           <div
@@ -506,9 +508,9 @@ export default function Editor({
         </div>
       )}
 
-      {/* ===== Toolbar Top: Mode & Source Language ===== */}
+      {/* Toolbar Top: Mode & Source Language */}
       <div className="flex flex-col gap-2 p-3 bg-[#f1f3f5] border-b border-[#d0d0d8]">
-        {/* ===== Row 1: Mode Selector ===== */}
+        {/* Row 1: Mode Selector */}
         <div className="flex flex-nowrap items-center gap-2">
           <span className="text-xs font-medium text-[#4a4a6a] whitespace-nowrap">🎯 Mode:</span>
           <div className="flex gap-1">
@@ -535,7 +537,7 @@ export default function Editor({
           </span>
         </div>
 
-        {/* ===== Row 2: Source Language ===== */}
+        {/* Row 2: Source Language */}
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-medium text-[#4a4a6a] whitespace-nowrap">📝 Source Language:</span>
           <select
@@ -552,7 +554,7 @@ export default function Editor({
           <span className="text-xs text-[#6c7086]">(auto-detected)</span>
         </div>
 
-        {/* ===== Row 3: Convert Section ===== */}
+        {/* Row 3: Convert Section */}
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-medium text-[#4a4a6a] whitespace-nowrap">🔄 Target Language:</span>
           <select
@@ -611,15 +613,16 @@ export default function Editor({
         </div>
       </div>
 
-      {/* ===== Action Buttons ===== */}
+      {/* Action Buttons */}
       <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2 bg-[#f8f9fa] border-b border-[#d0d0d8]">
         <div className="flex items-center gap-2 flex-wrap">
-          {/* ===== Generate Button ===== */}
           <Tooltip text="Generate AI-powered code analysis (Ctrl+Enter)" position="top">
             <button
               onClick={onGenerate}
-              disabled={loading || !code.trim()}
-              className="flex items-center gap-1.5 bg-[#4a86f7] hover:bg-[#3b6fd4] text-white font-medium px-4 py-1.5 rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              disabled={loading || !code.trim() || isGenerating}
+              className={`flex items-center gap-1.5 bg-[#4a86f7] hover:bg-[#3b6fd4] text-white font-medium px-4 py-1.5 rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed text-sm ${
+                isGenerating ? 'opacity-70' : ''
+              }`}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -628,7 +631,6 @@ export default function Editor({
             </button>
           </Tooltip>
 
-          {/* ===== Explain Button ===== */}
           <Tooltip text="Generate line-by-line code explanation" position="top">
             <button
               onClick={handleExplainClick}
@@ -643,7 +645,6 @@ export default function Editor({
             </button>
           </Tooltip>
 
-          {/* ===== Prompt Button ===== */}
           <Tooltip text="Generate a learning prompt from your code" position="top">
             <button
               onClick={handleGeneratePromptClick}
@@ -658,7 +659,6 @@ export default function Editor({
             </button>
           </Tooltip>
 
-          {/* ===== Stop Button ===== */}
           {loading && onStop && (
             <Tooltip text="Stop the current generation process" position="top">
               <button
@@ -670,7 +670,6 @@ export default function Editor({
             </Tooltip>
           )}
 
-          {/* ===== Clear Button ===== */}
           {code.trim() && (
             <Tooltip text="Clear all code and results" position="top">
               <button
@@ -692,7 +691,7 @@ export default function Editor({
         </div>
       </div>
 
-      {/* ===== Drop Zone Overlay ===== */}
+      {/* Drop Zone Overlay */}
       {isDragging && (
         <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#4a86f7]/5 backdrop-blur-sm">
           <div className="w-64 h-64 rounded-2xl border-4 border-dashed border-[#4a86f7] bg-white/80 flex flex-col items-center justify-center gap-4 shadow-2xl transition-all duration-300">
@@ -723,7 +722,7 @@ export default function Editor({
         </div>
       )}
 
-      {/* ===== Code Editor ===== */}
+      {/* Code Editor */}
       <div className="flex-1 overflow-hidden bg-[#fafbfc] relative">
         <CodeMirror
           value={code}
@@ -774,4 +773,8 @@ export default function Editor({
       </div>
     </div>
   );
-}
+});
+
+Editor.displayName = 'Editor';
+
+export default Editor;

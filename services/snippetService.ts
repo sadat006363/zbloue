@@ -2,9 +2,6 @@
 
 import { Snippet, CreateSnippetResponse } from '@/types';
 
-/**
- * داده‌های مورد نیاز برای ذخیره‌سازی Snippet جدید
- */
 export interface SaveSnippetData {
   code: string;
   language: string;
@@ -12,11 +9,9 @@ export interface SaveSnippetData {
   github_username?: string | null;
   avatar_url?: string | null;
   audit_result: any;
+  csrfToken?: string;
 }
 
-/**
- * داده‌های قابل به‌روزرسانی برای Snippet
- */
 export interface UpdateSnippetData {
   username?: string | null;
   github_username?: string | null;
@@ -24,20 +19,18 @@ export interface UpdateSnippetData {
   audit_result?: any;
   line_explanations?: any;
   generated_prompt?: string | null;
+  csrfToken?: string;
 }
 
-/**
- * سرویس مدیریت Snippetها
- */
 export const snippetService = {
-  /**
-   * ذخیره‌سازی یک Snippet جدید در دیتابیس
-   */
   async save(data: SaveSnippetData): Promise<CreateSnippetResponse> {
-    console.log('🔍 [snippetService.save] ===== START =====');
-    console.log('🔍 [snippetService.save] audit_result keys:', Object.keys(data.audit_result || {}));
-    console.log('🔍 [snippetService.save] Full data keys:', Object.keys(data));
-    console.log('🔍 [snippetService.save] ===== END =====');
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    if (data.csrfToken) {
+      headers['x-csrf-token'] = data.csrfToken;
+    }
 
     const payload = {
       code: data.code,
@@ -50,7 +43,7 @@ export const snippetService = {
 
     const response = await fetch('/api/create-snippet', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(payload),
     });
 
@@ -61,17 +54,21 @@ export const snippetService = {
     return result;
   },
 
-  /**
-   * به‌روزرسانی یک Snippet موجود با استفاده از slug
-   */
   async update(slug: string, data: UpdateSnippetData): Promise<Snippet> {
     const apiKey = process.env.NEXT_PUBLIC_API_KEY || '';
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+    };
+
+    if (data.csrfToken) {
+      headers['x-csrf-token'] = data.csrfToken;
+    }
+
     const response = await fetch(`/api/update-snippet/${slug}`, {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-      },
+      headers,
       body: JSON.stringify(data),
     });
 
@@ -82,9 +79,6 @@ export const snippetService = {
     return result.data;
   },
 
-  /**
-   * دریافت یک Snippet با slug (در صورت نیاز در سمت کلاینت)
-   */
   async getBySlug(slug: string): Promise<Snippet | null> {
     const response = await fetch(`/api/snippet/${slug}`);
     if (!response.ok) {

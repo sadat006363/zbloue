@@ -1,7 +1,8 @@
 // app/page.tsx
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import debounce from 'lodash/debounce'; // ← اضافه شده
 import Editor from '@/components/Editor';
 import OutputPanel from '@/components/OutputPanel/OutputPanel';
 import { useAppContext } from '@/context';
@@ -15,7 +16,23 @@ import {
   type PromptInfo,
 } from '@/types';
 
-export const dynamic = 'force-dynamic';
+// ============================================================
+// دریافت CSRF Token
+// ============================================================
+
+async function getCsrfToken(): Promise<string> {
+  try {
+    const response = await fetch('/api/csrf-token');
+    if (!response.ok) {
+      throw new Error('Failed to fetch CSRF token');
+    }
+    const data = await response.json();
+    return data.token;
+  } catch (error) {
+    console.error('CSRF token fetch failed:', error);
+    return '';
+  }
+}
 
 // ============================================================
 // Helper functions
@@ -132,7 +149,7 @@ function buildPromptInfo(
 }
 
 // ============================================================
-// 🔥 تابع تبدیل audit_result به LegacyGenerateResponse (بدون Adapter)
+// تبدیل audit_result به LegacyGenerateResponse
 // ============================================================
 
 function auditToLegacyResponse(audit: any): LegacyGenerateResponse {
@@ -359,22 +376,32 @@ export default function HomePage() {
 
   const outputPanelRef = useRef<{ setActiveTab: (tab: any) => void }>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const clearError = useCallback(() => {
     setErrorMessage(null);
     dispatch({ type: 'SET_ERROR', payload: null });
   }, [dispatch]);
 
-  const handleGenerate = useCallback(async () => {
+  // ============================================================
+  // 🔥 تابع اصلی Generate با Debounce
+  // ============================================================
+
+  const generateFn = useCallback(async () => {
     if (!code.trim()) {
       setErrorMessage('Please enter some code to analyze.');
       return;
     }
 
+    if (isGenerating) return;
+
     clearError();
+    setIsGenerating(true);
     dispatch({ type: 'SET_LOADING', payload: true });
 
     try {
+      const csrfToken = await getCsrfToken();
+
       const cleanedCode = cleanCodeForAnalysis(code, language);
 
       if (cleanedCode !== code) {
@@ -385,6 +412,7 @@ export default function HomePage() {
         code: cleanedCode,
         language,
         mode,
+        csrfToken,
       });
 
       if (response.error) {
@@ -419,6 +447,7 @@ export default function HomePage() {
         github_username: normalizedGithubUsername,
         avatar_url: normalizedAvatarUrl,
         audit_result: auditResult,
+        csrfToken,
       };
 
       const saveResult = await snippetService.save(saveData);
@@ -474,9 +503,27 @@ export default function HomePage() {
       setErrorMessage(message);
       dispatch({ type: 'SET_ERROR', payload: message });
     } finally {
+      setIsGenerating(false);
       dispatch({ type: 'SET_LOADING', payload: false });
     }
-  }, [code, language, mode, username, githubUsername, avatarUrl, dispatch, clearError]);
+  }, [code, language, mode, username, githubUsername, avatarUrl, isGenerating, dispatch, clearError]);
+
+  // ============================================================
+  // 🔥 Debounced version of generate
+  // ============================================================
+
+  const debouncedGenerate = useMemo(
+    () => debounce(generateFn, 500, { leading: true, trailing: false }),
+    [generateFn]
+  );
+
+  const handleGenerate = useCallback(() => {
+    debouncedGenerate();
+  }, [debouncedGenerate]);
+
+  // ============================================================
+  // 🔥 توابع دیگر (Explain, Prompt, Convert, Clear)
+  // ============================================================
 
   const handleExplain = useCallback(async () => {
     if (!code.trim()) {
@@ -498,9 +545,6 @@ export default function HomePage() {
         await snippetService.update(currentSnippet.slug, {
           line_explanations: explanations,
         });
-        console.log('✅ Line-by-line explanations saved to database!');
-      } else {
-        console.warn('⚠️ No snippet found to save line-by-line explanations');
       }
 
       const updatedOutput = {
@@ -553,9 +597,6 @@ export default function HomePage() {
         await snippetService.update(currentSnippet.slug, {
           generated_prompt: prompt,
         });
-        console.log('✅ Generated prompt saved to database!');
-      } else {
-        console.warn('⚠️ No snippet found to save generated prompt');
       }
 
       const updatedOutput = {
@@ -613,7 +654,8 @@ export default function HomePage() {
   const handleClear = useCallback(() => {
     dispatch({ type: 'CLEAR_ALL' });
     clearError();
-  }, [dispatch, clearError]);
+    debouncedGenerate.cancel(); // ← لغو debounce در هنگام پاک کردن
+  }, [dispatch, clearError, debouncedGenerate]);
 
   const handleUsernameChange = useCallback((name: string) => {
     dispatch({ type: 'SET_USERNAME', payload: name });
@@ -628,6 +670,10 @@ export default function HomePage() {
     setTimeout(() => dispatch({ type: 'SET_TOAST', payload: null }), 3000);
   }, [dispatch]);
 
+  // ============================================================
+  // 🔥 کلید میانبر Ctrl+Enter با Debounce
+  // ============================================================
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
@@ -638,6 +684,16 @@ export default function HomePage() {
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [handleGenerate]);
+
+  // ============================================================
+  // 🔥 Cleanup Debounce
+  // ============================================================
+
+  useEffect(() => {
+    return () => {
+      debouncedGenerate.cancel();
+    };
+  }, [debouncedGenerate]);
 
   return (
     <main className="min-h-screen bg-[#f8f9fa] p-2 md:p-3">
@@ -665,6 +721,8 @@ export default function HomePage() {
               onExplain={handleExplain}
               onClear={handleClear}
               onGeneratePrompt={handleGeneratePrompt}
+             isGenerating={isGenerating} // ← اضافه کنید
+
             />
           </div>
 

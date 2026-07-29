@@ -1,5 +1,9 @@
+// components/LineByLineExplanation.tsx
 'use client';
-import { useState } from 'react';
+
+import { useState, useMemo, memo } from 'react';
+// 🔥 استفاده از require برای react-window (CommonJS)
+const { FixedSizeList } = require('react-window');
 
 interface LineByLineExplanationProps {
   code: string;
@@ -13,6 +17,75 @@ interface LineByLineExplanationProps {
   onShare?: () => void;
 }
 
+// ============================================================
+// کامپوننت ردیف برای Virtualization
+// ============================================================
+
+interface RowProps {
+  index: number;
+  style: React.CSSProperties;
+  data: {
+    items: any[];
+    hoveredLine: number | null;
+    onLineHover?: (lineNumber: number | null) => void;
+  };
+}
+
+const Row = memo(function Row({ index, style, data }: RowProps) {
+  const item = data.items[index];
+  if (!item) return null;
+
+  const isHovered = data.hoveredLine === item.lineNumber;
+  const lineNumber = item.lineNumber || index + 1;
+
+  return (
+    <div
+      style={style}
+      className={`rounded-xl border transition-all duration-300 ${
+        isHovered
+          ? 'border-[#4a86f7] shadow-lg shadow-[#4a86f7]/20'
+          : 'border-[#313244] hover:border-[#4a86f7]/40'
+      } overflow-hidden mx-1 my-1`}
+      onMouseEnter={() => data.onLineHover?.(lineNumber)}
+      onMouseLeave={() => data.onLineHover?.(null)}
+    >
+      <div
+        className={`flex items-start gap-3 px-4 py-3 ${
+          isHovered ? 'bg-[#0d0d1a]' : 'bg-[#11111b]'
+        }`}
+      >
+        <span className="text-xs text-[#6c7086] select-none font-mono min-w-[32px] text-right">
+          {lineNumber}
+        </span>
+        <pre className="flex-1 font-mono text-sm text-[#cdd6f4] whitespace-pre-wrap break-all leading-relaxed">
+          {item.code || ' '}
+        </pre>
+      </div>
+
+      <div
+        className={`h-[2px] ${
+          isHovered ? 'bg-gradient-to-r from-[#4a86f7] to-[#a855f7]' : 'bg-[#313244]'
+        }`}
+      />
+
+      <div className={`px-4 py-3 ${isHovered ? 'bg-[#1a1a2e]' : 'bg-[#0f0f14]'}`}>
+        <div className="flex items-start gap-2">
+          <span className="text-[#4a86f7] text-sm mt-0.5">💡</span>
+          <p className="text-sm text-[#a6adc8] leading-relaxed">
+            {item.explanation || 'No explanation provided.'}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+});
+
+Row.displayName = 'Row';
+
+// ============================================================
+// کامپوننت اصلی
+// ============================================================
+
 export default function LineByLineExplanation({
   code,
   language,
@@ -24,7 +97,48 @@ export default function LineByLineExplanation({
   onDownload,
   onShare,
 }: LineByLineExplanationProps) {
-  // ===== حالت لودینگ =====
+  const [showShareDropdown, setShowShareDropdown] = useState(false);
+
+  const correctedExplanations = useMemo(() => {
+    if (!code || !explanations || explanations.length === 0) {
+      return explanations || [];
+    }
+
+    const codeLines = code.split('\n');
+    const result: any[] = [];
+    let expIndex = 0;
+    const explanationsCopy = [...explanations];
+
+    for (let i = 0; i < codeLines.length; i++) {
+      const lineNumber = i + 1;
+      const lineContent = codeLines[i];
+      const trimmedLine = lineContent.trim();
+
+      if (trimmedLine === '') {
+        result.push({ lineNumber, code: '', explanation: '' });
+        continue;
+      }
+
+      if (expIndex < explanationsCopy.length) {
+        const exp = explanationsCopy[expIndex];
+        if (exp && exp.code && trimmedLine.includes(exp.code.trim())) {
+          result.push({ ...exp, lineNumber });
+          expIndex++;
+        } else {
+          result.push({
+            lineNumber,
+            code: lineContent,
+            explanation: 'No explanation provided.',
+          });
+        }
+      } else {
+        result.push({ lineNumber, code: lineContent, explanation: '' });
+      }
+    }
+
+    return result;
+  }, [code, explanations]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -34,7 +148,6 @@ export default function LineByLineExplanation({
     );
   }
 
-  // ===== اگر توضیحی وجود نداشته باشد =====
   if (!explanations || explanations.length === 0) {
     return (
       <div className="text-center text-[#4a4a6a] py-8">
@@ -43,18 +156,33 @@ export default function LineByLineExplanation({
     );
   }
 
+  const itemHeight = 120;
+  const maxHeight = 600;
+  const listHeight = Math.min(correctedExplanations.length * itemHeight, maxHeight);
+
+  const handleCopy = () => {
+    if (onCopy) onCopy();
+  };
+
+  const handleDownload = () => {
+    if (onDownload) onDownload();
+  };
+
+  const handleShare = () => {
+    setShowShareDropdown(!showShareDropdown);
+  };
+
   return (
     <div className="space-y-4">
-      {/* ===== هدر و دکمه‌ها (در صورت وجود پراپ‌ها) ===== */}
       {(onCopy || onDownload || onShare) && (
         <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
           <h3 className="text-sm font-semibold text-[#4a86f7]">
-            📝 Line-by-Line Code Explanation
+            📝 Line-by-Line Code Explanation ({correctedExplanations.length} lines)
           </h3>
           <div className="flex items-center gap-2 flex-wrap">
             {onCopy && (
               <button
-                onClick={onCopy}
+                onClick={handleCopy}
                 className="flex items-center gap-1.5 text-sm px-2 py-1 rounded-md transition border border-[#d0d0d8] text-[#4a4a6a] hover:text-[#4a86f7] hover:bg-[#f1f3f5]"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -65,7 +193,7 @@ export default function LineByLineExplanation({
             )}
             {onDownload && (
               <button
-                onClick={onDownload}
+                onClick={handleDownload}
                 className="flex items-center gap-1.5 text-sm px-2 py-1 rounded-md transition border border-[#d0d0d8] text-[#4a4a6a] hover:text-[#4a86f7] hover:bg-[#f1f3f5]"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -76,7 +204,7 @@ export default function LineByLineExplanation({
             )}
             {onShare && (
               <button
-                onClick={onShare}
+                onClick={handleShare}
                 className="flex items-center gap-1.5 text-sm px-2 py-1 rounded-md transition border border-[#d0d0d8] text-[#4a4a6a] hover:text-[#4a86f7] hover:bg-[#f1f3f5]"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -89,57 +217,95 @@ export default function LineByLineExplanation({
         </div>
       )}
 
-      {/* ===== نمایش خطوط به صورت عمودی با شماره‌های دقیق ===== */}
-      <div className="space-y-3">
-        {explanations.map((item, index) => {
-          const isHovered = hoveredLine === item.lineNumber;
-          const lineNumber = item.lineNumber || index + 1;
+      {correctedExplanations.length > 50 ? (
+        <div className="custom-scrollbar">
+          <FixedSizeList
+            height={listHeight}
+            itemCount={correctedExplanations.length}
+            itemSize={itemHeight}
+            width="100%"
+            itemData={{
+              items: correctedExplanations,
+              hoveredLine,
+              onLineHover,
+            }}
+            className="custom-scrollbar"
+          >
+            {Row}
+          </FixedSizeList>
+        </div>
+      ) : (
+        <div className="space-y-3 max-h-[600px] overflow-y-auto custom-scrollbar pr-2">
+          {correctedExplanations.map((item, index) => {
+            const isHovered = hoveredLine === item.lineNumber;
+            const lineNumber = item.lineNumber || index + 1;
 
-          return (
-            <div
-              key={index}
-              className={`rounded-xl border transition-all duration-300 ${
-                isHovered
-                  ? 'border-[#4a86f7] shadow-lg shadow-[#4a86f7]/20'
-                  : 'border-[#313244] hover:border-[#4a86f7]/40'
-              } overflow-hidden`}
-              onMouseEnter={() => onLineHover?.(lineNumber)}
-              onMouseLeave={() => onLineHover?.(null)}
-            >
-              {/* ===== بخش کد (شماره خط + خود کد) ===== */}
+            return (
               <div
-                className={`flex items-start gap-3 px-4 py-3 ${
-                  isHovered ? 'bg-[#0d0d1a]' : 'bg-[#11111b]'
-                }`}
+                key={index}
+                className={`rounded-xl border transition-all duration-300 ${
+                  isHovered
+                    ? 'border-[#4a86f7] shadow-lg shadow-[#4a86f7]/20'
+                    : 'border-[#313244] hover:border-[#4a86f7]/40'
+                } overflow-hidden`}
+                onMouseEnter={() => onLineHover?.(lineNumber)}
+                onMouseLeave={() => onLineHover?.(null)}
               >
-                <span className="text-xs text-[#6c7086] select-none font-mono min-w-[32px] text-right">
-                  {lineNumber}
-                </span>
-                <pre className="flex-1 font-mono text-sm text-[#cdd6f4] whitespace-pre-wrap break-all leading-relaxed">
-                  {item.code || ' '}
-                </pre>
-              </div>
+                <div
+                  className={`flex items-start gap-3 px-4 py-3 ${
+                    isHovered ? 'bg-[#0d0d1a]' : 'bg-[#11111b]'
+                  }`}
+                >
+                  <span className="text-xs text-[#6c7086] select-none font-mono min-w-[32px] text-right">
+                    {lineNumber}
+                  </span>
+                  <pre className="flex-1 font-mono text-sm text-[#cdd6f4] whitespace-pre-wrap break-all leading-relaxed">
+                    {item.code || ' '}
+                  </pre>
+                </div>
 
-              {/* ===== خط جداکننده با گرادیان ===== */}
-              <div className={`h-[2px] ${isHovered ? 'bg-gradient-to-r from-[#4a86f7] to-[#a855f7]' : 'bg-[#313244]'}`} />
+                <div
+                  className={`h-[2px] ${
+                    isHovered
+                      ? 'bg-gradient-to-r from-[#4a86f7] to-[#a855f7]'
+                      : 'bg-[#313244]'
+                  }`}
+                />
 
-              {/* ===== بخش توضیحات ===== */}
-              <div
-                className={`px-4 py-3 ${
-                  isHovered ? 'bg-[#1a1a2e]' : 'bg-[#0f0f14]'
-                }`}
-              >
-                <div className="flex items-start gap-2">
-                  <span className="text-[#4a86f7] text-sm mt-0.5">💡</span>
-                  <p className="text-sm text-[#a6adc8] leading-relaxed">
-                    {item.explanation || 'No explanation provided.'}
-                  </p>
+                <div
+                  className={`px-4 py-3 ${
+                    isHovered ? 'bg-[#1a1a2e]' : 'bg-[#0f0f14]'
+                  }`}
+                >
+                  <div className="flex items-start gap-2">
+                    <span className="text-[#4a86f7] text-sm mt-0.5">💡</span>
+                    <p className="text-sm text-[#a6adc8] leading-relaxed">
+                      {item.explanation || 'No explanation provided.'}
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
+
+      <style jsx>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: #1e1e2e;
+          border-radius: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #4a86f7;
+          border-radius: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #3b6fd4;
+        }
+      `}</style>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 // components/OutputPanel/tabs/AnalysisTab.tsx
 'use client';
 
+import { memo, useMemo, useCallback, useState } from 'react';
 import {
   LegacyGenerateResponse,
   LegacyCodeWalkthroughItem,
@@ -14,7 +15,6 @@ import {
   LegacyScorecard,
 } from '@/types';
 import { safeString } from '@/lib/utils';
-import { useState } from 'react';
 import Tooltip from '@/components/common/Tooltip';
 
 interface AnalysisTabProps {
@@ -25,6 +25,10 @@ interface AnalysisTabProps {
   onCopyFullAnalysis?: () => void;
   onDownloadFullAnalysis?: () => void;
 }
+
+// ============================================================
+// توابع کمکی (خارج از کامپوننت)
+// ============================================================
 
 function formatText(text: string): string {
   if (!text) return '';
@@ -58,7 +62,7 @@ function formatText(text: string): string {
   return text;
 }
 
-const cleanMarkdown = (text: string) => {
+function cleanMarkdown(text: string): string {
   if (!text) return '';
   const formatted = formatText(text);
   if (formatted.startsWith('<pre')) {
@@ -69,9 +73,9 @@ const cleanMarkdown = (text: string) => {
   cleaned = cleaned.replace(/^-\s*/gm, '• ');
   cleaned = cleaned.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
   return cleaned;
-};
+}
 
-const cleanTextForCopy = (text: string) => {
+function cleanTextForCopy(text: string): string {
   if (!text) return '';
   const formatted = formatText(text);
   if (formatted.startsWith('<pre>')) {
@@ -82,11 +86,11 @@ const cleanTextForCopy = (text: string) => {
   cleaned = cleaned.replace(/^-\s*/gm, '• ');
   cleaned = cleaned.replace(/\*\*/g, '');
   return cleaned;
-};
+}
 
-const safeArray = <T,>(arr: T[] | undefined | null): T[] => {
+function safeArray<T>(arr: T[] | undefined | null): T[] {
   return Array.isArray(arr) ? arr : [];
-};
+}
 
 function severityBadge(severity: string): string {
   const map: Record<string, string> = {
@@ -99,7 +103,20 @@ function severityBadge(severity: string): string {
   return map[severity] || map.info;
 }
 
-export default function AnalysisTab({
+function getScoreValue(scoreItem: any): number | null {
+  if (!scoreItem) return null;
+  if (typeof scoreItem === 'number') return scoreItem;
+  if (typeof scoreItem === 'object' && scoreItem !== null) {
+    if (typeof scoreItem.score === 'number') return scoreItem.score;
+  }
+  return null;
+}
+
+// ============================================================
+// 🔥 کامپوننت اصلی با memo
+// ============================================================
+
+const AnalysisTab = memo(function AnalysisTab({
   fullAnalysis,
   isAdvanced,
   quickAnalysisText,
@@ -109,28 +126,56 @@ export default function AnalysisTab({
 }: AnalysisTabProps) {
   const [copySuccess, setCopySuccess] = useState(false);
 
-  const hasFindings = fullAnalysis?.findings && Array.isArray(fullAnalysis.findings) && fullAnalysis.findings.length > 0;
-  const hasExecutionOverview = fullAnalysis?.executionOverview && typeof fullAnalysis.executionOverview === 'object';
-  const hasArchitecturalObservations = fullAnalysis?.architecturalObservations && Array.isArray(fullAnalysis.architecturalObservations) && fullAnalysis.architecturalObservations.length > 0;
-  const hasRecommendedActions = fullAnalysis?.recommendedActions && Array.isArray(fullAnalysis.recommendedActions) && fullAnalysis.recommendedActions.length > 0;
-  const hasComplexity = fullAnalysis?.complexity && typeof fullAnalysis.complexity === 'object';
-  const hasLimitations = fullAnalysis?.limitations && Array.isArray(fullAnalysis.limitations) && fullAnalysis.limitations.length > 0;
-  const hasScorecardNew = fullAnalysis?.scorecard && typeof fullAnalysis.scorecard === 'object';
-  const hasSuggestedTests = fullAnalysis?.suggestedTests && Array.isArray(fullAnalysis.suggestedTests) && fullAnalysis.suggestedTests.length > 0;
-  const hasLinkedInPost = fullAnalysis?.linkedin_post && typeof fullAnalysis.linkedin_post === 'string' && fullAnalysis.linkedin_post.length > 0;
+  // ============================================================
+  // 🔥 محاسبات با useMemo
+  // ============================================================
 
-  const getScoreValue = (scoreItem: any): number | null => {
-    if (!scoreItem) return null;
-    if (typeof scoreItem === 'number') return scoreItem;
-    if (typeof scoreItem === 'object' && scoreItem !== null) {
-      if (typeof scoreItem.score === 'number') return scoreItem.score;
-    }
-    return null;
-  };
+  const hasFindings = useMemo(() => {
+    return fullAnalysis?.findings && Array.isArray(fullAnalysis.findings) && fullAnalysis.findings.length > 0;
+  }, [fullAnalysis?.findings]);
 
-  const scorecardDisplay = hasScorecardNew ? fullAnalysis.scorecard : null;
+  const hasExecutionOverview = useMemo(() => {
+    return fullAnalysis?.executionOverview && typeof fullAnalysis.executionOverview === 'object';
+  }, [fullAnalysis?.executionOverview]);
 
-  const getAnalysisText = () => {
+  const hasArchitecturalObservations = useMemo(() => {
+    return fullAnalysis?.architecturalObservations && Array.isArray(fullAnalysis.architecturalObservations) && fullAnalysis.architecturalObservations.length > 0;
+  }, [fullAnalysis?.architecturalObservations]);
+
+  const hasRecommendedActions = useMemo(() => {
+    return fullAnalysis?.recommendedActions && Array.isArray(fullAnalysis.recommendedActions) && fullAnalysis.recommendedActions.length > 0;
+  }, [fullAnalysis?.recommendedActions]);
+
+  const hasComplexity = useMemo(() => {
+    return fullAnalysis?.complexity && typeof fullAnalysis.complexity === 'object';
+  }, [fullAnalysis?.complexity]);
+
+  const hasLimitations = useMemo(() => {
+    return fullAnalysis?.limitations && Array.isArray(fullAnalysis.limitations) && fullAnalysis.limitations.length > 0;
+  }, [fullAnalysis?.limitations]);
+
+  const hasScorecardNew = useMemo(() => {
+    return fullAnalysis?.scorecard && typeof fullAnalysis.scorecard === 'object';
+  }, [fullAnalysis?.scorecard]);
+
+  const hasSuggestedTests = useMemo(() => {
+    return fullAnalysis?.suggestedTests && Array.isArray(fullAnalysis.suggestedTests) && fullAnalysis.suggestedTests.length > 0;
+  }, [fullAnalysis?.suggestedTests]);
+
+  const hasLinkedInPost = useMemo(() => {
+    return fullAnalysis?.linkedin_post && typeof fullAnalysis.linkedin_post === 'string' && fullAnalysis.linkedin_post.length > 0;
+  }, [fullAnalysis?.linkedin_post]);
+
+  // 🔥 اصلاح: استفاده از optional chaining برای جلوگیری از خطای TypeScript
+  const scorecardDisplay = useMemo(() => {
+    return hasScorecardNew ? fullAnalysis?.scorecard : null;
+  }, [hasScorecardNew, fullAnalysis?.scorecard]);
+
+  // ============================================================
+  // 🔥 توابع با useCallback
+  // ============================================================
+
+  const getAnalysisText = useCallback((): string => {
     if (!fullAnalysis) return '';
 
     let text = '';
@@ -261,9 +306,13 @@ export default function AnalysisTab({
     }
 
     return text;
-  };
+  }, [fullAnalysis, isAdvanced, hasFindings, hasExecutionOverview, hasArchitecturalObservations, hasRecommendedActions, hasComplexity, hasScorecardNew, hasLimitations]);
 
-  const handleCopy = async () => {
+  // ============================================================
+  // 🔥 هندلرها با useCallback
+  // ============================================================
+
+  const handleCopy = useCallback(async () => {
     const text = getAnalysisText();
     try {
       await navigator.clipboard.writeText(text);
@@ -272,9 +321,9 @@ export default function AnalysisTab({
     } catch (error) {
       console.error('Copy failed:', error);
     }
-  };
+  }, [getAnalysisText]);
 
-  const handleDownload = () => {
+  const handleDownload = useCallback(() => {
     const text = getAnalysisText();
     const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -283,13 +332,50 @@ export default function AnalysisTab({
     a.download = `analysis-${snippet?.slug || Date.now()}.txt`;
     a.click();
     URL.revokeObjectURL(url);
-  };
+  }, [getAnalysisText, snippet?.slug]);
 
-  // ===== Advanced Mode =====
+  // ============================================================
+  // 🔥 رندر برای Simple/Medium
+  // ============================================================
+
+  const cleanedText = useMemo(() => {
+    if (!quickAnalysisText) return '';
+    return cleanMarkdown(quickAnalysisText);
+  }, [quickAnalysisText]);
+
+  const cleanedTextForCopy = useMemo(() => {
+    if (!quickAnalysisText) return '';
+    return cleanTextForCopy(quickAnalysisText);
+  }, [quickAnalysisText]);
+
+  const handleCopySimple = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(cleanedTextForCopy);
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    } catch (error) {
+      console.error('Copy failed:', error);
+    }
+  }, [cleanedTextForCopy]);
+
+  const handleDownloadSimple = useCallback(() => {
+    const blob = new Blob([cleanedTextForCopy], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `analysis-${snippet?.slug || Date.now()}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [cleanedTextForCopy, snippet?.slug]);
+
+  // ============================================================
+  // 🔥 رندر اصلی
+  // ============================================================
+
   if (isAdvanced && fullAnalysis) {
     return (
       <div className="space-y-6">
-        {/* ===== Header with Copy & Download Buttons ===== */}
+        {/* Header */}
         <div className="flex justify-end items-center gap-3 pb-2 border-b-2 border-[#e8e8f0]">
           <Tooltip text="Copy full analysis to clipboard" position="top">
             <button
@@ -316,7 +402,7 @@ export default function AnalysisTab({
           </Tooltip>
         </div>
 
-        {/* ===== Content ===== */}
+        {/* Content */}
         <div>
           <h2 className="text-2xl font-bold text-[#1a1a2e]">{safeString(fullAnalysis.card_title || fullAnalysis.title || 'Advanced Analysis')}</h2>
           {fullAnalysis.key_concept && (
@@ -331,13 +417,13 @@ export default function AnalysisTab({
           )}
         </div>
 
-        {/* ===== Findings ===== */}
+        {/* Findings */}
         {hasFindings && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-3">🔍 Findings</h3>
             <div className="space-y-3">
               {fullAnalysis.findings.map((finding: any, idx: number) => (
-                <div key={idx} className="bg-white p-3 rounded-md border border-[#d0d0d8]">
+                <div key={finding.id || idx} className="bg-white p-3 rounded-md border border-[#d0d0d8]">
                   <div className="flex items-start justify-between gap-2 flex-wrap">
                     <span className="text-sm font-semibold text-[#1a1a2e]">{safeString(finding.id)}</span>
                     <span className={`text-xs px-2 py-0.5 rounded-full ${severityBadge(finding.severity)}`}>
@@ -383,7 +469,7 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* ===== Execution Overview ===== */}
+        {/* Execution Overview */}
         {hasExecutionOverview && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-2">⚡ Execution Overview</h3>
@@ -422,7 +508,7 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* ===== Architectural Observations ===== */}
+        {/* Architectural Observations */}
         {hasArchitecturalObservations && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-2">🏗️ Architectural Observations</h3>
@@ -440,7 +526,7 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* ===== Recommended Actions ===== */}
+        {/* Recommended Actions */}
         {hasRecommendedActions && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-2">🔧 Recommended Actions</h3>
@@ -466,7 +552,7 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* ===== Complexity ===== */}
+        {/* Complexity */}
         {hasComplexity && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-2">📈 Complexity</h3>
@@ -505,7 +591,7 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* ===== Suggested Tests ===== */}
+        {/* Suggested Tests */}
         {hasSuggestedTests && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-2">🧪 Suggested Tests</h3>
@@ -564,7 +650,7 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* ===== Code Walkthrough ===== */}
+        {/* Code Walkthrough */}
         {safeArray(fullAnalysis.codeWalkthrough).length > 0 && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-2">🧩 Code Walkthrough</h3>
@@ -577,7 +663,7 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* ===== What Works Well ===== */}
+        {/* What Works Well */}
         {safeArray(fullAnalysis.whatWorksWell).length > 0 && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#43a047] mb-2">✅ What Works Well</h3>
@@ -587,7 +673,7 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* ===== Bugs and Risky Cases ===== */}
+        {/* Bugs and Risky Cases */}
         {safeArray(fullAnalysis.bugsAndRiskyCases).length > 0 && (
           <div className="bg-red-50 p-4 rounded-lg border border-red-200">
             <h3 className="font-semibold text-[#e53935]">🐛 Bugs and Risky Cases</h3>
@@ -601,7 +687,7 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* ===== Edge Cases ===== */}
+        {/* Edge Cases */}
         {safeArray(fullAnalysis.edgeCases).length > 0 && (
           <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
             <h3 className="font-semibold text-[#f57c00]">🧪 Edge Cases</h3>
@@ -618,7 +704,7 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* ===== Performance Analysis ===== */}
+        {/* Performance Analysis */}
         {fullAnalysis.performanceAnalysis && !hasComplexity && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-2">⚡ Performance Analysis</h3>
@@ -648,7 +734,7 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* ===== Security Analysis ===== */}
+        {/* Security Analysis */}
         {fullAnalysis.securityAnalysis && (
           <div className={`p-4 rounded-lg border ${fullAnalysis.securityAnalysis.severity === 'Critical' ? 'bg-red-50 border-red-300' : fullAnalysis.securityAnalysis.severity === 'High' ? 'bg-orange-50 border-orange-300' : fullAnalysis.securityAnalysis.severity === 'Medium' ? 'bg-yellow-50 border-yellow-300' : 'bg-blue-50 border-blue-300'}`}>
             <h3 className="font-semibold text-[#1a1a2e]">🔒 Security Analysis</h3>
@@ -668,7 +754,7 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* ===== Production Readiness ===== */}
+        {/* Production Readiness */}
         {fullAnalysis.productionReadiness && (
           <div className={`p-4 rounded-lg border ${fullAnalysis.productionReadiness.isProductionReady ? 'bg-green-50 border-green-200' : 'bg-orange-50 border-orange-200'}`}>
             <h3 className="font-semibold text-[#1a1a2e]">🛡️ Production Readiness</h3>
@@ -688,7 +774,7 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* ===== Recommended Improvements ===== */}
+        {/* Recommended Improvements */}
         {safeArray(fullAnalysis.recommendedImprovements).length > 0 && !hasRecommendedActions && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-2">🔧 Recommended Improvements</h3>
@@ -706,7 +792,7 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* ===== Improved Code ===== */}
+        {/* Improved Code */}
         {fullAnalysis.improvedCode && fullAnalysis.improvedCode.available && (
           <div className="bg-[#e8f5e9] p-4 rounded-lg border border-green-200">
             <h3 className="font-semibold text-[#43a047] mb-2">✨ Improved Code</h3>
@@ -717,7 +803,7 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* ===== Scorecard ===== */}
+        {/* Scorecard */}
         {hasScorecardNew && scorecardDisplay && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-2">📊 Scorecard</h3>
@@ -739,7 +825,7 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* ===== Verdict ===== */}
+        {/* Verdict */}
         {fullAnalysis.verdict && (
           <div className={`p-4 rounded-lg border ${fullAnalysis.verdict.status === 'approved' || fullAnalysis.verdict.status === 'approved-with-suggestions' ? 'bg-green-50 border-green-200' : 'bg-orange-50 border-orange-200'}`}>
             <h3 className="font-semibold text-[#1a1a2e]">🏁 Verdict</h3>
@@ -750,7 +836,7 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* ===== Limitations ===== */}
+        {/* Limitations */}
         {hasLimitations && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#e53935] mb-2">⚠️ Limitations</h3>
@@ -760,7 +846,7 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* ===== LinkedIn Post ===== */}
+        {/* LinkedIn Post */}
         {hasLinkedInPost && (
           <div className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <h3 className="font-semibold text-[#4a86f7] mb-2">💼 LinkedIn Post</h3>
@@ -768,7 +854,7 @@ export default function AnalysisTab({
           </div>
         )}
 
-        {/* ===== Debug Trace (Development Only) ===== */}
+        {/* Debug Trace */}
         {(fullAnalysis as any).debug_trace && process.env.NODE_ENV === 'development' && (
           <details className="bg-[#f8f9fa] p-4 rounded-lg border border-[#d0d0d8]">
             <summary className="cursor-pointer text-sm font-medium text-[#1a1a2e]">🔍 Debug Trace</summary>
@@ -781,37 +867,16 @@ export default function AnalysisTab({
     );
   }
 
-  // ===== Simple/Medium Mode =====
+  // ============================================================
+  // Simple/Medium Mode
+  // ============================================================
+
   if (!quickAnalysisText) {
     return <div className="text-[#4a4a6a]">No quick analysis available.</div>;
   }
 
-  const cleanedText = cleanMarkdown(quickAnalysisText);
-  const cleanedTextForCopy = cleanTextForCopy(quickAnalysisText);
-
-  const handleCopySimple = async () => {
-    try {
-      await navigator.clipboard.writeText(cleanedTextForCopy);
-      setCopySuccess(true);
-      setTimeout(() => setCopySuccess(false), 2000);
-    } catch (error) {
-      console.error('Copy failed:', error);
-    }
-  };
-
-  const handleDownloadSimple = () => {
-    const blob = new Blob([cleanedTextForCopy], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `analysis-${snippet?.slug || Date.now()}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
   return (
     <div className="space-y-4">
-      {/* ===== Header with Copy & Download Buttons ===== */}
       <div className="flex justify-end items-center gap-3 pb-2 border-b-2 border-[#e8e8f0]">
         <Tooltip text="Copy analysis to clipboard" position="top">
           <button
@@ -838,7 +903,6 @@ export default function AnalysisTab({
         </Tooltip>
       </div>
       
-      {/* ===== Content ===== */}
       <div className="space-y-3">
         <h2 className="text-xl font-bold text-[#1a1a2e]">📊 Quick Analysis</h2>
         <div
@@ -848,4 +912,8 @@ export default function AnalysisTab({
       </div>
     </div>
   );
-}
+});
+
+AnalysisTab.displayName = 'AnalysisTab';
+
+export default AnalysisTab;

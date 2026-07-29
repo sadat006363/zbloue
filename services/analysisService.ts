@@ -7,20 +7,29 @@ interface GenerateOptions {
   language: string;
   mode: AnalysisMode;
   signal?: AbortSignal;
+  csrfToken?: string;
 }
 
 export const analysisService = {
   /**
    * Generate code analysis with increased timeout (120 seconds)
    */
-  async generate({ code, language, mode, signal }: GenerateOptions): Promise<LegacyGenerateResponse> {
+  async generate({ code, language, mode, signal, csrfToken }: GenerateOptions): Promise<LegacyGenerateResponse> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 120000);
 
     try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+
+      if (csrfToken) {
+        headers['x-csrf-token'] = csrfToken;
+      }
+
       const response = await fetch('/api/generate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ code, language, mode }),
         signal: signal || controller.signal,
       });
@@ -40,7 +49,6 @@ export const analysisService = {
 
   /**
    * Generate line-by-line explanations
-   * 🔥 پارامتر mode اضافه شد (3 آرگومان)
    */
   async explainLineByLine(code: string, language: string, mode: AnalysisMode): Promise<LineExplanation[]> {
     const response = await fetch('/api/explain-line-by-line', {
@@ -58,7 +66,6 @@ export const analysisService = {
 
   /**
    * Generate prompt from code
-   * 🔥 پارامتر mode اضافه شد (3 آرگومان)
    */
   async generatePrompt(code: string, language: string, mode: AnalysisMode): Promise<string> {
     const response = await fetch('/api/generate-prompt', {
