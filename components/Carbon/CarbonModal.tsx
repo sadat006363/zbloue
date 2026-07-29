@@ -32,11 +32,11 @@ export function CarbonModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-[85vw] h-[85vh] bg-[#0f0f14] rounded-2xl shadow-2xl overflow-hidden border border-[#313244]"
+        className="relative w-full max-w-[70vw] max-h-[80vh] bg-[#0f0f14] rounded-2xl shadow-2xl overflow-hidden border border-[#313244]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close Button */}
@@ -50,8 +50,8 @@ export function CarbonModal({
           </svg>
         </button>
 
-        {/* Carbon Editor */}
-        <div className="w-full h-full p-4">
+        {/* Carbon Editor - با padding کمتر برای فضای کوچکتر */}
+        <div className="w-full h-full p-3">
           <CarbonTab initialCode={initialCode} initialLanguage={initialLanguage} />
         </div>
       </div>
