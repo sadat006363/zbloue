@@ -27,6 +27,7 @@ import LineByLineTab from './tabs/LineByLineTab';
 import PromptTab from './tabs/PromptTab';
 import AllOutputsTab from './tabs/AllOutputsTab';
 import MonitoringTab from './tabs/MonitoringTab';
+import { CarbonModal } from '@/components/Carbon/CarbonModal';
 import { useAppContext } from '@/context';
 
 export interface OutputPanelProps {
@@ -47,7 +48,8 @@ export type TabType =
   | 'line-by-line'
   | 'prompt'
   | 'all-outputs'
-  | 'monitoring';
+  | 'monitoring'
+  | 'carbon';
 
 const safeString = (value: unknown): string => {
   if (value === null || value === undefined) return '';
@@ -93,7 +95,7 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
     const isAdvanced = mode === 'advanced';
 
     // ============================================================
-    // 🔥 استخراج فیلدها از audit_result به‌صورت مستقیم
+    // استخراج فیلدها از audit_result
     // ============================================================
     const audit = useMemo(() => snippet?.audit_result || null, [snippet]);
 
@@ -129,6 +131,8 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
 
     const [localAvatarUrl, setLocalAvatarUrl] = useState<string | null>(contextAvatarUrl || null);
     const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+
+    const [isCarbonModalOpen, setIsCarbonModalOpen] = useState(false);
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://Zbloue.vercel.app';
 
@@ -749,7 +753,34 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
           {activeTab === 'monitoring' && (
             <MonitoringTab />
           )}
+
+          {activeTab === 'carbon' && (
+            <div className="flex flex-col items-center justify-center h-full p-8 space-y-4 text-center">
+              <h2 className="text-3xl font-bold text-white">🎨 Carbon</h2>
+              <p className="text-[#a6adc8] max-w-md">
+                Create beautiful, customizable code snapshots with syntax highlighting.
+                Choose your theme, background, font, and more.
+              </p>
+              <button
+                onClick={() => setIsCarbonModalOpen(true)}
+                className="px-6 py-3 bg-gradient-to-r from-[#4a86f7] to-[#a855f7] text-white rounded-lg hover:opacity-90 transition font-medium"
+              >
+                Open Carbon Editor
+              </button>
+              <p className="text-xs text-[#6c7086]">
+                Your current code will be pre-loaded into the editor.
+              </p>
+            </div>
+          )}
         </div>
+
+        {/* 🔥 مودال Carbon */}
+        <CarbonModal
+          isOpen={isCarbonModalOpen}
+          onClose={() => setIsCarbonModalOpen(false)}
+          initialCode={snippet.raw_code || ''}
+          initialLanguage={snippet.language || 'javascript'}
+        />
       </div>
     );
   }

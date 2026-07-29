@@ -1,7 +1,6 @@
 // components/OutputPanel/OutputPanelHeader.tsx
 'use client';
 
-import { useRouter } from 'next/navigation';
 import Tooltip from '../common/Tooltip';
 
 export type TabType =
@@ -12,7 +11,8 @@ export type TabType =
   | 'line-by-line'
   | 'prompt'
   | 'all-outputs'
-  | 'monitoring';
+  | 'monitoring'
+  | 'carbon';
 
 interface OutputPanelHeaderProps {
   activeTab: TabType;
@@ -20,22 +20,66 @@ interface OutputPanelHeaderProps {
 }
 
 const tabs: { id: TabType; label: string; icon: string; tooltip: string }[] = [
-  { id: 'explanation', label: 'Explanation', icon: '📖', tooltip: 'High-level explanation of the code' },
-  { id: 'linkedin', label: 'LinkedIn', icon: '💼', tooltip: 'Ready-to-share LinkedIn post' },
-  { id: 'preview', label: 'Card', icon: '🖼️', tooltip: 'Shareable card preview' },
-  { id: 'analysis', label: 'Analysis', icon: '📊', tooltip: 'Detailed code analysis with findings' },
-  { id: 'line-by-line', label: 'Line by Line', icon: '📝', tooltip: 'Line-by-line code explanation' },
-  { id: 'prompt', label: 'Prompt', icon: '📝', tooltip: 'Generated learning prompt' },
-  { id: 'all-outputs', label: 'All Outputs', icon: '📊', tooltip: 'All outputs in one page' },
-  { id: 'monitoring', label: 'Monitoring', icon: '📊', tooltip: 'System metrics and monitoring dashboard' },
+  {
+    id: 'explanation',
+    label: 'Explanation',
+    icon: '📖',
+    tooltip: 'High-level explanation of the code',
+  },
+  {
+    id: 'linkedin',
+    label: 'LinkedIn',
+    icon: '💼',
+    tooltip: 'Ready-to-share LinkedIn post',
+  },
+  {
+    id: 'preview',
+    label: 'Card',
+    icon: '🖼️',
+    tooltip: 'Shareable card preview',
+  },
+  {
+    id: 'analysis',
+    label: 'Analysis',
+    icon: '📊',
+    tooltip: 'Detailed code analysis with findings',
+  },
+  {
+    id: 'line-by-line',
+    label: 'Line by Line',
+    icon: '📝',
+    tooltip: 'Line-by-line code explanation',
+  },
+  {
+    id: 'prompt',
+    label: 'Prompt',
+    icon: '📝',
+    tooltip: 'Generated learning prompt',
+  },
+  {
+    id: 'all-outputs',
+    label: 'All Outputs',
+    icon: '📊',
+    tooltip: 'All outputs in one page',
+  },
+  {
+    id: 'monitoring',
+    label: 'Monitoring',
+    icon: '📊',
+    tooltip: 'System metrics and monitoring dashboard',
+  },
+  {
+    id: 'carbon',
+    label: 'Carbon',
+    icon: '🎨',
+    tooltip: 'Create beautiful code snapshots',
+  },
 ];
 
 export default function OutputPanelHeader({
   activeTab,
   setActiveTab,
 }: OutputPanelHeaderProps) {
-  const router = useRouter();
-
   return (
     <div className="flex items-center border-b-2 border-[#d0d0d8] flex-wrap bg-[#f1f3f5] px-2">
       <div className="flex flex-wrap">
@@ -54,16 +98,6 @@ export default function OutputPanelHeader({
           </Tooltip>
         ))}
       </div>
-
-      {/* 🔥 دکمه Carbon - جدا از تب‌ها */}
-      <Tooltip text="باز کردن Carbon (ساخت تصویر از کد)" position="top">
-        <button
-          onClick={() => router.push('/carbon')}
-          className="ml-2 px-4 py-3 text-sm font-medium transition text-[#4a4a6a] hover:text-[#1a1a2e] bg-gradient-to-r from-[#4a86f7]/10 to-[#a855f7]/10 hover:from-[#4a86f7]/20 hover:to-[#a855f7]/20 rounded-md"
-        >
-          🎨 Carbon
-        </button>
-      </Tooltip>
     </div>
   );
 }
