@@ -27,7 +27,7 @@ import LineByLineTab from './tabs/LineByLineTab';
 import PromptTab from './tabs/PromptTab';
 import AllOutputsTab from './tabs/AllOutputsTab';
 import MonitoringTab from './tabs/MonitoringTab';
-import { CarbonModal } from '@/components/Carbon/CarbonModal';
+import { CarbonTab } from '@/components/Carbon/CarbonTab';
 import { useAppContext } from '@/context';
 
 export interface OutputPanelProps {
@@ -48,7 +48,8 @@ export type TabType =
   | 'line-by-line'
   | 'prompt'
   | 'all-outputs'
-  | 'monitoring';
+  | 'monitoring'
+  | 'carbon';
 
 const safeString = (value: unknown): string => {
   if (value === null || value === undefined) return '';
@@ -130,8 +131,6 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
 
     const [localAvatarUrl, setLocalAvatarUrl] = useState<string | null>(contextAvatarUrl || null);
     const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
-
-    const [isCarbonModalOpen, setIsCarbonModalOpen] = useState(false);
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://Zbloue.vercel.app';
 
@@ -653,11 +652,7 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
           />
         </div>
 
-        <OutputPanelHeader
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          onOpenCarbon={() => setIsCarbonModalOpen(true)}
-        />
+        <OutputPanelHeader activeTab={activeTab} setActiveTab={setActiveTab} />
 
         <div className="flex-1 p-4 md:p-6 overflow-y-auto max-h-[calc(100vh-200px)] text-[#1a1a2e]">
           {activeTab === 'explanation' && (
@@ -756,15 +751,16 @@ const OutputPanel = forwardRef<{ setActiveTab: (tab: TabType) => void }, OutputP
           {activeTab === 'monitoring' && (
             <MonitoringTab />
           )}
-        </div>
 
-        {/* 🔥 مودال Carbon */}
-        <CarbonModal
-          isOpen={isCarbonModalOpen}
-          onClose={() => setIsCarbonModalOpen(false)}
-          initialCode={snippet.raw_code || ''}
-          initialLanguage={snippet.language || 'javascript'}
-        />
+          {activeTab === 'carbon' && (
+            <div className="h-full">
+              <CarbonTab
+                initialCode={snippet.raw_code || ''}
+                initialLanguage={snippet.language || 'javascript'}
+              />
+            </div>
+          )}
+        </div>
       </div>
     );
   }
