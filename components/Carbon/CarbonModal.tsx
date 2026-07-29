@@ -36,7 +36,7 @@ export function CarbonModal({
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-[95vw] h-[90vh] bg-[#0f0f14] rounded-2xl shadow-2xl overflow-hidden border border-[#313244]"
+        className="relative w-full max-w-[85vw] h-[85vh] bg-[#0f0f14] rounded-2xl shadow-2xl overflow-hidden border border-[#313244]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close Button */}
