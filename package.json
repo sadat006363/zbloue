@@ -45,6 +45,7 @@
     "qrcode": "^1.5.4",
     "react": "^19.2.7",
     "react-color": "^2.19.3",
+    "react-colorful": "^5.8.0",
     "react-dom": "^19.2.7",
     "react-dropzone": "^17.0.0",
     "resvg": "^1.6.4",
